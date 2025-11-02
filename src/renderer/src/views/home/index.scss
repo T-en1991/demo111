@@ -1,0 +1,67 @@
+.home {
+  padding: 24px;
+}
+.hero {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+  .brand-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #42d392, #647eff);
+    box-shadow: 0 0 20px #647eff77;
+  }
+  h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+  }
+  .sub {
+    color: var(--ev-c-text-2);
+    font-size: 13px;
+  }
+}
+
+.menu {
+  .menu-item {
+    position: relative;
+    padding: 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
+    h3 {
+      margin: 0 0 4px 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+    p {
+      margin: 0 0 12px 0;
+      color: var(--ev-c-text-2);
+      font-size: 13px;
+    }
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+    }
+  }
+
+  .menu-item.screen {
+    background: linear-gradient(135deg, #1f2230, #25293a);
+  }
+  .menu-item.fish {
+    background: linear-gradient(135deg, #1f3030, #253a2b);
+  }
+  .menu-item.alerts {
+    background: linear-gradient(135deg, #302626, #3a2c2c);
+  }
+  .menu-item.logs {
+    background: linear-gradient(135deg, #263032, #2c3a3a);
+  }
+}
+
+/* 通用卡片样式供 Home 页模块复用 */

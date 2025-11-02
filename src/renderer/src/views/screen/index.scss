@@ -1,0 +1,293 @@
+.screen {
+  height: calc(100vh - 48px);
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  height: 100%;
+}
+
+.map-panel {
+  background: linear-gradient(135deg, #1f2230, #25293a);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  height: 100%;
+}
+
+.bmap {
+  width: 100%;
+  height: 100%;
+}
+
+.side-panel {
+  /* 移除外层大框视觉，改为透明容器 */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  height: 100%;
+  /* 纵向布局：顶部基本信息 + 中部报警占剩余高度 + 底部控制台 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .desc {
+    color: var(--ev-c-text-2);
+    font-size: 13px;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(145deg, rgba(40,45,60,0.9), rgba(32,36,50,0.9));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .panel-header.single-select {
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  }
+  .panel-header .title-block .title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .panel-header .title-block .subtitle {
+    font-size: 12px;
+    color: #9fb2ff;
+    margin-top: 4px;
+  }
+  .robot-select {
+    width: 100%;
+    min-width: 220px;
+  }
+  .robot-select :deep(.el-input__wrapper) {
+    height: 44px;
+    border-radius: 12px;
+    padding: 0 14px;
+    background: linear-gradient(135deg, rgba(30,34,50,0.95), rgba(26,29,44,0.95));
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow:
+      0 10px 28px rgba(0,0,0,0.45),
+      inset 0 0 10px rgba(100,126,255,0.18);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .robot-select :deep(.el-input__wrapper:hover) {
+    border-color: #647eff;
+    box-shadow:
+      0 0 0 3px #647eff33,
+      inset 0 0 10px rgba(100,126,255,0.22);
+  }
+  .robot-select :deep(.el-input__inner),
+  .robot-select :deep(.el-select__placeholder) {
+    font-size: 15px;
+    color: #e7ebff;
+  }
+  .robot-select :deep(.el-select__caret) {
+    color: #9fb2ff;
+  }
+  /* 通用区块卡片样式 */
+  .panel-card {
+    background: linear-gradient(135deg, #1f2130, #25273a);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+  }
+  /* 报警信息卡片占据剩余高度，内部列表滚动 */
+  .panel-card.alerts-card {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* 允许子元素正确溢出滚动 */
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e7ebff;
+    margin: 2px 0 10px 2px;
+  }
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .stat-card {
+    background: linear-gradient(145deg, rgba(40,45,60,0.9), rgba(32,36,50,0.9));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .stat-card .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .stat-card .stat-label {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #9fb2ff;
+  }
+  .stat-card.signal .stat-value {
+    display: flex;
+    align-items: center;
+  }
+  .sig { font-weight: 700; }
+  .s-strong { color: #ff4d4f; }
+  .s-medium { color: #f59e0b; }
+  .s-weak { color: #3b82f6; }
+
+  .alerts-section {
+    margin-top: 14px;
+  }
+  .alerts-header {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e7ebff;
+    margin: 4px 0 10px 0;
+  }
+  .alerts-list {
+    display: grid;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 6px;
+    grid-auto-rows: 56px; /* 每条固定高度 */
+  }
+  .alerts-list::-webkit-scrollbar { width: 6px; }
+  .alerts-list::-webkit-scrollbar-thumb {
+    background: rgba(100,126,255,0.45);
+    border-radius: 999px;
+  }
+  .alerts-list::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.08);
+    border-radius: 999px;
+  }
+  .alert-card {
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, rgba(40,45,60,0.9), rgba(32,36,50,0.9));
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    height: 56px; /* 固定高度与 grid-auto-rows 对齐 */
+    box-sizing: border-box;
+  }
+  .alert-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(100,126,255,0.35);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.42);
+  }
+  .alert-index {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .alert-index span {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.22);
+    color: #9fb2ff;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .alert-main {
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* 文本在固定高度内垂直居中 */
+    min-width: 0; /* 让省略号生效 */
+  }
+  .alert-main .alert-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 3px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .alert-main .alert-sub {
+    font-size: 11px;
+    color: #9fb2ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .alert-level {
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .alert-level.lv-high { color: #ff4d4f; border-color: #ff4d4f55; background: #2a1f24; }
+  .alert-level.lv-mid { color: #f59e0b; border-color: #f59e0b55; background: #2a2620; }
+  .alert-level.lv-low { color: #3b82f6; border-color: #3b82f655; background: #1f2430; }
+
+  .console-section { margin-top: 16px; }
+  .console-header {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e7ebff;
+    margin: 4px 0 10px 0;
+  }
+  .console-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .ctrl-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60px;
+    border-radius: 12px;
+    background: linear-gradient(145deg, rgba(48,51,66,0.95), rgba(36,39,54,0.95));
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  }
+  .ctrl-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(100,126,255,0.35);
+    box-shadow: 0 14px 32px rgba(0,0,0,0.5);
+  }
+  .ctrl-btn .icon {
+    margin-right: 8px;
+    font-size: 18px;
+    color: #9fb2ff;
+  }
+  .ctrl-btn .text {
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+}

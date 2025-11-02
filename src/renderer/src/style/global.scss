@@ -1,0 +1,11 @@
+@import './base.css';
+
+$brand: #647eff;
+
+body {
+  // 调整背景与字体，示例变量使用
+  color: var(--color-text);
+  a {
+    color: $brand;
+  }
+}
