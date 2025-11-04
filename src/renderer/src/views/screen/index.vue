@@ -5,6 +5,8 @@ import { loadBMapGL } from '../../utils/baiduMap'
 import { loadOfflineBMap } from '../../utils/offlineBMap'
 
 const AK = 'iWyOxtxr32YCdQBu9yYeICmRKBb6Jm1h'
+// 使用项目静态资源作为标注图标
+const fishIconUrl = new URL('../../assets/images/fish.svg', import.meta.url).href
 
 // 最小类型定义，覆盖当前使用到的构造与方法，避免使用 any
 type BMapLikeMap = {
@@ -13,6 +15,7 @@ type BMapLikeMap = {
   addControl: (control: unknown) => void
   addEventListener: (name: string, handler: (e: { point: { lng: number; lat: number } }) => void) => void
   addOverlay: (overlay: unknown) => void
+  setMapType?: (type: unknown) => void
 }
 
 interface BMap2DApi {
@@ -20,7 +23,9 @@ interface BMap2DApi {
   Point: new (lng: number, lat: number) => unknown
   NavigationControl: new () => unknown
   ScaleControl: new () => unknown
-  Marker: new (point: unknown) => unknown
+  Marker: new (point: unknown, opts?: unknown) => unknown
+  Icon: new (url: string, size?: unknown, opts?: unknown) => unknown
+  Size: new (w: number, h: number) => unknown
 }
 
 type SignalLevel = 'strong' | 'medium' | 'weak'
@@ -151,7 +156,27 @@ function focusAlert(a: AlertItem): void {
   if (!BMap || !mapInstance) return
   const point = new BMap.Point(a.lng, a.lat)
   mapInstance.centerAndZoom(point, 14)
-  const marker = new BMap.Marker(point)
+  // 使用鱼形 SVG 图标作为报警标注，匹配原图 64x64 并居中锚点
+  const icon = new BMap.Icon(
+    fishIconUrl,
+    new BMap.Size(32, 32),
+    { imageSize: new BMap.Size(32, 32), anchor: new BMap.Size(16, 16) }
+  )
+  const marker = new BMap.Marker(point, { icon })
+  mapInstance.addOverlay(marker)
+}
+
+// 使用 fish.svg 作为标注图标，默认 32x32，居中锚点，避免裁切与偏移
+function addSvgMarker(lng: number, lat: number, size = 32): void {
+  const BMap = getBMap()
+  if (!BMap || !mapInstance) return
+  const point = new BMap.Point(lng, lat)
+  const icon = new BMap.Icon(
+    fishIconUrl,
+    new BMap.Size(size, size),
+    { imageSize: new BMap.Size(size, size), anchor: new BMap.Size(Math.round(size / 2), Math.round(size / 2)) }
+  )
+  const marker = new BMap.Marker(point, { icon })
   mapInstance.addOverlay(marker)
 }
 
@@ -182,12 +207,17 @@ onMounted(async () => {
       map.enableScrollWheelZoom(true)
       map.addControl(new BMap.NavigationControl())
       map.addControl(new BMap.ScaleControl())
-
+      // 设置地图类型为卫星：从 window 读取运行时常量，方法存在时再调用
+      const satType = (window as unknown as { BMAP_SATELLITE_MAP?: unknown }).BMAP_SATELLITE_MAP
+      if (satType && typeof map.setMapType === 'function') {
+        map.setMapType(satType)
+      }
+      // 初始位置添加鱼形 SVG 标注（调整为 32x32）
+      addSvgMarker(start.lng, start.lat, 32)
       // 支持点击标注，并提示经纬度
       map.addEventListener('click', (e: { point: { lng: number; lat: number } }) => {
         const pt = e.point
-        const marker = new BMap.Marker(new BMap.Point(pt.lng, pt.lat))
-        map.addOverlay(marker)
+        addSvgMarker(pt.lng, pt.lat, 32)
         if (current.value) {
           current.value.lng = pt.lng
           current.value.lat = pt.lat
