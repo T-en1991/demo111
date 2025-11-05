@@ -12,8 +12,19 @@ declare global {
   interface Window {
     // 与 preload/index.d.ts 的声明保持一致，避免类型合并冲突
     electron: import('@electron-toolkit/preload').ElectronAPI
-    // 与 preload/index.d.ts 保持一致的宽松类型
-    api: unknown
+    // 与 preload/index.d.ts 保持一致的类型定义，避免 renderer 中访问 window.api 时为 unknown
+    api: {
+      quitApp(): void
+      fish: {
+        findAll(): Promise<any[]>
+        findById(id: number): Promise<any | null>
+        search(query: { name?: string; type?: string; status?: 'running' | 'stopped' }): Promise<any[]>
+        create(data: { name: string; type: string; status?: 'running' | 'stopped'; ip?: string | null; port?: number | null }): Promise<any>
+        update(id: number, data: { name?: string; type?: string; status?: 'running' | 'stopped'; ip?: string | null; port?: number | null }): Promise<any>
+        delete(id: number): Promise<any>
+        deleteMany(ids: number[]): Promise<any>
+      }
+    }
     // 百度地图 WebGL 全局对象挂载到 window
     BMapGL?: unknown
     // 百度地图 2D 版本全局对象备用
