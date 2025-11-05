@@ -18,6 +18,8 @@ CREATE TABLE "fish" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL,
+    "ip" TEXT,
+    "port" INTEGER,
     "status" TEXT NOT NULL DEFAULT 'running',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
@@ -31,12 +33,13 @@ CREATE TABLE "alerts" (
     "level" TEXT NOT NULL DEFAULT 'info',
     "type" TEXT,
     "source" TEXT,
+    "imgFile" TEXT,
+    "lat" REAL,
+    "lon" REAL,
+    "fishId" INTEGER,
     "status" TEXT NOT NULL DEFAULT 'active',
-    "userId" INTEGER,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    "resolvedAt" DATETIME,
-    CONSTRAINT "alerts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "alerts_fishId_fkey" FOREIGN KEY ("fishId") REFERENCES "fish" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 PRAGMA foreign_keys=on;
