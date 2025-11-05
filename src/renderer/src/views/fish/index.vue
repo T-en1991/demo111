@@ -7,6 +7,8 @@ interface Fish {
   id: number
   name: string
   type: string
+  ip?: string
+  port?: number
   status: FishStatus
   createdAt: string
   updatedAt: string
@@ -84,7 +86,7 @@ function onPageChange(p: number): void {
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
-const form = reactive<Fish>({ id: 0, name: '', type: 'A-型', status: 'running', createdAt: '', updatedAt: '' })
+const form = reactive<Fish>({ id: 0, name: '', type: 'A-型', ip: '', port: 9200, status: 'running', createdAt: '', updatedAt: '' })
 
 function openCreate(): void {
   isEdit.value = false
@@ -109,17 +111,21 @@ async function save(): Promise<void> {
     if (isEdit.value) {
       // 更新机器鱼
       await (window as any).api.fish.update(form.id, {
-        name: form.name,
-        type: form.type,
-        status: form.status
+          name: form.name,
+          type: form.type,
+          status: form.status,
+          ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
+          port: form.port && form.port > 0 ? form.port : undefined
       })
       ElMessage.success('已更新机器鱼')
     } else {
       // 创建机器鱼
       await (window as any).api.fish.create({
-        name: form.name,
-        type: form.type,
-        status: form.status
+          name: form.name,
+          type: form.type,
+          status: form.status,
+          ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
+          port: form.port && form.port > 0 ? form.port : undefined
       })
       ElMessage.success('已新增机器鱼')
     }
@@ -218,6 +224,8 @@ function formatDate(input?: string | Date | null): string {
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="名称" min-width="160" />
         <el-table-column prop="type" label="类型" width="120" />
+  <el-table-column prop="ip" label="IP" width="140" />
+  <el-table-column prop="port" label="端口" width="100" />
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
             <el-tag :type="row.status === 'running' ? 'success' : 'info'">
@@ -255,6 +263,12 @@ function formatDate(input?: string | Date | null): string {
             <el-option label="B-型" value="B-型" />
             <el-option label="C-型" value="C-型" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="IP">
+          <el-input v-model="form.ip" placeholder="绑定 IP (可选)" />
+        </el-form-item>
+        <el-form-item label="端口">
+          <el-input-number v-model="form.port" :min="0" :max="65535" />
         </el-form-item>
         <el-form-item label="状态">
           <el-radio-group v-model="form.status">

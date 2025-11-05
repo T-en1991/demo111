@@ -43,6 +43,8 @@ export function registerDatabaseIpc(): void {
     name: string;
     type: string;
     status?: 'running' | 'stopped';
+    ip?: string;
+    port?: number;
   }) => {
     try {
       return await fishService.create(data)
@@ -57,6 +59,8 @@ export function registerDatabaseIpc(): void {
     name?: string;
     type?: string;
     status?: 'running' | 'stopped';
+    ip?: string | null;
+    port?: number | null;
   }) => {
     try {
       return await fishService.update(id, data)

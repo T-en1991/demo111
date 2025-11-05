@@ -2,11 +2,15 @@ import { app, BrowserWindow } from 'electron'
 import { setupApp } from './app'
 import { createMainWindow } from './windows/mainWindow'
 import { registerIpc } from './ipc'
+import { startListenersForAllFish } from './network/tcpManager'
+import logger from './logger'
 async function bootstrap(): Promise<void> {
   await setupApp()
   // Create main window and register IPC handlers
   createMainWindow()
   registerIpc()
+  // Start TCP listeners for fish that have ip/port configured
+  startListenersForAllFish().catch((err) => logger.error('Failed to start fish listeners:', err))
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

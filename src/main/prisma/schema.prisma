@@ -14,7 +14,6 @@ model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String?
-  alerts    Alert[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -25,6 +24,9 @@ model Fish {
   id        Int        @id @default(autoincrement())
   name      String
   type      String
+  ip        String?    // optional IP to bind for this fish (e.g. "0.0.0.0")
+  port      Int?       // optional port to bind for this fish
+  alerts    Alert[]
   status    FishStatus @default(running)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -39,12 +41,14 @@ model Alert {
   level       AlertLevel @default(info)
   type        String?
   source      String?
+  imgFile     String?
+  lat         Float?
+  lon         Float?
+  fishId      Int?
+  fish        Fish?     @relation(fields: [fishId], references: [id], onDelete: SetNull)
   status      AlertStatus @default(active)
-  userId      Int?
-  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  resolvedAt  DateTime?
+  
 
   @@map("alerts")
 }

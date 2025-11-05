@@ -4,6 +4,8 @@ import { getMainWindow } from './windows/mainWindow'
 import { connectDatabase, disconnectDatabase } from './database'
 import logger from './logger'
 
+import { stopAllListeners } from './network/tcpManager'
+
 
 export async function setupApp(): Promise<void> {
   // Check for single instance lock
@@ -47,7 +49,16 @@ export async function setupApp(): Promise<void> {
     }
   })
 
-    app.on('before-quit', async () => {
+  // Start UDP listener if configured
+
+
+  app.on('before-quit', async () => {
+
+    try {
+      await stopAllListeners()
+    } catch (e) {
+      logger.error('Error stopping TCP listeners:', e)
+    }
     await disconnectDatabase()
   })
 }

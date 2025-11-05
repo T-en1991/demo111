@@ -35,31 +35,17 @@ export const userService = {
 
   // 获取所有用户
   async findAll(): Promise<any[]> {
-    return prisma.user.findMany({
-      include: {
-        alerts: true
-      }
-    })
+    return prisma.user.findMany()
   },
 
   // 根据ID查找用户
   async findById(id: number): Promise<any | null> {
-    return prisma.user.findUnique({
-      where: { id },
-      include: {
-        alerts: true
-      }
-    })
+    return prisma.user.findUnique({ where: { id } })
   },
 
   // 根据邮箱查找用户
   async findByEmail(email: string): Promise<any | null> {
-    return prisma.user.findUnique({
-      where: { email },
-      include: {
-        alerts: true
-      }
-    })
+    return prisma.user.findUnique({ where: { email } })
   },
 
   // 更新用户
@@ -88,7 +74,10 @@ export const alertService = {
     type?: string;
     source?: string;
     status?: 'active' | 'resolved' | 'acknowledged';
-    userId?: number;
+    fishId?: number | null;
+    imgFile?: string | null;
+    lat?: number | null;
+    lon?: number | null;
   }): Promise<any> {
     return prisma.alert.create({ data })
   },
@@ -96,9 +85,6 @@ export const alertService = {
   // 获取所有告警
   async findAll(): Promise<any[]> {
     return prisma.alert.findMany({
-      include: {
-        user: true
-      },
       orderBy: {
         createdAt: 'desc'
       }
@@ -109,9 +95,6 @@ export const alertService = {
   async findActive(): Promise<any[]> {
     return prisma.alert.findMany({
       where: { status: 'active' },
-      include: {
-        user: true
-      },
       orderBy: {
         createdAt: 'desc'
       }
@@ -122,9 +105,6 @@ export const alertService = {
   async findByLevel(level: 'info' | 'warning' | 'error' | 'critical'): Promise<any[]> {
     return prisma.alert.findMany({
       where: { level },
-      include: {
-        user: true
-      },
       orderBy: {
         createdAt: 'desc'
       }
@@ -134,10 +114,7 @@ export const alertService = {
   // 根据ID查找告警
   async findById(id: number): Promise<any | null> {
     return prisma.alert.findUnique({
-      where: { id },
-      include: {
-        user: true
-      }
+      where: { id }
     })
   },
 
@@ -149,7 +126,6 @@ export const alertService = {
     type?: string;
     source?: string;
     status?: 'active' | 'resolved' | 'acknowledged';
-    resolvedAt?: Date;
   }): Promise<any> {
     return prisma.alert.update({
       where: { id },
@@ -162,8 +138,7 @@ export const alertService = {
     return prisma.alert.update({
       where: { id },
       data: {
-        status: 'resolved',
-        resolvedAt: new Date()
+        status: 'resolved'
       }
     })
   },
@@ -200,6 +175,8 @@ export const fishService = {
     name: string;
     type: string;
     status?: 'running' | 'stopped';
+    ip?: string | null;
+    port?: number | null;
   }): Promise<any> {
     return prisma.fish.create({ data })
   },
@@ -276,6 +253,8 @@ export const fishService = {
     name?: string;
     type?: string;
     status?: 'running' | 'stopped';
+    ip?: string | null;
+    port?: number | null;
   }): Promise<any> {
     return prisma.fish.update({
       where: { id },
