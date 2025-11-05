@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/.483f97bd35aa5726ada2be02ecff4d7d4c4f435c-audit.json",
+    "files": [
+        {
+            "date": 1762354084405,
+            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-05.log",
+            "hash": "23eb2e15a44abd4bab8fce9bb49f043e28b293bbab1f5fac2c44a789daa8ff0a"
+        }
+    ],
+    "hashType": "sha256"
+}
