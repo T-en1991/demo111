@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 
 type FishStatus = 'running' | 'stopped'
@@ -9,17 +9,12 @@ interface Fish {
   type: string
   status: FishStatus
   createdAt: string
+  updatedAt: string
 }
 
-// 模拟数据
-const allFish = ref<Fish[]>([
-  { id: 1, name: '蓝鲨-01', type: 'A-型', status: 'running', createdAt: '2025-10-01' },
-  { id: 2, name: '蓝鲨-02', type: 'B-型', status: 'stopped', createdAt: '2025-10-02' },
-  { id: 3, name: '深海-03', type: 'A-型', status: 'running', createdAt: '2025-10-05' },
-  { id: 4, name: '巡航-04', type: 'C-型', status: 'stopped', createdAt: '2025-10-06' },
-  { id: 5, name: '侦察-05', type: 'B-型', status: 'running', createdAt: '2025-10-10' },
-  { id: 6, name: '蓝鲨-06', type: 'A-型', status: 'running', createdAt: '2025-10-12' }
-])
+// 响应式数据
+const allFish = ref<Fish[]>([])
+const loading = ref(false)
 
 // 搜索条件
 const query = reactive({
@@ -32,6 +27,29 @@ function resetQuery(): void {
   query.name = ''
   query.type = ''
   query.status = ''
+  loadFish()
+}
+
+// 加载机器鱼数据
+async function loadFish(): Promise<void> {
+  loading.value = true
+  try {
+    // 如果有搜索条件，使用搜索API，否则获取所有数据
+    if (query.name || query.type || query.status) {
+      const searchQuery: any = {}
+      if (query.name) searchQuery.name = query.name.trim()
+      if (query.type) searchQuery.type = query.type
+      if (query.status) searchQuery.status = query.status
+      allFish.value = await window.api.fish.search(searchQuery)
+    } else {
+      allFish.value = await window.api.fish.findAll()
+    }
+  } catch (error) {
+    console.error('加载机器鱼失败:', error)
+    ElMessage.error('加载数据失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 过滤后的数据
@@ -65,11 +83,12 @@ function onPageChange(p: number): void {
 // 新增 / 编辑
 const dialogVisible = ref(false)
 const isEdit = ref(false)
-const form = reactive<Fish>({ id: 0, name: '', type: 'A-型', status: 'running', createdAt: '' })
+const saving = ref(false)
+const form = reactive<Fish>({ id: 0, name: '', type: 'A-型', status: 'running', createdAt: '', updatedAt: '' })
 
 function openCreate(): void {
   isEdit.value = false
-  Object.assign(form, { id: 0, name: '', type: 'A-型', status: 'running', createdAt: '' })
+  Object.assign(form, { id: 0, name: '', type: 'A-型', status: 'running', createdAt: '', updatedAt: '' })
   dialogVisible.value = true
 }
 
@@ -79,35 +98,82 @@ function openEdit(row: Fish): void {
   dialogVisible.value = true
 }
 
-function save(): void {
+async function save(): Promise<void> {
   if (!form.name.trim()) {
     ElMessage.error('请填写名称')
     return
   }
-  if (isEdit.value) {
-    const idx = allFish.value.findIndex((f) => f.id === form.id)
-    if (idx >= 0) allFish.value[idx] = { ...form }
-    ElMessage.success('已更新机器鱼')
-  } else {
-    const maxId = Math.max(0, ...allFish.value.map((f) => f.id))
-    const createdAt = new Date().toISOString().slice(0, 10)
-    allFish.value.unshift({ ...form, id: maxId + 1, createdAt })
-    ElMessage.success('已新增机器鱼')
+
+  saving.value = true
+  try {
+    if (isEdit.value) {
+      // 更新机器鱼
+      await (window as any).api.fish.update(form.id, {
+        name: form.name,
+        type: form.type,
+        status: form.status
+      })
+      ElMessage.success('已更新机器鱼')
+    } else {
+      // 创建机器鱼
+      await (window as any).api.fish.create({
+        name: form.name,
+        type: form.type,
+        status: form.status
+      })
+      ElMessage.success('已新增机器鱼')
+    }
+
+    dialogVisible.value = false
+    await loadFish() // 重新加载数据
+  } catch (error) {
+    console.error('保存失败:', error)
+    ElMessage.error('保存失败')
+  } finally {
+    saving.value = false
   }
-  dialogVisible.value = false
 }
 
-function remove(row: Fish): void {
-  ElMessageBox.confirm(`确认删除 ${row.name} 吗？`, '提示', { type: 'warning' })
-    .then(() => {
-      allFish.value = allFish.value.filter((f) => f.id !== row.id)
-      ElMessage.success('已删除')
-    })
-    .catch(() => {})
+async function remove(row: Fish): Promise<void> {
+  try {
+    await ElMessageBox.confirm(`确认删除 ${row.name} 吗？`, '提示', { type: 'warning' })
+
+    await (window as any).api.fish.delete(row.id)
+    ElMessage.success('已删除')
+    await loadFish() // 重新加载数据
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 function closeDialog(): void {
   dialogVisible.value = false
+}
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadFish()
+})
+
+// 格式化日期为 yyyy-MM-dd HH:mm:ss
+function pad(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`
+}
+
+function formatDate(input?: string | Date | null): string {
+  if (!input) return ''
+  const d = typeof input === 'string' ? new Date(input) : new Date(input)
+  if (Number.isNaN(d.getTime())) return ''
+  const yyyy = d.getFullYear()
+  const MM = pad(d.getMonth() + 1)
+  const dd = pad(d.getDate())
+  const HH = pad(d.getHours())
+  const mm = pad(d.getMinutes())
+  const ss = pad(d.getSeconds())
+  return `${yyyy}-${MM}-${dd} ${HH}:${mm}:${ss}`
 }
 </script>
 
@@ -137,7 +203,7 @@ function closeDialog(): void {
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary">搜索</el-button>
+          <el-button type="primary" @click="loadFish">搜索</el-button>
           <el-button @click="resetQuery">重置</el-button>
         </el-form-item>
         <div class="spacer" />
@@ -159,7 +225,11 @@ function closeDialog(): void {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建日期" width="140" />
+        <el-table-column prop="createdAt" label="创建日期" width="140">
+          <template #default="{ row }">
+            {{ formatDate(row.createdAt) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" plain @click="openEdit(row)">编辑</el-button>
@@ -169,16 +239,8 @@ function closeDialog(): void {
       </el-table>
 
       <div class="pagination">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          :page-size="pageSize"
-          :current-page="page"
-          :page-sizes="[5, 10, 20]"
-          @size-change="onSizeChange"
-          @current-change="onPageChange"
-        />
+        <el-pagination background layout="total, sizes, prev, pager, next, jumper" :total="total" :page-size="pageSize"
+          :current-page="page" :page-sizes="[5, 10, 20]" @size-change="onSizeChange" @current-change="onPageChange" />
       </div>
     </el-card>
 

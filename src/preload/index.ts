@@ -5,6 +5,20 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   quitApp(): void {
     ipcRenderer.send('app:quit')
+  },
+
+  // Fish database operations
+  fish: {
+    findAll: () => ipcRenderer.invoke('fish:findAll'),
+    findById: (id: number) => ipcRenderer.invoke('fish:findById', id),
+    search: (query: { name?: string; type?: string; status?: 'running' | 'stopped' }) =>
+      ipcRenderer.invoke('fish:search', query),
+    create: (data: { name: string; type: string; status?: 'running' | 'stopped' }) =>
+      ipcRenderer.invoke('fish:create', data),
+    update: (id: number, data: { name?: string; type?: string; status?: 'running' | 'stopped' }) =>
+      ipcRenderer.invoke('fish:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('fish:delete', id),
+    deleteMany: (ids: number[]) => ipcRenderer.invoke('fish:deleteMany', ids)
   }
 }
 

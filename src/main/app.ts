@@ -1,7 +1,24 @@
 import { app } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { getMainWindow } from './windows/mainWindow'
+import { connectDatabase, disconnectDatabase } from './database'
+import logger from './logger'
+
 
 export async function setupApp(): Promise<void> {
+  // Check for single instance lock
+  const gotTheLock = app.requestSingleInstanceLock()
+
+  if (!gotTheLock) {
+    app.quit()
+    return
+  }
+  // Connect to database
+  try {
+    await connectDatabase()
+  } catch (error) {
+    logger.error('Failed to connect to database:', error)
+  }
   // Ensure app is ready before creating windows
   await app.whenReady()
 
@@ -19,5 +36,18 @@ export async function setupApp(): Promise<void> {
     if (process.platform !== 'darwin') {
       app.quit()
     }
+  })
+
+  // Handle second instance
+  app.on('second-instance', () => {
+    const mainWindow = getMainWindow()
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+  })
+
+    app.on('before-quit', async () => {
+    await disconnectDatabase()
   })
 }
