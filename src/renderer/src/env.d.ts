@@ -12,17 +12,23 @@ declare global {
   interface Window {
     // 与 preload/index.d.ts 的声明保持一致，避免类型合并冲突
     electron: import('@electron-toolkit/preload').ElectronAPI
+    // 引入 Prisma 类型以使用明确的模型类型
+    // 注意：此处仅作类型引用，不会引入运行时依赖
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+    // @ts-ignore: 在全局声明中使用 import() 类型引用以避免运行时依赖，TypeScript 在此处的模块合并可能出现误报；忽略一次以允许 window.api 的类型合并
+    
     // 与 preload/index.d.ts 保持一致的类型定义，避免 renderer 中访问 window.api 时为 unknown
     api: {
       quitApp(): void
       fish: {
-        findAll(): Promise<any[]>
-        findById(id: number): Promise<any | null>
-        search(query: { name?: string; type?: string; status?: 'running' | 'stopped' }): Promise<any[]>
-        create(data: { name: string; type: string; status?: 'running' | 'stopped'; ip?: string | null; port?: number | null }): Promise<any>
-        update(id: number, data: { name?: string; type?: string; status?: 'running' | 'stopped'; ip?: string | null; port?: number | null }): Promise<any>
-        delete(id: number): Promise<any>
-        deleteMany(ids: number[]): Promise<any>
+        findAll(): Promise<import('@prisma/client').Fish[]>
+        findById(id: number): Promise<import('@prisma/client').Fish | null>
+        search(query: { name?: string }): Promise<import('@prisma/client').Fish[]>
+        create(data: { name: string; ip?: string | null; port?: number | null }): Promise<import('@prisma/client').Fish>
+        update(id: number, data: { name?: string; ip?: string | null; port?: number | null }): Promise<import('@prisma/client').Fish>
+        delete(id: number): Promise<import('@prisma/client').Fish>
+        deleteMany(ids: number[]): Promise<import('@prisma/client').Prisma.BatchPayload>
+        seed(count: number): Promise<import('@prisma/client').Prisma.BatchPayload>
       }
     }
     // 百度地图 WebGL 全局对象挂载到 window

@@ -16,6 +16,52 @@
   }
 }
 
+.stats-card {
+  margin-bottom: 16px;
+  .stats-grid {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .stat-item {
+    display: grid;
+    grid-template-columns: auto auto;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(135deg, #1f2230, #25293a);
+    .label {
+      color: var(--ev-c-text-2);
+      font-size: 12px;
+    }
+    .value {
+      color: #fff;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    &.total {
+      background: linear-gradient(135deg, #23283a, #2c3250);
+    }
+    &.running {
+      background: linear-gradient(135deg, #1f3030, #253a2b);
+    }
+    &.stopped {
+      background: linear-gradient(135deg, #302626, #3a2c2c);
+    }
+  }
+  .type-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    :deep(.el-tag) {
+      border-radius: 10px;
+    }
+  }
+}
+
 .toolbar {
   margin-bottom: 16px;
 }
@@ -27,9 +73,24 @@
 }
 
 .table-card {
+  :deep(.el-table) {
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  :deep(.el-table__header-wrapper) {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.05));
+  }
   .pagination {
     display: flex;
     justify-content: flex-end;
     padding-top: 12px;
+  }
+}
+
+// 弹窗滚动：限制内容区高度并启用纵向滚动
+:deep(.fish-dialog) {
+  .el-dialog__body {
+    max-height: 60vh;
+    overflow-y: auto;
   }
 }

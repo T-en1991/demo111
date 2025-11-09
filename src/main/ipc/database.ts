@@ -89,4 +89,14 @@ export function registerDatabaseIpc(): void {
       throw error
     }
   })
+
+  // 批量生成假数据
+  ipcMain.handle('fish:seed', async (_, count: number) => {
+    try {
+      return await fishService.seedMocks(Math.max(0, Number(count) || 0))
+    } catch (error) {
+      console.error('Error seeding fish mocks:', error)
+      throw error
+    }
+  })
 }

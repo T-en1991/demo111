@@ -26,7 +26,7 @@ function go(name: string): void {
       <el-col :xs="24" :sm="12" :md="8">
         <div class="menu-item fish" @click="go('fish')">
           <h3>机器鱼管理</h3>
-          <p>支持增删改查、搜索与分页</p>
+          <p>支持增删改查</p>
           <el-button type="success" plain>进入</el-button>
         </div>
       </el-col>

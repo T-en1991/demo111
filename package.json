@@ -19,14 +19,12 @@
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
     "build:linux": "npm run build && electron-builder --linux",
-  "db:generate": "prisma generate --config src/main/prisma/prisma.config.ts",
-  "db:migrate": "prisma migrate dev --config src/main/prisma/prisma.config.ts",
-  "db:push": "prisma db push --config src/main/prisma/prisma.config.ts",
-  "db:studio": "prisma studio --config src/main/prisma/prisma.config.ts"
+    "db:generate": "prisma generate --config src/main/prisma/prisma.config.ts",
+    "db:migrate": "prisma migrate dev --config src/main/prisma/prisma.config.ts",
+    "db:push": "prisma db push --config src/main/prisma/prisma.config.ts",
+    "db:studio": "prisma studio --config src/main/prisma/prisma.config.ts"
   },
   "dependencies": {
-    "winston": "^3.9.0",
-    "winston-daily-rotate-file": "^4.7.1",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@element-plus/icons-vue": "^2.3.2",
@@ -36,7 +34,9 @@
     "leaflet": "^1.9.4",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.7.1",
-    "vue-router": "^4.6.3"
+    "vue-router": "^4.6.3",
+    "winston": "^3.9.0",
+    "winston-daily-rotate-file": "^4.7.1"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
@@ -53,6 +53,7 @@
     "prettier": "^3.6.2",
     "prisma": "^6.18.0",
     "sass": "^1.93.3",
+    "serve": "^14.2.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.6",
     "vue": "^3.5.21",
@@ -60,7 +61,3 @@
     "vue-tsc": "^3.0.7"
   }
 }
-
-
-
-

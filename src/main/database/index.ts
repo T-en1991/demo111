@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
+import type { User, Alert, Fish } from '@prisma/client'
 import logger from '../logger'
 
 const prisma = new PrismaClient({
@@ -29,27 +30,27 @@ export async function disconnectDatabase(): Promise<void> {
 // User CRUD 操作
 export const userService = {
   // 创建用户
-  async create(data: { email: string; name?: string }): Promise<any> {
+  async create(data: { email: string; name?: string }): Promise<User> {
     return prisma.user.create({ data })
   },
 
   // 获取所有用户
-  async findAll(): Promise<any[]> {
+  async findAll(): Promise<User[]> {
     return prisma.user.findMany()
   },
 
   // 根据ID查找用户
-  async findById(id: number): Promise<any | null> {
+  async findById(id: number): Promise<User | null> {
     return prisma.user.findUnique({ where: { id } })
   },
 
   // 根据邮箱查找用户
-  async findByEmail(email: string): Promise<any | null> {
+  async findByEmail(email: string): Promise<User | null> {
     return prisma.user.findUnique({ where: { email } })
   },
 
   // 更新用户
-  async update(id: number, data: { email?: string; name?: string }): Promise<any> {
+  async update(id: number, data: { email?: string; name?: string }): Promise<User> {
     return prisma.user.update({
       where: { id },
       data
@@ -57,7 +58,7 @@ export const userService = {
   },
 
   // 删除用户
-  async delete(id: number): Promise<any> {
+  async delete(id: number): Promise<User> {
     return prisma.user.delete({
       where: { id }
     })
@@ -78,12 +79,12 @@ export const alertService = {
     imgFile?: string | null;
     lat?: number | null;
     lon?: number | null;
-  }): Promise<any> {
+  }): Promise<Alert> {
     return prisma.alert.create({ data })
   },
 
   // 获取所有告警
-  async findAll(): Promise<any[]> {
+  async findAll(): Promise<Alert[]> {
     return prisma.alert.findMany({
       orderBy: {
         createdAt: 'desc'
@@ -92,7 +93,7 @@ export const alertService = {
   },
 
   // 获取活跃告警
-  async findActive(): Promise<any[]> {
+  async findActive(): Promise<Alert[]> {
     return prisma.alert.findMany({
       where: { status: 'active' },
       orderBy: {
@@ -102,7 +103,7 @@ export const alertService = {
   },
 
   // 根据级别获取告警
-  async findByLevel(level: 'info' | 'warning' | 'error' | 'critical'): Promise<any[]> {
+  async findByLevel(level: 'info' | 'warning' | 'error' | 'critical'): Promise<Alert[]> {
     return prisma.alert.findMany({
       where: { level },
       orderBy: {
@@ -112,7 +113,7 @@ export const alertService = {
   },
 
   // 根据ID查找告警
-  async findById(id: number): Promise<any | null> {
+  async findById(id: number): Promise<Alert | null> {
     return prisma.alert.findUnique({
       where: { id }
     })
@@ -126,7 +127,7 @@ export const alertService = {
     type?: string;
     source?: string;
     status?: 'active' | 'resolved' | 'acknowledged';
-  }): Promise<any> {
+  }): Promise<Alert> {
     return prisma.alert.update({
       where: { id },
       data
@@ -134,7 +135,7 @@ export const alertService = {
   },
 
   // 解决告警
-  async resolve(id: number): Promise<any> {
+  async resolve(id: number): Promise<Alert> {
     return prisma.alert.update({
       where: { id },
       data: {
@@ -144,7 +145,7 @@ export const alertService = {
   },
 
   // 确认告警
-  async acknowledge(id: number): Promise<any> {
+  async acknowledge(id: number): Promise<Alert> {
     return prisma.alert.update({
       where: { id },
       data: {
@@ -154,14 +155,14 @@ export const alertService = {
   },
 
   // 删除告警
-  async delete(id: number): Promise<any> {
+  async delete(id: number): Promise<Alert> {
     return prisma.alert.delete({
       where: { id }
     })
   },
 
   // 批量删除已解决的告警
-  async deleteResolved(): Promise<any> {
+  async deleteResolved(): Promise<Prisma.BatchPayload> {
     return prisma.alert.deleteMany({
       where: { status: 'resolved' }
     })
@@ -177,12 +178,12 @@ export const fishService = {
     status?: 'running' | 'stopped';
     ip?: string | null;
     port?: number | null;
-  }): Promise<any> {
+  }): Promise<Fish> {
     return prisma.fish.create({ data })
   },
 
   // 获取所有机器鱼
-  async findAll(): Promise<any[]> {
+  async findAll(): Promise<Fish[]> {
     return prisma.fish.findMany({
       orderBy: {
         createdAt: 'desc'
@@ -191,16 +192,16 @@ export const fishService = {
   },
 
   // 根据ID查找机器鱼
-  async findById(id: number): Promise<any | null> {
+  async findById(id: number): Promise<Fish | null> {
     return prisma.fish.findUnique({
       where: { id }
     })
   },
 
   // 根据状态获取机器鱼
-  async findByStatus(status: 'running' | 'stopped'): Promise<any[]> {
+  async findByStatus(status: 'running' | 'stopped'): Promise<Fish[]> {
     return prisma.fish.findMany({
-      where: { status },
+      where: { status } as any,
       orderBy: {
         createdAt: 'desc'
       }
@@ -208,9 +209,9 @@ export const fishService = {
   },
 
   // 根据类型获取机器鱼
-  async findByType(type: string): Promise<any[]> {
+  async findByType(type: string): Promise<Fish[]> {
     return prisma.fish.findMany({
-      where: { type },
+      where: { type } as any,
       orderBy: {
         createdAt: 'desc'
       }
@@ -222,13 +223,12 @@ export const fishService = {
     name?: string;
     type?: string;
     status?: 'running' | 'stopped';
-  }): Promise<any[]> {
+  }): Promise<Fish[]> {
     const where: any = {}
 
     if (query.name) {
       where.name = {
-        contains: query.name,
-        mode: 'insensitive'
+        contains: query.name
       }
     }
 
@@ -241,7 +241,7 @@ export const fishService = {
     }
 
     return prisma.fish.findMany({
-      where,
+      where: where as any,
       orderBy: {
         createdAt: 'desc'
       }
@@ -255,7 +255,7 @@ export const fishService = {
     status?: 'running' | 'stopped';
     ip?: string | null;
     port?: number | null;
-  }): Promise<any> {
+  }): Promise<Fish> {
     return prisma.fish.update({
       where: { id },
       data
@@ -263,14 +263,14 @@ export const fishService = {
   },
 
   // 删除机器鱼
-  async delete(id: number): Promise<any> {
+  async delete(id: number): Promise<Fish> {
     return prisma.fish.delete({
       where: { id }
     })
   },
 
   // 批量删除机器鱼
-  async deleteMany(ids: number[]): Promise<any> {
+  async deleteMany(ids: number[]): Promise<Prisma.BatchPayload> {
     return prisma.fish.deleteMany({
       where: {
         id: {
@@ -278,6 +278,25 @@ export const fishService = {
         }
       }
     })
+  },
+
+  // 批量生成假数据
+  async seedMocks(count: number): Promise<Prisma.BatchPayload> {
+    const types = ['A-型', 'B-型', 'C-型'] as const
+    const statuses = ['running', 'stopped'] as const
+    const rows = Array.from({ length: count }, (_, i) => {
+      const idx = i + 1
+      const name = `机器人-${String(idx).padStart(3, '0')}`
+      const type = types[i % types.length]
+      const status = statuses[i % statuses.length]
+      // 随机分配部分 IP/端口
+      const hasNet = Math.random() < 0.25
+      const ip = hasNet ? '0.0.0.0' : null
+      const port = hasNet ? (9000 + Math.floor(Math.random() * 1000)) : null
+      return { name, type, status, ip, port }
+    })
+    // 使用 createMany 提高插入效率
+    return prisma.fish.createMany({ data: rows })
   }
 }
 

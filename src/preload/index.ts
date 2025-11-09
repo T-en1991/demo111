@@ -13,12 +13,13 @@ const api = {
     findById: (id: number) => ipcRenderer.invoke('fish:findById', id),
     search: (query: { name?: string; type?: string; status?: 'running' | 'stopped' }) =>
       ipcRenderer.invoke('fish:search', query),
-    create: (data: { name: string; type: string; status?: 'running' | 'stopped' }) =>
+    create: (data: { name: string; type: string; status?: 'running' | 'stopped'; ip?: string | null; port?: number | null }) =>
       ipcRenderer.invoke('fish:create', data),
-    update: (id: number, data: { name?: string; type?: string; status?: 'running' | 'stopped' }) =>
+    update: (id: number, data: { name?: string; type?: string; status?: 'running' | 'stopped'; ip?: string | null; port?: number | null }) =>
       ipcRenderer.invoke('fish:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('fish:delete', id),
-    deleteMany: (ids: number[]) => ipcRenderer.invoke('fish:deleteMany', ids)
+    deleteMany: (ids: number[]) => ipcRenderer.invoke('fish:deleteMany', ids),
+    seed: (count: number) => ipcRenderer.invoke('fish:seed', count)
   }
 }
 
