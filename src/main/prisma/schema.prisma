@@ -23,11 +23,23 @@ model User {
 model Fish {
   id        Int        @id @default(autoincrement())
   name      String
-  type      String
+  type      String     @default("default")
   ip        String?    // optional IP to bind for this fish (e.g. "0.0.0.0")
   port      Int?       // optional port to bind for this fish
   alerts    Alert[]
   status    FishStatus @default(running)
+  // 控制命令（可选）
+  ascendCommand   String?
+  descendCommand  String?
+  forwardCommand  String?
+  leftCommand     String?
+  rightCommand    String?
+  manualCommand   String?
+  exitManualCommand String?
+  returnCommand   String?
+  description     String?
+  // 轨迹（JSON 数组：{ lon, lat, alt|null, depth|null }[]）
+  track Json?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -51,6 +63,21 @@ model Alert {
   
 
   @@map("alerts")
+}
+
+model History {
+  id             Int       @id @default(autoincrement())
+  lon            Float?
+  lat            Float?
+  depth          Float?
+  height         Float?
+  battery        Int?
+  signalStrength Int?
+  time           DateTime
+  content        String?
+  createdAt      DateTime  @default(now())
+
+  @@map("history")
 }
 
 enum FishStatus {

@@ -5,7 +5,7 @@ import About from '../views/about/index.vue'
 import Login from '../views/login/index.vue'
 import Screen from '../views/screen/index.vue'
 import FishManage from '../views/fish/index.vue'
-import Alerts from '../views/alerts/index.vue'
+import History from '../views/history/index.vue'
 import pinia from '../store'
 import { useAppStore } from '../store/app'
 
@@ -26,9 +26,9 @@ const routes: RouteRecordRaw[] = [
     component: FishManage
   },
   {
-    path: '/alerts',
-    name: 'alerts',
-    component: Alerts
+    path: '/history',
+    name: 'history',
+    component: History
   },
   {
     path: '/logs',

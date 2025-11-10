@@ -18,6 +18,29 @@ interface Fish {
   exitManualCommand?: string
   returnCommand?: string
   description?: string
+  track?: TrackPoint[]
+}
+
+// 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
+type FishFromBackend = {
+  id: number
+  name: string
+  ip: string | null
+  port: number | null
+  createdAt: string | Date
+  updatedAt: string | Date
+  type?: string
+  status?: 'running' | 'stopped'
+  ascendCommand?: string | null
+  descendCommand?: string | null
+  forwardCommand?: string | null
+  leftCommand?: string | null
+  rightCommand?: string | null
+  manualCommand?: string | null
+  exitManualCommand?: string | null
+  returnCommand?: string | null
+  description?: string | null
+  track?: unknown
 }
 
 // 轨迹点类型（仅前端使用，不持久化）
@@ -57,7 +80,26 @@ async function loadFish(): Promise<void> {
   loading.value = true
   try {
     // 简化为始终获取全部数据
-    const raw: import('@prisma/client').Fish[] = await window.api.fish.findAll()
+    const raw = (await window.api.fish.findAll()) as FishFromBackend[]
+    const toTrackPoints = (json: unknown): TrackPoint[] => {
+      if (!Array.isArray(json)) return []
+      return (json as unknown[]).map((tp) => {
+        const o = tp as Record<string, unknown>
+        const lon = typeof o.lon === 'number' ? o.lon : Number(o.lon)
+        const lat = typeof o.lat === 'number' ? o.lat : Number(o.lat)
+        const altRaw = o.alt
+        const depthRaw = o.depth
+        const altNum = altRaw === null || altRaw === undefined ? null : Number(altRaw)
+        const depthNum = depthRaw === null || depthRaw === undefined ? null : Number(depthRaw)
+        return {
+          lon: Number.isFinite(lon) ? lon : 0,
+          lat: Number.isFinite(lat) ? lat : 0,
+          alt: altNum !== null && !Number.isFinite(altNum as number) ? null : altNum,
+          depth: depthNum !== null && !Number.isFinite(depthNum as number) ? null : depthNum
+        }
+      })
+    }
+
     const normalized: Fish[] = raw.map((f) => ({
       id: f.id,
       name: f.name,
@@ -65,16 +107,16 @@ async function loadFish(): Promise<void> {
       port: f.port ?? undefined,
       createdAt: typeof f.createdAt === 'string' ? f.createdAt : new Date(f.createdAt).toISOString(),
       updatedAt: typeof f.updatedAt === 'string' ? f.updatedAt : new Date(f.updatedAt).toISOString(),
-      // 命令与描述为前端独立字段，后端未提供，前端默认置空
-      ascendCommand: undefined,
-      descendCommand: undefined,
-      forwardCommand: undefined,
-      leftCommand: undefined,
-      rightCommand: undefined,
-      manualCommand: undefined,
-      exitManualCommand: undefined,
-      returnCommand: undefined,
-      description: undefined
+      ascendCommand: f.ascendCommand ?? undefined,
+      descendCommand: f.descendCommand ?? undefined,
+      forwardCommand: f.forwardCommand ?? undefined,
+      leftCommand: f.leftCommand ?? undefined,
+      rightCommand: f.rightCommand ?? undefined,
+      manualCommand: f.manualCommand ?? undefined,
+      exitManualCommand: f.exitManualCommand ?? undefined,
+      returnCommand: f.returnCommand ?? undefined,
+      description: f.description ?? undefined,
+      track: toTrackPoints(f.track as unknown)
     }))
     allFish.value = normalized
   } catch (error) {
@@ -140,17 +182,17 @@ function openEdit(row: Fish): void {
     name: row.name,
     ip: row.ip ?? '',
     port: row.port ?? 9200,
-    // 以下命令与描述为前端临时字段，不从后端读取
-    cmdUp: form.cmdUp || '',
-    cmdDown: form.cmdDown || '',
-    cmdForward: form.cmdForward || '',
-    cmdLeft: form.cmdLeft || '',
-    cmdRight: form.cmdRight || '',
-    cmdManual: form.cmdManual || '',
-    cmdExitManual: form.cmdExitManual || '',
-    cmdReturn: form.cmdReturn || '',
-    description: form.description || '',
-    track: form.track || []
+    // 从后端读取的命令与描述
+    cmdUp: row.ascendCommand ?? '',
+    cmdDown: row.descendCommand ?? '',
+    cmdForward: row.forwardCommand ?? '',
+    cmdLeft: row.leftCommand ?? '',
+    cmdRight: row.rightCommand ?? '',
+    cmdManual: row.manualCommand ?? '',
+    cmdExitManual: row.exitManualCommand ?? '',
+    cmdReturn: row.returnCommand ?? '',
+    description: row.description ?? '',
+    track: (row.track ?? []).map((p) => ({ ...p }))
   })
   dialogVisible.value = true
 }
@@ -210,7 +252,22 @@ async function save(): Promise<void> {
       await window.api.fish.update(form.id, {
         name: form.name.trim(),
         ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
-        port: form.port && form.port > 0 ? form.port : undefined
+        port: form.port && form.port > 0 ? form.port : undefined,
+        ascendCommand: form.cmdUp || null,
+        descendCommand: form.cmdDown || null,
+        forwardCommand: form.cmdForward || null,
+        leftCommand: form.cmdLeft || null,
+        rightCommand: form.cmdRight || null,
+        manualCommand: form.cmdManual || null,
+        exitManualCommand: form.cmdExitManual || null,
+        returnCommand: form.cmdReturn || null,
+        description: form.description || null,
+        track: form.track.length ? form.track.map((p) => ({
+          lon: p.lon,
+          lat: p.lat,
+          alt: p.alt,
+          depth: p.depth
+        })) : []
       })
       ElMessage.success('已更新机器鱼')
     } else {
@@ -218,7 +275,22 @@ async function save(): Promise<void> {
       await window.api.fish.create({
         name: form.name.trim(),
         ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
-        port: form.port && form.port > 0 ? form.port : undefined
+        port: form.port && form.port > 0 ? form.port : undefined,
+        ascendCommand: form.cmdUp || null,
+        descendCommand: form.cmdDown || null,
+        forwardCommand: form.cmdForward || null,
+        leftCommand: form.cmdLeft || null,
+        rightCommand: form.cmdRight || null,
+        manualCommand: form.cmdManual || null,
+        exitManualCommand: form.cmdExitManual || null,
+        returnCommand: form.cmdReturn || null,
+        description: form.description || null,
+        track: form.track.length ? form.track.map((p) => ({
+          lon: p.lon,
+          lat: p.lat,
+          alt: p.alt,
+          depth: p.depth
+        })) : []
       })
       ElMessage.success('已新增机器鱼')
     }

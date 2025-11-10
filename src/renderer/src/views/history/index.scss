@@ -1,0 +1,129 @@
+.alerts-page {
+  padding: 24px;
+}
+.page-header {
+  margin-bottom: 12px;
+  h1 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    margin: 0;
+  }
+  .sub {
+    margin-top: 4px;
+    color: var(--ev-c-text-2);
+    font-size: 13px;
+  }
+}
+.toolbar {
+  margin-bottom: 16px;
+}
+.table-card {
+  .pagination {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 12px;
+  }
+}
+
+// 信号强度条样式
+.signal-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.signal-text {
+  color: var(--ev-c-text-2);
+  font-size: 12px;
+}
+.signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 20px;
+}
+.signal-bars .bar {
+  width: 4px;
+  background-color: #E4E7ED;
+  border-radius: 2px;
+}
+.signal-bars .bar:nth-child(1) { height: 4px; }
+.signal-bars .bar:nth-child(2) { height: 8px; }
+.signal-bars .bar:nth-child(3) { height: 12px; }
+.signal-bars .bar:nth-child(4) { height: 16px; }
+.signal-bars .bar:nth-child(5) { height: 20px; }
+.signal-bars .bar.is-on { background-color: #67C23A; }
+.signal-bars.level-weak .bar.is-on { background-color: #E6A23C; }
+.signal-bars.level-bad .bar.is-on { background-color: #F56C6C; }
+
+// 详情弹窗紧凑头部样式
+.history-dialog {
+  :deep(.el-dialog__header) {
+    padding-bottom: 6px;
+  }
+}
+.detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.detail-header .line1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.detail-header .line1 .content {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ev-c-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-header .line1 .time {
+  color: var(--ev-c-text-2);
+  font-size: 13px;
+}
+.detail-header .line2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.meta-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ev-c-text-2);
+}
+.meta-line .meta-item {
+  color: var(--ev-c-text-2);
+}
+.meta-line .sep {
+  color: var(--el-border-color);
+}
+.text-good { color: #67C23A; }
+.text-weak { color: #E6A23C; }
+.text-bad { color: #F56C6C; }
+.mini-signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.mini-signal-bars .bar {
+  width: 3px;
+  background-color: #E4E7ED;
+  border-radius: 2px;
+}
+.mini-signal-bars .bar:nth-child(1) { height: 4px; }
+.mini-signal-bars .bar:nth-child(2) { height: 7px; }
+.mini-signal-bars .bar:nth-child(3) { height: 10px; }
+.mini-signal-bars .bar:nth-child(4) { height: 12px; }
+.mini-signal-bars .bar:nth-child(5) { height: 14px; }
+.mini-signal-bars .bar.is-on { background-color: #67C23A; }
+.mini-signal-bars.level-weak .bar.is-on { background-color: #E6A23C; }
+.mini-signal-bars.level-bad .bar.is-on { background-color: #F56C6C; }

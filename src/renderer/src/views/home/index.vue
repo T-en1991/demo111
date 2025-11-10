@@ -31,8 +31,8 @@ function go(name: string): void {
         </div>
       </el-col>
       <el-col :xs="24" :sm="12" :md="8">
-        <div class="menu-item alerts" @click="go('alerts')">
-          <h3>报警查询</h3>
+        <div class="menu-item alerts" @click="go('history')">
+          <h3>历史记录</h3>
           <p>多条件过滤与列表分页</p>
           <el-button type="warning" plain>进入</el-button>
         </div>

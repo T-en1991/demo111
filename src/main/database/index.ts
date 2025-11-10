@@ -174,12 +174,44 @@ export const fishService = {
   // 创建机器鱼
   async create(data: {
     name: string;
-    type: string;
-    status?: 'running' | 'stopped';
     ip?: string | null;
     port?: number | null;
+    type?: string;
+    status?: 'running' | 'stopped';
+    ascendCommand?: string | null;
+    descendCommand?: string | null;
+    forwardCommand?: string | null;
+    leftCommand?: string | null;
+    rightCommand?: string | null;
+    manualCommand?: string | null;
+    exitManualCommand?: string | null;
+    returnCommand?: string | null;
+    description?: string | null;
+    track?: Prisma.JsonValue | null;
   }): Promise<Fish> {
-    return prisma.fish.create({ data })
+    const payload = {
+      name: data.name,
+      type: data.type ?? 'default',
+      status: data.status ?? 'stopped',
+      ip: data.ip ?? null,
+      port: data.port ?? null,
+      ascendCommand: data.ascendCommand ?? null,
+      descendCommand: data.descendCommand ?? null,
+      forwardCommand: data.forwardCommand ?? null,
+      leftCommand: data.leftCommand ?? null,
+      rightCommand: data.rightCommand ?? null,
+      manualCommand: data.manualCommand ?? null,
+      exitManualCommand: data.exitManualCommand ?? null,
+      returnCommand: data.returnCommand ?? null,
+      description: data.description ?? null,
+      track:
+        data.track === undefined
+          ? undefined
+          : data.track === null
+            ? Prisma.DbNull
+            : (data.track as Prisma.InputJsonValue)
+    }
+    return prisma.fish.create({ data: payload })
   },
 
   // 获取所有机器鱼
@@ -201,7 +233,7 @@ export const fishService = {
   // 根据状态获取机器鱼
   async findByStatus(status: 'running' | 'stopped'): Promise<Fish[]> {
     return prisma.fish.findMany({
-      where: { status } as any,
+      where: { status },
       orderBy: {
         createdAt: 'desc'
       }
@@ -211,7 +243,7 @@ export const fishService = {
   // 根据类型获取机器鱼
   async findByType(type: string): Promise<Fish[]> {
     return prisma.fish.findMany({
-      where: { type } as any,
+      where: { type },
       orderBy: {
         createdAt: 'desc'
       }
@@ -224,7 +256,7 @@ export const fishService = {
     type?: string;
     status?: 'running' | 'stopped';
   }): Promise<Fish[]> {
-    const where: any = {}
+    const where: Prisma.FishWhereInput = {}
 
     if (query.name) {
       where.name = {
@@ -241,7 +273,7 @@ export const fishService = {
     }
 
     return prisma.fish.findMany({
-      where: where as any,
+      where,
       orderBy: {
         createdAt: 'desc'
       }
@@ -251,14 +283,33 @@ export const fishService = {
   // 更新机器鱼
   async update(id: number, data: {
     name?: string;
-    type?: string;
-    status?: 'running' | 'stopped';
     ip?: string | null;
     port?: number | null;
+    type?: string;
+    status?: 'running' | 'stopped';
+    ascendCommand?: string | null;
+    descendCommand?: string | null;
+    forwardCommand?: string | null;
+    leftCommand?: string | null;
+    rightCommand?: string | null;
+    manualCommand?: string | null;
+    exitManualCommand?: string | null;
+    returnCommand?: string | null;
+    description?: string | null;
+    track?: Prisma.JsonValue | null;
   }): Promise<Fish> {
+    const payload = {
+      ...data,
+      track:
+        data.track === undefined
+          ? undefined
+          : data.track === null
+            ? Prisma.DbNull
+            : (data.track as Prisma.InputJsonValue)
+    }
     return prisma.fish.update({
       where: { id },
-      data
+      data: payload
     })
   },
 

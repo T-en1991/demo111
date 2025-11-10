@@ -23,9 +23,41 @@ declare global {
       fish: {
         findAll(): Promise<import('@prisma/client').Fish[]>
         findById(id: number): Promise<import('@prisma/client').Fish | null>
-        search(query: { name?: string }): Promise<import('@prisma/client').Fish[]>
-        create(data: { name: string; ip?: string | null; port?: number | null }): Promise<import('@prisma/client').Fish>
-        update(id: number, data: { name?: string; ip?: string | null; port?: number | null }): Promise<import('@prisma/client').Fish>
+        search(query: { name?: string; type?: string; status?: 'running' | 'stopped' }): Promise<import('@prisma/client').Fish[]>
+        create(data: {
+          name: string;
+          ip?: string | null;
+          port?: number | null;
+          type?: string;
+          status?: 'running' | 'stopped';
+          ascendCommand?: string | null;
+          descendCommand?: string | null;
+          forwardCommand?: string | null;
+          leftCommand?: string | null;
+          rightCommand?: string | null;
+          manualCommand?: string | null;
+          exitManualCommand?: string | null;
+          returnCommand?: string | null;
+          description?: string | null;
+          track?: import('@prisma/client').Prisma.JsonValue | null;
+        }): Promise<import('@prisma/client').Fish>
+        update(id: number, data: {
+          name?: string;
+          ip?: string | null;
+          port?: number | null;
+          type?: string;
+          status?: 'running' | 'stopped';
+          ascendCommand?: string | null;
+          descendCommand?: string | null;
+          forwardCommand?: string | null;
+          leftCommand?: string | null;
+          rightCommand?: string | null;
+          manualCommand?: string | null;
+          exitManualCommand?: string | null;
+          returnCommand?: string | null;
+          description?: string | null;
+          track?: import('@prisma/client').Prisma.JsonValue | null;
+        }): Promise<import('@prisma/client').Fish>
         delete(id: number): Promise<import('@prisma/client').Fish>
         deleteMany(ids: number[]): Promise<import('@prisma/client').Prisma.BatchPayload>
         seed(count: number): Promise<import('@prisma/client').Prisma.BatchPayload>

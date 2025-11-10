@@ -41,10 +41,20 @@ export function registerDatabaseIpc(): void {
   // 创建机器鱼
   ipcMain.handle('fish:create', async (_, data: {
     name: string;
-    type: string;
+    ip?: string | null;
+    port?: number | null;
+    type?: string;
     status?: 'running' | 'stopped';
-    ip?: string;
-    port?: number;
+    ascendCommand?: string | null;
+    descendCommand?: string | null;
+    forwardCommand?: string | null;
+    leftCommand?: string | null;
+    rightCommand?: string | null;
+    manualCommand?: string | null;
+    exitManualCommand?: string | null;
+    returnCommand?: string | null;
+    description?: string | null;
+    track?: import('@prisma/client').Prisma.JsonValue | null;
   }) => {
     try {
       return await fishService.create(data)
@@ -57,10 +67,20 @@ export function registerDatabaseIpc(): void {
   // 更新机器鱼
   ipcMain.handle('fish:update', async (_, id: number, data: {
     name?: string;
-    type?: string;
-    status?: 'running' | 'stopped';
     ip?: string | null;
     port?: number | null;
+    type?: string;
+    status?: 'running' | 'stopped';
+    ascendCommand?: string | null;
+    descendCommand?: string | null;
+    forwardCommand?: string | null;
+    leftCommand?: string | null;
+    rightCommand?: string | null;
+    manualCommand?: string | null;
+    exitManualCommand?: string | null;
+    returnCommand?: string | null;
+    description?: string | null;
+    track?: import('@prisma/client').Prisma.JsonValue | null;
   }) => {
     try {
       return await fishService.update(id, data)

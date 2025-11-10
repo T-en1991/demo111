@@ -6,6 +6,8 @@ import { startListenersForAllFish } from './network/tcpManager'
 import logger from './logger'
 async function bootstrap(): Promise<void> {
   await setupApp()
+  // Ensure Electron app is ready before creating BrowserWindow
+  await app.whenReady()
   // Create main window and register IPC handlers
   createMainWindow()
   registerIpc()
