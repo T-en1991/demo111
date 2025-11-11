@@ -6,6 +6,7 @@ import Login from '../views/login/index.vue'
 import Screen from '../views/screen/index.vue'
 import FishManage from '../views/fish/index.vue'
 import History from '../views/history/index.vue'
+// 上传页面采用按需加载
 import pinia from '../store'
 import { useAppStore } from '../store/app'
 
@@ -34,6 +35,11 @@ const routes: RouteRecordRaw[] = [
     path: '/logs',
     name: 'logs',
     component: () => import('../views/logs/index.vue')
+  },
+  {
+    path: '/upload',
+    name: 'upload',
+    component: () => import('../views/upload/index.vue')
   },
   {
     path: '/about',

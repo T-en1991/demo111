@@ -46,9 +46,10 @@ interface RobotStatus {
 }
 
 const robots = reactive<RobotStatus[]>([
-  { id: 'A1', name: '水下机器人 A1', battery: 98, depth: 100, altitude: 5, yaw: 260, pitch: 15, roll: 2, lng: 116.404, lat: 39.915, acoustic: 'strong' },
-  { id: 'B2', name: '水下机器人 B2', battery: 86, depth: 80, altitude: 8, yaw: 120, pitch: 8, roll: 5, lng: 121.4737, lat: 31.2304, acoustic: 'medium' },
-  { id: 'C3', name: '水下机器人 C3', battery: 72, depth: 60, altitude: 3, yaw: 45, pitch: 12, roll: 3, lng: 113.2644, lat: 23.1291, acoustic: 'weak' }
+  // 将默认选中的 A1 初始位置设置为经度 53.573275、纬度 24.281445
+  { id: 'A1', name: '鲸鲨01号', battery: 98, depth: 100, altitude: 5, yaw: 260, pitch: 15, roll: 2, lng: 53.573275, lat: 24.281445, acoustic: 'strong' },
+  { id: 'B2', name: '鲸鲨02号', battery: 86, depth: 80, altitude: 8, yaw: 120, pitch: 8, roll: 5, lng: 121.4737, lat: 31.2304, acoustic: 'medium' },
+  { id: 'C3', name: '鲸鲨03号', battery: 72, depth: 60, altitude: 3, yaw: 45, pitch: 12, roll: 3, lng: 113.2644, lat: 23.1291, acoustic: 'weak' }
 ])
 const selectedId = ref<string>(robots[0].id)
 const current = computed<RobotStatus | undefined>(() => robots.find(r => r.id === selectedId.value))
@@ -200,19 +201,11 @@ type VideoMode = 'mono' | 'stereo'
 const videoDialogVisible = ref(false)
 const videoMode = ref<VideoMode>('mono')
 const videoUrls = reactive<Record<string, { mono?: string; stereo?: string }>>({})
-// 示例视频地址映射（用于“假的观看效果”）
-videoUrls['A1'] = {
-  mono: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-  stereo: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
-}
-videoUrls['B2'] = {
-  mono: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-  stereo: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
-}
-videoUrls['C3'] = {
-  mono: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-  stereo: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4'
-}
+// 使用本地示例视频，同时作为单目与双目演示源
+const mockVideoUrl = new URL('../../assets/mock.mp4', import.meta.url).href
+videoUrls['A1'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
+videoUrls['B2'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
+videoUrls['C3'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
 const currentVideoTitle = computed((): string => '实时视频')
 const currentVideoUrl = computed((): string | undefined => {
   const vs = videoUrls[selectedId.value] ?? {}
@@ -225,7 +218,7 @@ function openVideo(mode: VideoMode): void {
 
 type RoutePoint = { lng: number; lat: number; altitude: number; depth: number }
 
-function setCurrentMarker(lng: number, lat: number, size = 32): void {
+function setCurrentMarker(lng: number, lat: number, size = 56): void {
   const BMap = getBMap()
   if (!BMap || !mapInstance) return
   const point = new BMap.Point(lng, lat)
@@ -314,11 +307,11 @@ async function fetchFishData(
   let route: RoutePoint[] = prevRoute.length > 0 ? [...prevRoute] : []
   if (route.length === 0) {
     // 初始化一段规划路线（近似直线+轻微扰动）
-    const steps = 12
+    const steps = 24
     for (let i = 0; i < steps; i++) {
       const t = i / (steps - 1)
-      const lng = base.lng + t * 0.01 + (Math.random() - 0.5) * 0.0008
-      const lat = base.lat + t * 0.01 + (Math.random() - 0.5) * 0.0008
+      const lng = base.lng + t * 0.05 + (Math.random() - 0.5) * 0.001
+      const lat = base.lat + t * 0.05 + (Math.random() - 0.5) * 0.001
       route.push({ lng, lat, altitude: base.altitude + Math.round((Math.random() - 0.5) * 2), depth: base.depth })
     }
   }
@@ -351,7 +344,7 @@ async function loadSelectedFishData(recenter = false): Promise<void> {
   }
 
   // 更新当前位置标注与轨迹折线
-  setCurrentMarker(res.info.lng, res.info.lat, 32)
+  setCurrentMarker(res.info.lng, res.info.lat, 56)
   routePoints.value = res.route
   drawRoute(routePoints.value)
 
@@ -391,10 +384,7 @@ async function init(): Promise<void> {
       map.enableScrollWheelZoom(true)
       map.addControl(new BMap.NavigationControl())
       map.addControl(new BMap.ScaleControl())
-      const satType = (window as unknown as { BMAP_SATELLITE_MAP?: unknown }).BMAP_SATELLITE_MAP
-      if (satType && typeof map.setMapType === 'function') {
-        map.setMapType(satType)
-      }
+      // 按需保留默认地图类型（不启用卫星图）
 
       // 初始化加载选中鱼的数据并绘制
       await loadSelectedFishData(true)

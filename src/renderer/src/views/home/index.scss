@@ -62,6 +62,50 @@
   .menu-item.logs {
     background: linear-gradient(135deg, #263032, #2c3a3a);
   }
+  .menu-item.upload {
+    background: linear-gradient(135deg, #2a2a36, #333347);
+  }
 }
 
 /* 通用卡片样式供 Home 页模块复用 */
+
+.upload-inline {
+  display: grid;
+  gap: 10px;
+}
+.upload-box {
+  border: 1px dashed var(--el-border-color);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+}
+.upload-list .list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ev-c-text-2);
+  font-size: 12px;
+}
+.upload-list ul {
+  margin: 6px 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+.upload-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.upload-list .name {
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.upload-list .size {
+  color: var(--ev-c-text-2);
+  font-size: 12px;
+}

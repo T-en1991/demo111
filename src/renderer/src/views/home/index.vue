@@ -46,6 +46,13 @@ function go(name: string): void {
           <el-button type="info" plain>进入</el-button>
         </div>
       </el-col>
+      <el-col :xs="24" :sm="12" :md="8">
+        <div class="menu-item upload" @click="go('upload')">
+          <h3>上传数据</h3>
+          <p>选择文件以导入到系统</p>
+          <el-button type="primary" plain>进入</el-button>
+        </div>
+      </el-col>
     </el-row>
   </section>
 </template>

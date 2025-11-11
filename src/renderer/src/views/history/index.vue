@@ -9,6 +9,7 @@ interface AlertItem {
   height?: number
   battery?: number
   signalStrength?: number
+  type?: '记录' | '报警'
   time: string
   content?: string
   imgFile?: string
@@ -26,6 +27,7 @@ const allAlerts = ref<AlertItem[]>([
     height: 4.5,
     battery: 15,
     signalStrength: -68,
+    type: '报警',
     content: '电池电量降至 15%，请尽快充电',
     camStereoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
   },
@@ -38,6 +40,7 @@ const allAlerts = ref<AlertItem[]>([
     height: 3.9,
     battery: 82,
     signalStrength: -55,
+    type: '报警',
     content: '检测到滚转角超过阈值'
   },
   {
@@ -49,6 +52,7 @@ const allAlerts = ref<AlertItem[]>([
     height: 0.8,
     battery: 90,
     signalStrength: -60,
+    type: '记录',
     content: '已完成温度传感器校准'
   },
   {
@@ -60,6 +64,7 @@ const allAlerts = ref<AlertItem[]>([
     height: 2.2,
     battery: 70,
     signalStrength: -75,
+    type: '报警',
     content: '短时通信丢失约 30s'
   },
   {
@@ -71,6 +76,7 @@ const allAlerts = ref<AlertItem[]>([
     height: 3.1,
     battery: 40,
     signalStrength: -80,
+    type: '报警',
     content: '设备温度达到 75℃，超过告警阈值',
     imgFile: 'https://picsum.photos/800/450',
     camMonoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
@@ -84,6 +90,7 @@ const allAlerts = ref<AlertItem[]>([
     height: 1.7,
     battery: 88,
     signalStrength: -62,
+    type: '记录',
     content: '巡检完成，状态正常'
   }
 ])
@@ -95,21 +102,26 @@ defaultStart.setDate(now.getDate() - 1)
 defaultStart.setHours(0, 0, 0, 0)
 type DateRange = [Date, Date] | []
 const query = reactive({
-  range: [defaultStart, now] as DateRange
+  range: [defaultStart, now] as DateRange,
+  type: '全部' as '全部' | '记录' | '报警'
 })
 // 仅在点击“查询”后应用筛选的有效范围（默认采用昨天零点到现在）
 const activeRange = ref<DateRange>([defaultStart, now] as DateRange)
+const activeType = ref<'全部' | '记录' | '报警'>('全部')
 
 
 function resetQuery(): void {
   query.range = []
   activeRange.value = []
+  query.type = '全部'
+  activeType.value = '全部'
   page.value = 1
 }
 function applyQuery(): void {
   activeRange.value = Array.isArray(query.range) && query.range.length === 2
     ? [query.range[0], query.range[1]]
     : []
+  activeType.value = query.type
   page.value = 1
 }
 
@@ -121,7 +133,8 @@ const filtered = computed((): AlertItem[] => {
           return t >= activeRange.value[0] && t <= activeRange.value[1]
         })()
       : true
-    return byRange
+    const byType = activeType.value === '全部' ? true : a.type === activeType.value
+    return byRange && byType
   })
 })
 
@@ -198,6 +211,13 @@ function batteryClass(percent?: number): string {
             end-placeholder="结束日期"
             unlink-panels
           />
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="query.type" placeholder="选择类型" style="width: 160px">
+            <el-option label="全部" value="全部" />
+            <el-option label="记录" value="记录" />
+            <el-option label="报警" value="报警" />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="applyQuery">查询</el-button>

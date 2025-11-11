@@ -1,0 +1,59 @@
+/* 使用全局 CSS 变量，不依赖 var.scss */
+
+.upload-page {
+  padding: 16px;
+  color: #e6edf3;
+}
+
+.page-header {
+  margin-bottom: 12px;
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: var(--ev-c-text-2); margin: 0; }
+}
+
+.upload-card {
+  background: rgba(24, 32, 48, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.upload-inline {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.upload-box {
+  border: 2px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(18, 24, 38, 0.6);
+  padding: 18px;
+  color: #c9d1d9;
+}
+
+.upload-list {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 8px;
+}
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #c9d1d9;
+}
+.upload-list ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.upload-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  margin-bottom: 6px;
+}
+.upload-list .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+.upload-list .size { color: var(--ev-c-text-2); }

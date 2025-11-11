@@ -29,6 +29,11 @@
             "date": 1762751775822,
             "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-10.log",
             "hash": "18b0fedd4af65472bed60769012ed08524e7ba4c4979f901621b13837b703ff3"
+        },
+        {
+            "date": 1762791832866,
+            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-11.log",
+            "hash": "2ce0182b97a116e116b5b653f14a802807f7394b07610dcbc3e18196059b794f"
         }
     ],
     "hashType": "sha256"
