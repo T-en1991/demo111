@@ -21,7 +21,7 @@ function exitApp(): void {
 </script>
 
 <template>
-  <section class="global-topbar" v-if="route.name !== 'login'">
+  <section v-if="route.name !== 'login'" class="global-topbar">
     <div class="brand-name">深海鲲鹏-鲸鲨监控系统</div>
     <div class="right-actions">
       <el-tooltip effect="dark" content="返回主页" placement="bottom">
@@ -36,7 +36,6 @@ function exitApp(): void {
       </el-tooltip>
     </div>
   </section>
-
 </template>
 
 <style scoped>
@@ -48,7 +47,12 @@ function exitApp(): void {
   padding: 0 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   /* 轻微渐变的半透明背景，提高质感 */
-  background: linear-gradient(90deg, rgba(13,18,32,0.92) 0%, rgba(18,26,40,0.88) 50%, rgba(22,30,44,0.92) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(13, 18, 32, 0.92) 0%,
+    rgba(18, 26, 40, 0.88) 50%,
+    rgba(22, 30, 44, 0.92) 100%
+  );
   backdrop-filter: blur(10px);
 }
 .brand-name {

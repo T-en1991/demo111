@@ -6,7 +6,6 @@ import logger from './logger'
 
 import { stopAllListeners } from './network/tcpManager'
 
-
 export async function setupApp(): Promise<void> {
   // Check for single instance lock
   const gotTheLock = app.requestSingleInstanceLock()
@@ -51,9 +50,7 @@ export async function setupApp(): Promise<void> {
 
   // Start UDP listener if configured
 
-
   app.on('before-quit', async () => {
-
     try {
       await stopAllListeners()
     } catch (e) {

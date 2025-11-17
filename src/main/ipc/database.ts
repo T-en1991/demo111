@@ -25,74 +25,103 @@ export function registerDatabaseIpc(): void {
   })
 
   // 搜索机器鱼
-  ipcMain.handle('fish:search', async (_, query: {
-    name?: string;
-    type?: string;
-    status?: 'running' | 'stopped';
-  }) => {
-    try {
-      return await fishService.search(query)
-    } catch (error) {
-      console.error('Error searching fish:', error)
-      throw error
+  ipcMain.handle(
+    'fish:search',
+    async (
+      _,
+      query: {
+        name?: string
+        type?: string
+        status?: 'running' | 'stopped'
+      }
+    ) => {
+      try {
+        return await fishService.search(query)
+      } catch (error) {
+        console.error('Error searching fish:', error)
+        throw error
+      }
     }
-  })
+  )
 
   // 创建机器鱼
-  ipcMain.handle('fish:create', async (_, data: {
-    name: string;
-    ip?: string | null;
-    port?: number | null;
-    rtspUrl?: string | null;
-    rtsp2?: string | null;
-    type?: string;
-    status?: 'running' | 'stopped';
-    ascendCommand?: string | null;
-    descendCommand?: string | null;
-    forwardCommand?: string | null;
-    leftCommand?: string | null;
-    rightCommand?: string | null;
-    manualCommand?: string | null;
-    exitManualCommand?: string | null;
-    returnCommand?: string | null;
-    description?: string | null;
-    track?: import('@prisma/client').Prisma.JsonValue | null;
-  }) => {
-    try {
-      return await fishService.create(data)
-    } catch (error) {
-      console.error('Error creating fish:', error)
-      throw error
+  ipcMain.handle(
+    'fish:create',
+    async (
+      _,
+      data: {
+        name: string
+        ip?: string | null
+        port?: number | null
+        rtspUrl?: string | null
+        rtsp2?: string | null
+        satcomIp?: string | null
+        satcomPort1?: number | null
+        satcomPort2?: number | null
+        microwaveIp?: string | null
+        microwavePort?: number | null
+        type?: string
+        status?: 'running' | 'stopped'
+        ascendCommand?: string | null
+        descendCommand?: string | null
+        forwardCommand?: string | null
+        leftCommand?: string | null
+        rightCommand?: string | null
+        manualCommand?: string | null
+        exitManualCommand?: string | null
+        returnCommand?: string | null
+        description?: string | null
+        track?: import('@prisma/client').Prisma.JsonValue | null
+      }
+    ) => {
+      try {
+        return await fishService.create(data)
+      } catch (error) {
+        console.error('Error creating fish:', error)
+        throw error
+      }
     }
-  })
+  )
 
   // 更新机器鱼
-  ipcMain.handle('fish:update', async (_, id: number, data: {
-    name?: string;
-    ip?: string | null;
-    port?: number | null;
-    rtspUrl?: string | null;
-    rtsp2?: string | null;
-    type?: string;
-    status?: 'running' | 'stopped';
-    ascendCommand?: string | null;
-    descendCommand?: string | null;
-    forwardCommand?: string | null;
-    leftCommand?: string | null;
-    rightCommand?: string | null;
-    manualCommand?: string | null;
-    exitManualCommand?: string | null;
-    returnCommand?: string | null;
-    description?: string | null;
-    track?: import('@prisma/client').Prisma.JsonValue | null;
-  }) => {
-    try {
-      return await fishService.update(id, data)
-    } catch (error) {
-      console.error('Error updating fish:', error)
-      throw error
+  ipcMain.handle(
+    'fish:update',
+    async (
+      _,
+      id: number,
+      data: {
+        name?: string
+        ip?: string | null
+        port?: number | null
+        rtspUrl?: string | null
+        rtsp2?: string | null
+        satcomIp?: string | null
+        satcomPort1?: number | null
+        satcomPort2?: number | null
+        microwaveIp?: string | null
+        microwavePort?: number | null
+        type?: string
+        status?: 'running' | 'stopped'
+        ascendCommand?: string | null
+        descendCommand?: string | null
+        forwardCommand?: string | null
+        leftCommand?: string | null
+        rightCommand?: string | null
+        manualCommand?: string | null
+        exitManualCommand?: string | null
+        returnCommand?: string | null
+        description?: string | null
+        track?: import('@prisma/client').Prisma.JsonValue | null
+      }
+    ) => {
+      try {
+        return await fishService.update(id, data)
+      } catch (error) {
+        console.error('Error updating fish:', error)
+        throw error
+      }
     }
-  })
+  )
 
   // 删除机器鱼
   ipcMain.handle('fish:delete', async (_, id: number) => {

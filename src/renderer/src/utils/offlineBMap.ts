@@ -36,7 +36,10 @@ class ScaleControl {
 class Map {
   private map: L.Map
   constructor(container: string | HTMLElement) {
-    const el = typeof container === 'string' ? (document.getElementById(container) as HTMLElement) : container
+    const el =
+      typeof container === 'string'
+        ? (document.getElementById(container) as HTMLElement)
+        : container
     this.map = L.map(el, { zoomControl: false, scrollWheelZoom: false })
     // 设置深色背景，避免无瓦片时呈现默认灰色
     el.style.background = '#1e2030'

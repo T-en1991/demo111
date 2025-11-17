@@ -64,8 +64,11 @@ function openVideoDialog() {
 
     <!-- 视频弹窗和按钮 -->
     <VideoDialog ref="videoDialog" url="ws://localhost:8085/" />
-    <el-button type="primary" style="position: fixed; bottom: 32px; right: 32px; z-index: 1000;"
-      @click="openVideoDialog">
+    <el-button
+      type="primary"
+      style="position: fixed; bottom: 32px; right: 32px; z-index: 1000"
+      @click="openVideoDialog"
+    >
       查看实时视频
     </el-button>
   </section>

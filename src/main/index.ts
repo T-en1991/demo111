@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { app, BrowserWindow } from 'electron'
 import { setupApp } from './app'
 import { startRtspRelay } from './rtspRelay'

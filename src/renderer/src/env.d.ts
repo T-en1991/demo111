@@ -14,50 +14,74 @@ declare global {
     electron: import('@electron-toolkit/preload').ElectronAPI
     // 引入 Prisma 类型以使用明确的模型类型
     // 注意：此处仅作类型引用，不会引入运行时依赖
-    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+
     // @ts-ignore: 在全局声明中使用 import() 类型引用以避免运行时依赖，TypeScript 在此处的模块合并可能出现误报；忽略一次以允许 window.api 的类型合并
-    
+
     // 与 preload/index.d.ts 保持一致的类型定义，避免 renderer 中访问 window.api 时为 unknown
     api: {
       quitApp(): void
+      openWinSCP(): Promise<boolean>
       fish: {
         findAll(): Promise<import('@prisma/client').Fish[]>
         findById(id: number): Promise<import('@prisma/client').Fish | null>
-        search(query: { name?: string; type?: string; status?: 'running' | 'stopped' }): Promise<import('@prisma/client').Fish[]>
+        search(query: {
+          name?: string
+          type?: string
+          status?: 'running' | 'stopped'
+        }): Promise<import('@prisma/client').Fish[]>
         create(data: {
-          name: string;
-          ip?: string | null;
-          port?: number | null;
-          type?: string;
-          status?: 'running' | 'stopped';
-          ascendCommand?: string | null;
-          descendCommand?: string | null;
-          forwardCommand?: string | null;
-          leftCommand?: string | null;
-          rightCommand?: string | null;
-          manualCommand?: string | null;
-          exitManualCommand?: string | null;
-          returnCommand?: string | null;
-          description?: string | null;
-          track?: import('@prisma/client').Prisma.JsonValue | null;
+          name: string
+          ip?: string | null
+          port?: number | null
+          rtspUrl?: string | null
+          rtsp2?: string | null
+          // 新增：卫通与微波通信参数
+          satcomIp?: string | null
+          satcomPort1?: number | null
+          satcomPort2?: number | null
+          microwaveIp?: string | null
+          microwavePort?: number | null
+          type?: string
+          status?: 'running' | 'stopped'
+          ascendCommand?: string | null
+          descendCommand?: string | null
+          forwardCommand?: string | null
+          leftCommand?: string | null
+          rightCommand?: string | null
+          manualCommand?: string | null
+          exitManualCommand?: string | null
+          returnCommand?: string | null
+          description?: string | null
+          track?: import('@prisma/client').Prisma.JsonValue | null
         }): Promise<import('@prisma/client').Fish>
-        update(id: number, data: {
-          name?: string;
-          ip?: string | null;
-          port?: number | null;
-          type?: string;
-          status?: 'running' | 'stopped';
-          ascendCommand?: string | null;
-          descendCommand?: string | null;
-          forwardCommand?: string | null;
-          leftCommand?: string | null;
-          rightCommand?: string | null;
-          manualCommand?: string | null;
-          exitManualCommand?: string | null;
-          returnCommand?: string | null;
-          description?: string | null;
-          track?: import('@prisma/client').Prisma.JsonValue | null;
-        }): Promise<import('@prisma/client').Fish>
+        update(
+          id: number,
+          data: {
+            name?: string
+            ip?: string | null
+            port?: number | null
+            rtspUrl?: string | null
+            rtsp2?: string | null
+            // 新增：卫通与微波通信参数
+            satcomIp?: string | null
+            satcomPort1?: number | null
+            satcomPort2?: number | null
+            microwaveIp?: string | null
+            microwavePort?: number | null
+            type?: string
+            status?: 'running' | 'stopped'
+            ascendCommand?: string | null
+            descendCommand?: string | null
+            forwardCommand?: string | null
+            leftCommand?: string | null
+            rightCommand?: string | null
+            manualCommand?: string | null
+            exitManualCommand?: string | null
+            returnCommand?: string | null
+            description?: string | null
+            track?: import('@prisma/client').Prisma.JsonValue | null
+          }
+        ): Promise<import('@prisma/client').Fish>
         delete(id: number): Promise<import('@prisma/client').Fish>
         deleteMany(ids: number[]): Promise<import('@prisma/client').Prisma.BatchPayload>
         seed(count: number): Promise<import('@prisma/client').Prisma.BatchPayload>
@@ -72,4 +96,4 @@ declare global {
   }
 }
 
-export { }
+export {}

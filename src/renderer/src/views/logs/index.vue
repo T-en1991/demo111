@@ -30,14 +30,54 @@ const query = reactive({
 const activeRange = ref<DateRange>([defaultStart, now] as DateRange)
 
 const allLogs = ref<LogItem[]>([
-  { id: 1, actionName: '系统启动', actionContent: '服务初始化完成', time: fmt(new Date(now.getTime() - 23 * 3600 * 1000)) },
-  { id: 2, actionName: '用户登录', actionContent: '管理员登陆成功', time: fmt(new Date(now.getTime() - 20 * 3600 * 1000)) },
-  { id: 3, actionName: '保存配置', actionContent: '更新网络参数', time: fmt(new Date(now.getTime() - 12 * 3600 * 1000)) },
-  { id: 4, actionName: '设备连接', actionContent: '串口设备已连接', time: fmt(new Date(now.getTime() - 8 * 3600 * 1000)) },
-  { id: 5, actionName: '同步数据', actionContent: '上报 128 条状态', time: fmt(new Date(now.getTime() - 4 * 3600 * 1000)) },
-  { id: 6, actionName: '清理缓存', actionContent: '释放临时文件', time: fmt(new Date(now.getTime() - 2 * 3600 * 1000)) },
-  { id: 7, actionName: '导出报表', actionContent: '生成日报 CSV', time: fmt(new Date(now.getTime() - 1 * 3600 * 1000)) },
-  { id: 8, actionName: '重启服务', actionContent: '通信服务重启', time: fmt(new Date(now.getTime() - 10 * 60 * 1000)) },
+  {
+    id: 1,
+    actionName: '系统启动',
+    actionContent: '服务初始化完成',
+    time: fmt(new Date(now.getTime() - 23 * 3600 * 1000))
+  },
+  {
+    id: 2,
+    actionName: '用户登录',
+    actionContent: '管理员登陆成功',
+    time: fmt(new Date(now.getTime() - 20 * 3600 * 1000))
+  },
+  {
+    id: 3,
+    actionName: '保存配置',
+    actionContent: '更新网络参数',
+    time: fmt(new Date(now.getTime() - 12 * 3600 * 1000))
+  },
+  {
+    id: 4,
+    actionName: '设备连接',
+    actionContent: '串口设备已连接',
+    time: fmt(new Date(now.getTime() - 8 * 3600 * 1000))
+  },
+  {
+    id: 5,
+    actionName: '同步数据',
+    actionContent: '上报 128 条状态',
+    time: fmt(new Date(now.getTime() - 4 * 3600 * 1000))
+  },
+  {
+    id: 6,
+    actionName: '清理缓存',
+    actionContent: '释放临时文件',
+    time: fmt(new Date(now.getTime() - 2 * 3600 * 1000))
+  },
+  {
+    id: 7,
+    actionName: '导出报表',
+    actionContent: '生成日报 CSV',
+    time: fmt(new Date(now.getTime() - 1 * 3600 * 1000))
+  },
+  {
+    id: 8,
+    actionName: '重启服务',
+    actionContent: '通信服务重启',
+    time: fmt(new Date(now.getTime() - 10 * 60 * 1000))
+  }
 ])
 
 function resetQuery(): void {
@@ -45,19 +85,19 @@ function resetQuery(): void {
   activeRange.value = []
 }
 function applyQuery(): void {
-  activeRange.value = Array.isArray(query.range) && query.range.length === 2
-    ? [query.range[0], query.range[1]]
-    : []
+  activeRange.value =
+    Array.isArray(query.range) && query.range.length === 2 ? [query.range[0], query.range[1]] : []
 }
 
 const filtered = computed((): LogItem[] => {
   return allLogs.value.filter((l) => {
-    const byRange = Array.isArray(activeRange.value) && activeRange.value.length === 2
-      ? (() => {
-          const t = new Date(l.time.replace(' ', 'T'))
-          return t >= activeRange.value[0] && t <= activeRange.value[1]
-        })()
-      : true
+    const byRange =
+      Array.isArray(activeRange.value) && activeRange.value.length === 2
+        ? (() => {
+            const t = new Date(l.time.replace(' ', 'T'))
+            return t >= activeRange.value[0] && t <= activeRange.value[1]
+          })()
+        : true
     return byRange
   })
 })

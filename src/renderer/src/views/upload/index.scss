@@ -16,6 +16,12 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .upload-inline {
   display: grid;
   grid-template-columns: 1fr;

@@ -57,10 +57,10 @@ function onEnter(e: KeyboardEvent): void {
         <label class="field">
           <span class="label">账号</span>
           <input
+            v-model.trim="form.username"
             class="input"
             type="text"
             placeholder="请输入账号"
-            v-model.trim="form.username"
             @keydown="onEnter"
           />
         </label>
@@ -69,10 +69,10 @@ function onEnter(e: KeyboardEvent): void {
           <span class="label">密码</span>
           <div class="password-row">
             <input
+              v-model.trim="form.password"
               class="input"
               :type="form.showPassword ? 'text' : 'password'"
               placeholder="请输入密码"
-              v-model.trim="form.password"
               @keydown="onEnter"
             />
             <button class="ghost" type="button" @click="form.showPassword = !form.showPassword">
@@ -88,9 +88,7 @@ function onEnter(e: KeyboardEvent): void {
         </button>
       </div>
 
-      <div class="hint">
-        体验账号：<code>admin_123</code> / 密码：<code>admin_123</code>
-      </div>
+      <div class="hint">体验账号：<code>admin_123</code> / 密码：<code>admin_123</code></div>
     </div>
   </section>
 </template>

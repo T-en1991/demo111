@@ -109,7 +109,6 @@ const query = reactive({
 const activeRange = ref<DateRange>([defaultStart, now] as DateRange)
 const activeType = ref<'全部' | '记录' | '报警'>('全部')
 
-
 function resetQuery(): void {
   query.range = []
   activeRange.value = []
@@ -118,21 +117,21 @@ function resetQuery(): void {
   page.value = 1
 }
 function applyQuery(): void {
-  activeRange.value = Array.isArray(query.range) && query.range.length === 2
-    ? [query.range[0], query.range[1]]
-    : []
+  activeRange.value =
+    Array.isArray(query.range) && query.range.length === 2 ? [query.range[0], query.range[1]] : []
   activeType.value = query.type
   page.value = 1
 }
 
 const filtered = computed((): AlertItem[] => {
   return allAlerts.value.filter((a) => {
-    const byRange = Array.isArray(activeRange.value) && activeRange.value.length === 2
-      ? (() => {
-          const t = new Date(a.time.replace(' ', 'T'))
-          return t >= activeRange.value[0] && t <= activeRange.value[1]
-        })()
-      : true
+    const byRange =
+      Array.isArray(activeRange.value) && activeRange.value.length === 2
+        ? (() => {
+            const t = new Date(a.time.replace(' ', 'T'))
+            return t >= activeRange.value[0] && t <= activeRange.value[1]
+          })()
+        : true
     const byType = activeType.value === '全部' ? true : a.type === activeType.value
     return byRange && byType
   })
@@ -146,8 +145,13 @@ const currentPageData = computed((): AlertItem[] => {
   return filtered.value.slice(start, start + pageSize.value)
 })
 
-function onSizeChange(size: number): void { pageSize.value = size; page.value = 1 }
-function onPageChange(p: number): void { page.value = p }
+function onSizeChange(size: number): void {
+  pageSize.value = size
+  page.value = 1
+}
+function onPageChange(p: number): void {
+  page.value = p
+}
 
 // 详情弹窗
 const detailVisible = ref(false)
@@ -158,7 +162,9 @@ function openDetail(row: AlertItem): void {
   detailVisible.value = true
   activeTab.value = 'mono'
 }
-function closeDetail(): void { detailVisible.value = false }
+function closeDetail(): void {
+  detailVisible.value = false
+}
 
 function baiduMarkerUrl(lat: number, lon: number, title?: string, time?: string): string {
   const t = encodeURIComponent(title ?? '记录')
@@ -235,15 +241,29 @@ function batteryClass(percent?: number): string {
         <el-table-column prop="height" label="高度" width="120" />
         <el-table-column label="电量(%)" width="180">
           <template #default="{ row }">
-            <el-progress :percentage="row.battery ?? 0" :stroke-width="10"
-              :status="row.battery != null && row.battery < 20 ? 'exception' : (row.battery != null && row.battery >= 80 ? 'success' : undefined)" />
+            <el-progress
+              :percentage="row.battery ?? 0"
+              :stroke-width="10"
+              :status="
+                row.battery != null && row.battery < 20
+                  ? 'exception'
+                  : row.battery != null && row.battery >= 80
+                    ? 'success'
+                    : undefined
+              "
+            />
           </template>
         </el-table-column>
         <el-table-column label="信号强度(dBm)" width="200">
           <template #default="{ row }">
             <div class="signal-cell">
               <span class="signal-bars" :class="signalClass(row.signalStrength)">
-                <span v-for="i in 5" :key="i" class="bar" :class="{ 'is-on': i <= getSignalLevel(row.signalStrength) }"></span>
+                <span
+                  v-for="i in 5"
+                  :key="i"
+                  class="bar"
+                  :class="{ 'is-on': i <= getSignalLevel(row.signalStrength) }"
+                ></span>
               </span>
               <span class="signal-text">{{ row.signalStrength ?? '-' }} dBm</span>
             </div>
@@ -276,7 +296,9 @@ function batteryClass(percent?: number): string {
       <template #header>
         <div class="detail-header">
           <div class="line1">
-            <span class="content" :title="detailItem?.content ?? ''">{{ detailItem?.content ?? '记录详情' }}</span>
+            <span class="content" :title="detailItem?.content ?? ''">{{
+              detailItem?.content ?? '记录详情'
+            }}</span>
             <span class="time">{{ detailItem?.time }}</span>
           </div>
           <div class="meta-line">
@@ -290,9 +312,19 @@ function batteryClass(percent?: number): string {
             <span class="sep">•</span>
             <span class="meta-item">高度: {{ detailItem?.height ?? '-' }}</span>
             <span class="sep">•</span>
-            <span class="meta-item">电量: <span :class="batteryClass(detailItem?.battery)">{{ detailItem?.battery ?? '-' }}%</span></span>
+            <span class="meta-item"
+              >电量:
+              <span :class="batteryClass(detailItem?.battery)"
+                >{{ detailItem?.battery ?? '-' }}%</span
+              ></span
+            >
             <span class="sep">•</span>
-            <span class="meta-item">信号: <span :class="signalClass(detailItem?.signalStrength)">{{ detailItem?.signalStrength ?? '-' }} dBm</span></span>
+            <span class="meta-item"
+              >信号:
+              <span :class="signalClass(detailItem?.signalStrength)"
+                >{{ detailItem?.signalStrength ?? '-' }} dBm</span
+              ></span
+            >
           </div>
         </div>
       </template>
@@ -300,8 +332,15 @@ function batteryClass(percent?: number): string {
       <div class="map-pane" style="margin-top: 8px">
         <div v-if="detailItem?.lat != null && detailItem?.lon != null">
           <iframe
-            :src="baiduMarkerUrl(detailItem!.lat!, detailItem!.lon!, detailItem!.content, detailItem!.time)"
-            style="width: 100%; height: 420px; border: 0; border-radius: 8px;"
+            :src="
+              baiduMarkerUrl(
+                detailItem!.lat!,
+                detailItem!.lon!,
+                detailItem!.content,
+                detailItem!.time
+              )
+            "
+            style="width: 100%; height: 420px; border: 0; border-radius: 8px"
           />
         </div>
         <el-empty v-else description="暂无坐标信息，无法在地图上标注" />
@@ -311,7 +350,14 @@ function batteryClass(percent?: number): string {
         <el-tab-pane label="单目摄像头" name="mono">
           <div class="video-pane">
             <template v-if="detailItem?.camMonoUrl">
-              <video :src="detailItem!.camMonoUrl!" controls muted autoplay playsinline style="width: 100%; max-height: 420px; background: #000;" />
+              <video
+                :src="detailItem!.camMonoUrl!"
+                controls
+                muted
+                autoplay
+                playsinline
+                style="width: 100%; max-height: 420px; background: #000"
+              />
             </template>
             <el-empty v-else description="暂无单目摄像头视频流" />
           </div>
@@ -320,7 +366,14 @@ function batteryClass(percent?: number): string {
         <el-tab-pane label="双目摄像头" name="stereo">
           <div class="video-pane">
             <template v-if="detailItem?.camStereoUrl">
-              <video :src="detailItem!.camStereoUrl!" controls muted autoplay playsinline style="width: 100%; max-height: 420px; background: #000;" />
+              <video
+                :src="detailItem!.camStereoUrl!"
+                controls
+                muted
+                autoplay
+                playsinline
+                style="width: 100%; max-height: 420px; background: #000"
+              />
             </template>
             <el-empty v-else description="暂无双目摄像头视频流" />
           </div>
@@ -328,7 +381,11 @@ function batteryClass(percent?: number): string {
 
         <el-tab-pane label="图片" name="image">
           <template v-if="detailItem?.imgFile">
-            <el-image :src="detailItem!.imgFile!" fit="contain" style="width: 100%; max-height: 420px; border-radius: 8px;" />
+            <el-image
+              :src="detailItem!.imgFile!"
+              fit="contain"
+              style="width: 100%; max-height: 420px; border-radius: 8px"
+            />
           </template>
           <el-empty v-else description="暂无图片" />
         </el-tab-pane>

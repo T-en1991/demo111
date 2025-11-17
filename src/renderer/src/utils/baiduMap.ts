@@ -2,11 +2,7 @@ let bmapPromise: Promise<void> | null = null
 
 export function loadBMapGL(ak: string): Promise<void> {
   // 改为仅加载 2D API，确保地图可靠显示
-  if (
-    typeof window !== 'undefined' &&
-    'BMap' in window &&
-    (window as { BMap?: unknown }).BMap
-  ) {
+  if (typeof window !== 'undefined' && 'BMap' in window && (window as { BMap?: unknown }).BMap) {
     return Promise.resolve()
   }
   if (bmapPromise) return bmapPromise

@@ -21,6 +21,12 @@ interface Fish {
   returnCommand?: string
   description?: string
   track?: TrackPoint[]
+  // 额外通信参数（解析自 description 的结构化内容）
+  satcomIp?: string
+  satcomPort1?: number
+  satcomPort2?: number
+  microwaveIp?: string
+  microwavePort?: number
 }
 
 // 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
@@ -44,6 +50,12 @@ type FishFromBackend = {
   exitManualCommand?: string | null
   returnCommand?: string | null
   description?: string | null
+  // 新增：卫通与微波通信参数（后端直接返回）
+  satcomIp?: string | null
+  satcomPort1?: number | null
+  satcomPort2?: number | null
+  microwaveIp?: string | null
+  microwavePort?: number | null
   track?: unknown
 }
 
@@ -63,6 +75,12 @@ interface FishForm {
   port?: number
   rtspUrl: string
   rtsp2: string
+  // 额外通信参数：卫通与微波
+  satcomIp: string
+  satcomPort1: number
+  satcomPort2: number
+  microwaveIp: string
+  microwavePort: number
   cmdUp: string
   cmdDown: string
   cmdForward: string
@@ -80,6 +98,51 @@ const allFish = ref<Fish[]>([])
 const loading = ref(false)
 
 // 取消查询与分页：不再需要 query 与重置逻辑
+
+// 保留 6 位小数的四舍五入（用于轨迹经纬度）
+function round6(n: number): number {
+  return Math.round(n * 1e6) / 1e6
+}
+
+// 类型守卫：判断 value 是否为普通对象
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object'
+}
+
+// 解析 description 文本中的结构化通信参数（若为纯文本则作为 text 返回）
+function parseExtraDesc(input: string | null | undefined): {
+  text?: string
+  satcomIp?: string
+  satcomPort1?: number
+  satcomPort2?: number
+  microwaveIp?: string
+  microwavePort?: number
+} {
+  if (!input) return {}
+  try {
+    const parsed: unknown = JSON.parse(input)
+    if (!isRecord(parsed)) {
+      return { text: input }
+    }
+    const text = typeof parsed.text === 'string' ? parsed.text : undefined
+    const satRaw = isRecord((parsed as Record<string, unknown>).satcom)
+      ? (parsed as Record<string, unknown>).satcom
+      : {}
+    const micRaw = isRecord((parsed as Record<string, unknown>).microwave)
+      ? (parsed as Record<string, unknown>).microwave
+      : {}
+    const sat = satRaw as { ip?: unknown; port1?: unknown; port2?: unknown }
+    const mic = micRaw as { ip?: unknown; port?: unknown }
+    const satcomIp = typeof sat.ip === 'string' ? sat.ip : undefined
+    const satcomPort1 = sat.port1 != null ? Number(sat.port1) : undefined
+    const satcomPort2 = sat.port2 != null ? Number(sat.port2) : undefined
+    const microwaveIp = typeof mic.ip === 'string' ? mic.ip : undefined
+    const microwavePort = mic.port != null ? Number(mic.port) : undefined
+    return { text, satcomIp, satcomPort1, satcomPort2, microwaveIp, microwavePort }
+  } catch {
+    return { text: input }
+  }
+}
 
 // 加载机器鱼数据
 async function loadFish(): Promise<void> {
@@ -106,26 +169,37 @@ async function loadFish(): Promise<void> {
       })
     }
 
-    const normalized: Fish[] = raw.map((f) => ({
-      id: f.id,
-      name: f.name,
-      ip: f.ip ?? undefined,
-      port: f.port ?? undefined,
-      rtspUrl: f.rtspUrl ?? undefined,
-      rtsp2: f.rtsp2 ?? undefined,
-      createdAt: typeof f.createdAt === 'string' ? f.createdAt : new Date(f.createdAt).toISOString(),
-      updatedAt: typeof f.updatedAt === 'string' ? f.updatedAt : new Date(f.updatedAt).toISOString(),
-      ascendCommand: f.ascendCommand ?? undefined,
-      descendCommand: f.descendCommand ?? undefined,
-      forwardCommand: f.forwardCommand ?? undefined,
-      leftCommand: f.leftCommand ?? undefined,
-      rightCommand: f.rightCommand ?? undefined,
-      manualCommand: f.manualCommand ?? undefined,
-      exitManualCommand: f.exitManualCommand ?? undefined,
-      returnCommand: f.returnCommand ?? undefined,
-      description: f.description ?? undefined,
-      track: toTrackPoints(f.track as unknown)
-    }))
+    const normalized: Fish[] = raw.map((f) => {
+      const extra = parseExtraDesc(f.description ?? undefined)
+      return {
+        id: f.id,
+        name: f.name,
+        ip: f.ip ?? undefined,
+        port: f.port ?? undefined,
+        rtspUrl: f.rtspUrl ?? undefined,
+        rtsp2: f.rtsp2 ?? undefined,
+        createdAt:
+          typeof f.createdAt === 'string' ? f.createdAt : new Date(f.createdAt).toISOString(),
+        updatedAt:
+          typeof f.updatedAt === 'string' ? f.updatedAt : new Date(f.updatedAt).toISOString(),
+        ascendCommand: f.ascendCommand ?? undefined,
+        descendCommand: f.descendCommand ?? undefined,
+        forwardCommand: f.forwardCommand ?? undefined,
+        leftCommand: f.leftCommand ?? undefined,
+        rightCommand: f.rightCommand ?? undefined,
+        manualCommand: f.manualCommand ?? undefined,
+        exitManualCommand: f.exitManualCommand ?? undefined,
+        returnCommand: f.returnCommand ?? undefined,
+        description: typeof extra.text === 'string' ? extra.text : (f.description ?? undefined),
+        track: toTrackPoints(f.track as unknown),
+        // 额外通信参数：优先使用后端字段，其次兼容旧的 description JSON
+        satcomIp: f.satcomIp ?? extra.satcomIp,
+        satcomPort1: f.satcomPort1 ?? extra.satcomPort1,
+        satcomPort2: f.satcomPort2 ?? extra.satcomPort2,
+        microwaveIp: f.microwaveIp ?? extra.microwaveIp,
+        microwavePort: f.microwavePort ?? extra.microwavePort
+      }
+    })
     allFish.value = normalized
   } catch (error) {
     console.error('加载机器鱼失败:', error)
@@ -152,6 +226,11 @@ const form = reactive<FishForm>({
   port: 9200,
   rtspUrl: '',
   rtsp2: '',
+  satcomIp: '',
+  satcomPort1: 0,
+  satcomPort2: 0,
+  microwaveIp: '',
+  microwavePort: 0,
   cmdUp: '',
   cmdDown: '',
   cmdForward: '',
@@ -173,6 +252,11 @@ function openCreate(): void {
     port: 9200,
     rtspUrl: '',
     rtsp2: '',
+    satcomIp: '',
+    satcomPort1: 0,
+    satcomPort2: 0,
+    microwaveIp: '',
+    microwavePort: 0,
     cmdUp: '',
     cmdDown: '',
     cmdForward: '',
@@ -196,6 +280,11 @@ function openEdit(row: Fish): void {
     port: row.port ?? 9200,
     rtspUrl: row.rtspUrl ?? '',
     rtsp2: row.rtsp2 ?? '',
+    satcomIp: row.satcomIp ?? '',
+    satcomPort1: row.satcomPort1 ?? 0,
+    satcomPort2: row.satcomPort2 ?? 0,
+    microwaveIp: row.microwaveIp ?? '',
+    microwavePort: row.microwavePort ?? 0,
     // 从后端读取的命令与描述
     cmdUp: row.ascendCommand ?? '',
     cmdDown: row.descendCommand ?? '',
@@ -264,7 +353,7 @@ async function save(): Promise<void> {
   try {
     if (isEdit.value) {
       // 检查rtspUrl/rtsp2是否变更
-      const oldFish = allFish.value.find(f => f.id === form.id)
+      const oldFish = allFish.value.find((f) => f.id === form.id)
       if (oldFish && (oldFish.rtspUrl !== form.rtspUrl || oldFish.rtsp2 !== form.rtsp2)) {
         rtspChanged = true
       }
@@ -275,6 +364,12 @@ async function save(): Promise<void> {
         port: form.port && form.port > 0 ? form.port : undefined,
         rtspUrl: form.rtspUrl || null,
         rtsp2: form.rtsp2 || null,
+        // 新增字段直接写入后端
+        satcomIp: form.satcomIp || null,
+        satcomPort1: form.satcomPort1 || null,
+        satcomPort2: form.satcomPort2 || null,
+        microwaveIp: form.microwaveIp || null,
+        microwavePort: form.microwavePort || null,
         ascendCommand: form.cmdUp || null,
         descendCommand: form.cmdDown || null,
         forwardCommand: form.cmdForward || null,
@@ -283,13 +378,16 @@ async function save(): Promise<void> {
         manualCommand: form.cmdManual || null,
         exitManualCommand: form.cmdExitManual || null,
         returnCommand: form.cmdReturn || null,
+        // 描述仅保存纯文本
         description: form.description || null,
-        track: form.track.length ? form.track.map((p) => ({
-          lon: p.lon,
-          lat: p.lat,
-          alt: p.alt,
-          depth: p.depth
-        })) : []
+        track: form.track.length
+          ? form.track.map((p) => ({
+              lon: round6(p.lon),
+              lat: round6(p.lat),
+              alt: p.alt,
+              depth: p.depth
+            }))
+          : []
       })
       ElMessage.success('已更新机器鱼')
     } else {
@@ -300,6 +398,12 @@ async function save(): Promise<void> {
         port: form.port && form.port > 0 ? form.port : undefined,
         rtspUrl: form.rtspUrl || null,
         rtsp2: form.rtsp2 || null,
+        // 新增字段直接写入后端
+        satcomIp: form.satcomIp || null,
+        satcomPort1: form.satcomPort1 || null,
+        satcomPort2: form.satcomPort2 || null,
+        microwaveIp: form.microwaveIp || null,
+        microwavePort: form.microwavePort || null,
         ascendCommand: form.cmdUp || null,
         descendCommand: form.cmdDown || null,
         forwardCommand: form.cmdForward || null,
@@ -308,13 +412,16 @@ async function save(): Promise<void> {
         manualCommand: form.cmdManual || null,
         exitManualCommand: form.cmdExitManual || null,
         returnCommand: form.cmdReturn || null,
+        // 描述仅保存纯文本
         description: form.description || null,
-        track: form.track.length ? form.track.map((p) => ({
-          lon: p.lon,
-          lat: p.lat,
-          alt: p.alt,
-          depth: p.depth
-        })) : []
+        track: form.track.length
+          ? form.track.map((p) => ({
+              lon: round6(p.lon),
+              lat: round6(p.lat),
+              alt: p.alt,
+              depth: p.depth
+            }))
+          : []
       })
       ElMessage.success('已新增机器鱼')
     }
@@ -392,13 +499,11 @@ function formatDate(input?: string | Date | null): string {
       </el-form>
     </el-card>
 
-    <el-card class="table-card" shadow="never" v-loading="loading">
+    <el-card v-loading="loading" class="table-card" shadow="never">
       <el-table :data="allFish" border stripe style="width: 100%" height="560">
         <el-table-column type="index" label="#" width="60" />
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="名称" min-width="160" />
-        <el-table-column prop="ip" label="IP" width="140" />
-        <el-table-column prop="port" label="端口" width="100" />
         <el-table-column prop="createdAt" label="创建日期" width="140">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
@@ -413,19 +518,64 @@ function formatDate(input?: string | Date | null): string {
       </el-table>
     </el-card>
 
-
-
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑机器鱼' : '新增机器鱼'" width="60%" class="fish-dialog">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑机器鱼' : '新增机器鱼'"
+      width="60%"
+      class="fish-dialog"
+    >
       <el-form label-width="120px">
-        <el-form-item label="名称">
-          <el-input v-model="form.name" placeholder="请输入名称" />
-        </el-form-item>
-        <el-form-item label="IP">
-          <el-input v-model="form.ip" placeholder="绑定 IP (可选)" />
-        </el-form-item>
-        <el-form-item label="端口">
-          <el-input-number v-model="form.port" :min="0" :max="65535" />
-        </el-form-item>
+        <!-- 第一行：名称、微波IP、微波端口 -->
+        <el-row :gutter="12">
+          <el-col :span="8">
+            <el-form-item label="名称">
+              <el-input v-model="form.name" placeholder="请输入名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="微波 IP">
+              <el-input v-model="form.microwaveIp" placeholder="微波 IP" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="微波端口">
+              <el-input-number
+                v-model="form.microwavePort"
+                :min="0"
+                :max="65535"
+                controls-position="right"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <!-- 第二行：卫通IP、卫通端口1、卫通端口2 -->
+        <el-row :gutter="12">
+          <el-col :span="8">
+            <el-form-item label="卫通 IP">
+              <el-input v-model="form.satcomIp" placeholder="卫通 IP" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="卫通端口1">
+              <el-input-number
+                v-model="form.satcomPort1"
+                :min="0"
+                :max="65535"
+                controls-position="right"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="卫通端口2">
+              <el-input-number
+                v-model="form.satcomPort2"
+                :min="0"
+                :max="65535"
+                controls-position="right"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item label="上浮命令">
           <el-input v-model="form.cmdUp" placeholder="上浮命令" />
         </el-form-item>
@@ -456,29 +606,55 @@ function formatDate(input?: string | Date | null): string {
               <el-button type="primary" plain @click="addTrackPoint">添加轨迹点</el-button>
             </div>
             <el-table :data="form.track" border stripe style="width: 100%" size="small">
-              <el-table-column label="经度" >
+              <el-table-column label="经度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.000001" controls-position="right" />
+                  <el-input-number
+                    v-model="form.track[$index].lon"
+                    :min="-180"
+                    :max="180"
+                    :step="0.000001"
+                    :precision="6"
+                    controls-position="right"
+                  />
                 </template>
               </el-table-column>
               <el-table-column label="纬度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.000001" controls-position="right" />
+                  <el-input-number
+                    v-model="form.track[$index].lat"
+                    :min="-90"
+                    :max="90"
+                    :step="0.000001"
+                    :precision="6"
+                    controls-position="right"
+                  />
                 </template>
               </el-table-column>
-              <el-table-column label="高度" >
+              <el-table-column label="高度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].alt" :min="0" :step="0.1" controls-position="right" />
+                  <el-input-number
+                    v-model="form.track[$index].alt"
+                    :min="0"
+                    :step="0.1"
+                    controls-position="right"
+                  />
                 </template>
               </el-table-column>
               <el-table-column label="深度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].depth" :min="0" :step="0.1" controls-position="right" />
+                  <el-input-number
+                    v-model="form.track[$index].depth"
+                    :min="0"
+                    :step="0.1"
+                    controls-position="right"
+                  />
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="120" fixed="right">
                 <template #default="{ $index }">
-                  <el-button size="small" type="danger" plain @click="removeTrackPoint($index)">删除</el-button>
+                  <el-button size="small" type="danger" plain @click="removeTrackPoint($index)"
+                    >删除</el-button
+                  >
                 </template>
               </el-table-column>
             </el-table>
@@ -500,7 +676,7 @@ function formatDate(input?: string | Date | null): string {
           <el-input v-model="form.rtsp2" placeholder="rtsp://... (第二路, 可选)" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input type="textarea" v-model="form.description" placeholder="描述" :rows="3" />
+          <el-input v-model="form.description" type="textarea" placeholder="描述" :rows="3" />
         </el-form-item>
       </el-form>
       <template #footer>

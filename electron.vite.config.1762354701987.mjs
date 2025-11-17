@@ -1,7 +1,7 @@
 // electron.vite.config.ts
-import { resolve } from "path";
-import { defineConfig, externalizeDepsPlugin } from "electron-vite";
-import vue from "@vitejs/plugin-vue";
+import { resolve } from 'path'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import vue from '@vitejs/plugin-vue'
 var electron_vite_config_default = defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()]
@@ -12,12 +12,10 @@ var electron_vite_config_default = defineConfig({
   renderer: {
     resolve: {
       alias: {
-        "@renderer": resolve("src/renderer/src")
+        '@renderer': resolve('src/renderer/src')
       }
     },
     plugins: [vue()]
   }
-});
-export {
-  electron_vite_config_default as default
-};
+})
+export { electron_vite_config_default as default }

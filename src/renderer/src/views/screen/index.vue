@@ -1,7 +1,7 @@
 <script setup lang="ts">
-
 import { onMounted, onUnmounted, reactive, ref, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { loadBMapGL } from '../../utils/baiduMap'
 import { loadOfflineBMap } from '../../utils/offlineBMap'
 import VideoPlayerJSMpeg from '../../components/VideoPlayerJSMpeg.vue'
@@ -15,7 +15,10 @@ type BMapLikeMap = {
   centerAndZoom: (point: unknown, zoom: number) => void
   enableScrollWheelZoom: (enable: boolean) => void
   addControl: (control: unknown) => void
-  addEventListener: (name: string, handler: (e: { point: { lng: number; lat: number } }) => void) => void
+  addEventListener: (
+    name: string,
+    handler: (e: { point: { lng: number; lat: number } }) => void
+  ) => void
   addOverlay: (overlay: unknown) => void
   removeOverlay: (overlay: unknown) => void
   setMapType?: (type: unknown) => void
@@ -49,12 +52,50 @@ interface RobotStatus {
 
 const robots = reactive<RobotStatus[]>([
   // 将默认选中的 A1 初始位置设置为经度 53.573275、纬度 24.281445
-  { id: 'A1', name: '鲸鲨01号', battery: 98, depth: 100, altitude: 5, yaw: 260, pitch: 15, roll: 2, lng: 53.573275, lat: 24.281445, acoustic: 'strong' },
-  { id: 'B2', name: '鲸鲨02号', battery: 86, depth: 80, altitude: 8, yaw: 120, pitch: 8, roll: 5, lng: 121.4737, lat: 31.2304, acoustic: 'medium' },
-  { id: 'C3', name: '鲸鲨03号', battery: 72, depth: 60, altitude: 3, yaw: 45, pitch: 12, roll: 3, lng: 113.2644, lat: 23.1291, acoustic: 'weak' }
+  {
+    id: 'A1',
+    name: '鲸鲨01号',
+    battery: 98,
+    depth: 100,
+    altitude: 5,
+    yaw: 260,
+    pitch: 15,
+    roll: 2,
+    lng: 53.573275,
+    lat: 24.281445,
+    acoustic: 'strong'
+  },
+  {
+    id: 'B2',
+    name: '鲸鲨02号',
+    battery: 86,
+    depth: 80,
+    altitude: 8,
+    yaw: 120,
+    pitch: 8,
+    roll: 5,
+    lng: 121.4737,
+    lat: 31.2304,
+    acoustic: 'medium'
+  },
+  {
+    id: 'C3',
+    name: '鲸鲨03号',
+    battery: 72,
+    depth: 60,
+    altitude: 3,
+    yaw: 45,
+    pitch: 12,
+    roll: 3,
+    lng: 113.2644,
+    lat: 23.1291,
+    acoustic: 'weak'
+  }
 ])
 const selectedId = ref<string>(robots[0].id)
-const current = computed<RobotStatus | undefined>(() => robots.find(r => r.id === selectedId.value))
+const current = computed<RobotStatus | undefined>(() =>
+  robots.find((r) => r.id === selectedId.value)
+)
 // 为模板提供已解包的派生值，避免在模板中直接访问 ComputedRef 成员导致类型提示报错
 const currentLng = computed<number>(() => current.value?.lng ?? 0)
 const currentLat = computed<number>(() => current.value?.lat ?? 0)
@@ -91,49 +132,84 @@ function descend(): void {
   r.depth = r.depth + 5
   ElMessage.success(`下潜：当前深度 ${r.depth}m`)
 }
-function moveForward(): void { console.log('[tap] forward') }
-function moveBackward(): void { console.log('[tap] backward') }
-function moveLeft(): void { console.log('[tap] left') }
-function moveRight(): void { console.log('[tap] right') }
-// 已移除“返航/初始定高”按钮与方法（保留示例方向与深度控制）
+function moveForward(): void {
+  console.log('[tap] forward')
+}
+function moveLeft(): void {
+  console.log('[tap] left')
+}
+function moveRight(): void {
+  console.log('[tap] right')
+}
 
-// 按住持续触发：每 100ms 执行一次并打印日志
-type HoldAction = 'forward' | 'backward' | 'left' | 'right' | 'ascend' | 'descend'
-const holdTimers: Partial<Record<HoldAction, number>> = {}
-function execAction(action: HoldAction): void {
-  switch (action) {
-    case 'forward':
-      moveForward();
-      break
-    case 'backward':
-      moveBackward();
-      break
-    case 'left':
-      moveLeft();
-      break
-    case 'right':
-      moveRight();
-      break
-    case 'ascend':
-      ascend();
-      break
-    case 'descend':
-      descend();
-      break
-  }
-  console.log(`[hold] ${action}`)
+// 按住持续触发：开始/停止
+function startHold(key: string, handler: () => void, interval = 200, immediate = true): void {
+  if (holdTimers[key] != null) return
+  if (immediate) handler()
+  holdTimers[key] = window.setInterval(handler, interval)
 }
-function pressStart(action: HoldAction): void {
-  if (holdTimers[action] != null) return
-  holdTimers[action] = window.setInterval((): void => {
-    execAction(action)
-  }, 100)
-}
-function pressStop(action: HoldAction): void {
-  const t = holdTimers[action]
+function stopHold(key: string): void {
+  const t = holdTimers[key]
   if (t != null) {
     clearInterval(t)
-    delete holdTimers[action]
+    delete holdTimers[key]
+  }
+}
+
+// 防抖：用于非连续性操作避免短时间内重复触发
+function debounce<T extends (...args: unknown[]) => void>(
+  fn: T,
+  wait = 300
+): (...args: Parameters<T>) => void {
+  let timer: number | null = null
+  return (...args: Parameters<T>): void => {
+    if (timer != null) {
+      clearTimeout(timer)
+    }
+    timer = window.setTimeout((): void => {
+      timer = null
+      fn(...args)
+    }, wait)
+  }
+}
+
+// 为非连续性操作创建防抖包装
+const toggleManualDebounced = debounce(toggleManual, 300)
+const toggleLowPowerDebounced = debounce(toggleLowPower, 300)
+const setLightOnDebounced = debounce((): void => setLight(true), 300)
+const setLightOffDebounced = debounce((): void => setLight(false), 300)
+const returnHomeDebounced = debounce(returnHome, 500)
+// 已移除“返航/初始定高”按钮与方法（保留示例方向与深度控制）
+// 控制台新状态：人工模式、低功耗、灯光
+const manualMode = ref(false)
+const lowPowerMode = ref(false)
+const lightOn = ref(false)
+
+function toggleManual(): void {
+  manualMode.value = !manualMode.value
+  ElMessage.success(`人工模式：${manualMode.value ? '开启' : '关闭'}`)
+}
+function toggleLowPower(): void {
+  lowPowerMode.value = !lowPowerMode.value
+  ElMessage.success(`低功耗模式：${lowPowerMode.value ? '开启' : '关闭'}`)
+}
+function setLight(on: boolean): void {
+  lightOn.value = on
+  ElMessage.success(`灯光：${on ? '开启' : '关闭'}`)
+}
+function returnHome(): void {
+  const BMap = getBMap()
+  if (!BMap || !mapInstance) return
+  const id = selectedId.value
+  const home = homes[id]
+  if (!home) return
+  const point = new BMap.Point(home.lng, home.lat)
+  mapInstance.centerAndZoom(point, 14)
+  const target = robots.find((r) => r.id === id)
+  if (target) {
+    target.lng = home.lng
+    target.lat = home.lat
+    ElMessage.success('已返航至初始位置')
   }
 }
 
@@ -145,22 +221,96 @@ interface AlertItem {
   lng: number
   lat: number
   level: AlertLevel
+  imageUrl?: string
 }
 
 const alerts = reactive<AlertItem[]>([
-  { id: 'al-1', time: new Date().toISOString(), lng: robots[0].lng + 0.0012, lat: robots[0].lat + 0.0012, level: '高' },
-  { id: 'al-2', time: new Date(Date.now() - 30 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0008, lat: robots[0].lat - 0.0006, level: '中' },
-  { id: 'al-3', time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng + 0.0024, lat: robots[0].lat - 0.0014, level: '低' },
-  { id: 'al-4', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-5', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-6', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-7', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-8', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-9', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-10', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-11', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-  { id: 'al-12', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' }
-
+  {
+    id: 'al-1',
+    time: new Date().toISOString(),
+    lng: robots[0].lng + 0.0012,
+    lat: robots[0].lat + 0.0012,
+    level: '高',
+    imageUrl: fishIconUrl
+  },
+  {
+    id: 'al-2',
+    time: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0008,
+    lat: robots[0].lat - 0.0006,
+    level: '中'
+  },
+  {
+    id: 'al-3',
+    time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng + 0.0024,
+    lat: robots[0].lat - 0.0014,
+    level: '低',
+    imageUrl: fishIconUrl
+  },
+  {
+    id: 'al-4',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-5',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-6',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-7',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-8',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-9',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-10',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-11',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  },
+  {
+    id: 'al-12',
+    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    lng: robots[0].lng - 0.0032,
+    lat: robots[0].lat + 0.0022,
+    level: '中'
+  }
 ])
 
 function levelClass(level: AlertLevel): string {
@@ -183,20 +333,33 @@ function formatTime(iso: string): string {
   }
 }
 
+const router = useRouter()
+const alertImageDialogVisible = ref(false)
+const currentAlertImageUrl = ref<string>('')
+
 function focusAlert(a: AlertItem): void {
-  console.log(a)
-  // const BMap = getBMap()
-  // if (!BMap || !mapInstance) return
-  // const point = new BMap.Point(a.lng, a.lat)
-  // mapInstance.centerAndZoom(point, 14)
-  // 点击报警只定位，不在地图上新增任何标注
+  // 有图片则直接弹窗展示；无图片则弹出提示
+  if (a.imageUrl) {
+    currentAlertImageUrl.value = a.imageUrl
+    alertImageDialogVisible.value = true
+  } else {
+    void ElMessageBox.alert('如需查看详细信息，请先让设备浮出水面后再操作', '提示', {
+      type: 'warning'
+    })
+  }
 }
 
+function goHistory(): void {
+  // 跳转到历史页面（按路由名称）
+  router.push({ name: 'history' })
+}
 
 // 路径折线与当前位置标注引用，便于更新与移除
 let routeOverlay: unknown | null = null
 let currentMarker: unknown | null = null
 let pollTimer: number | null = null
+// 持续按压动作的定时器集合（键：动作名；值：setInterval 返回的标识）
+const holdTimers: Record<string, number> = {}
 
 // 视频弹窗状态
 type VideoMode = 'mono' | 'stereo'
@@ -209,10 +372,6 @@ videoUrls['A1'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
 videoUrls['B2'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
 videoUrls['C3'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
 const currentVideoTitle = computed((): string => '实时视频')
-const currentVideoUrl = computed((): string | undefined => {
-  const vs = videoUrls[selectedId.value] ?? {}
-  return videoMode.value === 'mono' ? vs.mono : vs.stereo
-})
 const showVideoPlayer = ref(true)
 function openVideo(mode: VideoMode): void {
   videoMode.value = mode
@@ -236,16 +395,17 @@ function setCurrentMarker(lng: number, lat: number, size = 56): void {
   if (currentMarker && typeof mapInstance.removeOverlay === 'function') {
     mapInstance.removeOverlay(currentMarker)
   }
-  const icon = new BMap.Icon(
-    fishIconUrl,
-    new BMap.Size(size, size),
-    { imageSize: new BMap.Size(size, size), anchor: new BMap.Size(Math.round(size / 2), Math.round(size / 2)) }
-  )
+  const icon = new BMap.Icon(fishIconUrl, new BMap.Size(size, size), {
+    imageSize: new BMap.Size(size, size),
+    anchor: new BMap.Size(Math.round(size / 2), Math.round(size / 2))
+  })
   currentMarker = new BMap.Marker(point, { icon })
   mapInstance.addOverlay(currentMarker)
   // 点击鱼标注，打开视频弹窗（默认单目）
   try {
-    (currentMarker as { addEventListener?: (type: string, handler: () => void) => void }).addEventListener?.('click', (): void => {
+    ;(
+      currentMarker as { addEventListener?: (type: string, handler: () => void) => void }
+    ).addEventListener?.('click', (): void => {
       openVideo('mono')
     })
   } catch (e) {
@@ -257,7 +417,11 @@ function drawRoute(points: RoutePoint[]): void {
   const BMap = getBMap()
   if (!BMap || !mapInstance) return
   const path = points.map((p: RoutePoint): unknown => new BMap.Point(p.lng, p.lat))
-  const polyline = new BMap.Polyline(path, { strokeColor: 'red', strokeWeight: 4, strokeOpacity: 0.9 })
+  const polyline = new BMap.Polyline(path, {
+    strokeColor: 'red',
+    strokeWeight: 4,
+    strokeOpacity: 0.9
+  })
   if (routeOverlay && typeof mapInstance.removeOverlay === 'function') {
     mapInstance.removeOverlay(routeOverlay)
   }
@@ -274,12 +438,14 @@ function mockAlarmsFor(center: { lng: number; lat: number }): AlertItem[] {
   for (let i = 0; i < count; i++) {
     const jitterLng = center.lng + (Math.random() - 0.5) * 0.003
     const jitterLat = center.lat + (Math.random() - 0.5) * 0.003
+    const hasImage = Math.random() < 0.5
     res.push({
       id: `al-${Date.now()}-${i}`,
       time: new Date(Date.now() - i * 15 * 60 * 1000).toISOString(),
       lng: jitterLng,
       lat: jitterLat,
-      level: (levels[Math.floor(Math.random() * levels.length)] as AlertLevel),
+      level: levels[Math.floor(Math.random() * levels.length)] as AlertLevel,
+      imageUrl: hasImage ? fishIconUrl : undefined
     })
   }
   return res
@@ -300,7 +466,10 @@ async function fetchFishData(
   const nextPitch = Math.max(-90, Math.min(90, base.pitch + Math.round((Math.random() - 0.5) * 4)))
   const nextRoll = Math.max(-180, Math.min(180, base.roll + Math.round((Math.random() - 0.5) * 6)))
   const nextBattery = Math.max(0, base.battery - (Math.random() < 0.3 ? 1 : 0))
-  const nextAcoustic: SignalLevel = Math.random() < 0.7 ? base.acoustic : (['strong', 'medium', 'weak'][Math.floor(Math.random() * 3)] as SignalLevel)
+  const nextAcoustic: SignalLevel =
+    Math.random() < 0.7
+      ? base.acoustic
+      : (['strong', 'medium', 'weak'][Math.floor(Math.random() * 3)] as SignalLevel)
 
   const info: RobotStatus = {
     ...base,
@@ -323,7 +492,12 @@ async function fetchFishData(
       const t = i / (steps - 1)
       const lng = base.lng + t * 0.05 + (Math.random() - 0.5) * 0.001
       const lat = base.lat + t * 0.05 + (Math.random() - 0.5) * 0.001
-      route.push({ lng, lat, altitude: base.altitude + Math.round((Math.random() - 0.5) * 2), depth: base.depth })
+      route.push({
+        lng,
+        lat,
+        altitude: base.altitude + Math.round((Math.random() - 0.5) * 2),
+        depth: base.depth
+      })
     }
   }
   // 保持原先设置好的轨迹线，不追加最新点
@@ -373,7 +547,9 @@ async function init(): Promise<void> {
     type GlobalCfg = { __MAP_MODE?: string }
     const globalCfg = window as unknown as GlobalCfg
     const useOffline =
-      !navigator.onLine || globalCfg.__MAP_MODE === 'offline' || localStorage.getItem('MAP_MODE') === 'offline'
+      !navigator.onLine ||
+      globalCfg.__MAP_MODE === 'offline' ||
+      localStorage.getItem('MAP_MODE') === 'offline'
     if (useOffline) {
       await loadOfflineBMap()
     } else {
@@ -395,7 +571,17 @@ async function init(): Promise<void> {
       map.enableScrollWheelZoom(true)
       map.addControl(new BMap.NavigationControl())
       map.addControl(new BMap.ScaleControl())
-      // 按需保留默认地图类型（不启用卫星图）
+      // 切换为卫星地图（若常量可用）
+      try {
+        const sat =
+          (window as { BMAP_SATELLITE_MAP?: unknown }).BMAP_SATELLITE_MAP ??
+          (BMap as unknown as { SATELLITE_MAP?: unknown }).SATELLITE_MAP
+        if (map.setMapType && sat) {
+          map.setMapType(sat as unknown)
+        }
+      } catch (e) {
+        console.warn('Switch to satellite map failed:', e)
+      }
 
       // 初始化加载选中鱼的数据并绘制
       await loadSelectedFishData(true)
@@ -414,7 +600,9 @@ async function init(): Promise<void> {
   }
 }
 
-onMounted((): void => { void init() })
+onMounted((): void => {
+  void init()
+})
 
 onUnmounted((): void => {
   if (pollTimer) {
@@ -422,7 +610,9 @@ onUnmounted((): void => {
     pollTimer = null
   }
   // 清理持续按压的所有定时器
-  Object.values(holdTimers).forEach((t): void => { if (t != null) clearInterval(t) })
+  Object.values(holdTimers).forEach((t): void => {
+    clearInterval(t)
+  })
 })
 
 watch(selectedId, (): void => {
@@ -446,7 +636,12 @@ watch(selectedId, (): void => {
         <div class="panel-card">
           <div class="section-title">基本信息</div>
           <div class="panel-header single-select">
-            <el-select v-model="selectedId" size="large" class="robot-select" placeholder="选择机器人">
+            <el-select
+              v-model="selectedId"
+              size="large"
+              class="robot-select"
+              placeholder="选择机器人"
+            >
               <el-option v-for="r in robots" :key="r.id" :label="r.name" :value="r.id" />
             </el-select>
           </div>
@@ -486,8 +681,18 @@ watch(selectedId, (): void => {
             <div class="stat-card signal">
               <div class="stat-value">
                 <span
-                  :class="['sig', currentAcoustic === 'strong' ? 's-strong' : currentAcoustic === 'medium' ? 's-medium' : 's-weak']">
-                  {{ currentAcoustic === 'strong' ? '强' : currentAcoustic === 'medium' ? '中' : '弱' }}
+                  :class="[
+                    'sig',
+                    currentAcoustic === 'strong'
+                      ? 's-strong'
+                      : currentAcoustic === 'medium'
+                        ? 's-medium'
+                        : 's-weak'
+                  ]"
+                >
+                  {{
+                    currentAcoustic === 'strong' ? '强' : currentAcoustic === 'medium' ? '中' : '弱'
+                  }}
                 </span>
               </div>
               <div class="stat-label">声通信号强度</div>
@@ -496,13 +701,22 @@ watch(selectedId, (): void => {
         </div>
 
         <div class="panel-card alerts-card">
-          <div class="section-title">报警信息</div>
+          <div class="section-header">
+            <div class="section-title">报警信息</div>
+            <button class="section-more" type="button" title="查看历史" @click="goHistory()">
+              ...
+            </button>
+          </div>
           <div class="alerts-list">
-            <div class="alert-card" v-for="(a, i) in alerts" :key="a.id" @click="focusAlert(a)">
-              <div class="alert-index"><span>{{ i + 1 }}</span></div>
+            <div v-for="(a, i) in alerts" :key="a.id" class="alert-card" @click="focusAlert(a)">
+              <div class="alert-index">
+                <span>{{ i + 1 }}</span>
+              </div>
               <div class="alert-main">
                 <div class="alert-title">{{ formatTime(a.time) }}</div>
-                <div class="alert-sub">经度 {{ Number(a.lng).toFixed(6) }} · 纬度 {{ Number(a.lat).toFixed(6) }}</div>
+                <div class="alert-sub">
+                  经度 {{ Number(a.lng).toFixed(6) }} · 纬度 {{ Number(a.lat).toFixed(6) }}
+                </div>
               </div>
               <div class="alert-level" :class="levelClass(a.level)">{{ a.level }}</div>
             </div>
@@ -511,45 +725,129 @@ watch(selectedId, (): void => {
 
         <div class="panel-card">
           <div class="section-title">控制台</div>
-          <div class="console-pad">
-            <!-- 左侧：上浮 -->
-            <div class="pad-vertical">
-              <div class="vert-btn ascend" @click="ascend" @pointerdown="pressStart('ascend')"
-                @pointerup="pressStop('ascend')" @pointerleave="pressStop('ascend')">
-                <span class="icon">⤒</span>
-                <span class="text">上浮</span>
-              </div>
-            </div>
-            <div class="dpad">
-              <div class="pad-btn up" @click="moveForward" @pointerdown="pressStart('forward')"
-                @pointerup="pressStop('forward')" @pointerleave="pressStop('forward')"><span class="icon">↑</span></div>
-              <div class="pad-btn left" @click="moveLeft" @pointerdown="pressStart('left')"
-                @pointerup="pressStop('left')" @pointerleave="pressStop('left')"><span class="icon">←</span></div>
-              <div class="pad-btn right" @click="moveRight" @pointerdown="pressStart('right')"
-                @pointerup="pressStop('right')" @pointerleave="pressStop('right')"><span class="icon">→</span></div>
-              <div class="pad-btn down" @click="moveBackward" @pointerdown="pressStart('backward')"
-                @pointerup="pressStop('backward')" @pointerleave="pressStop('backward')"><span class="icon">↓</span>
-              </div>
-            </div>
-            <!-- 右侧：下潜 -->
-            <div class="pad-vertical">
-              <div class="vert-btn descend" @click="descend" @pointerdown="pressStart('descend')"
-                @pointerup="pressStop('descend')" @pointerleave="pressStop('descend')">
-                <span class="icon">⤓</span>
-                <span class="text">下潜</span>
-              </div>
-            </div>
+          <div class="actions-grid">
+            <!-- 第一行：方向 -->
+            <button
+              class="action-btn primary"
+              @mousedown="startHold('forward', moveForward, 100)"
+              @mouseup="stopHold('forward')"
+              @mouseleave="stopHold('forward')"
+              @touchstart.passive="startHold('forward', moveForward, 100)"
+              @touchend="stopHold('forward')"
+              @touchcancel="stopHold('forward')"
+            >
+              <span class="icon">↑</span><span class="text">向前</span>
+            </button>
+            <button
+              class="action-btn primary"
+              @mousedown="startHold('left', moveLeft, 100)"
+              @mouseup="stopHold('left')"
+              @mouseleave="stopHold('left')"
+              @touchstart.passive="startHold('left', moveLeft, 100)"
+              @touchend="stopHold('left')"
+              @touchcancel="stopHold('left')"
+            >
+              <span class="icon">←</span><span class="text">向左</span>
+            </button>
+            <button
+              class="action-btn primary"
+              @mousedown="startHold('right', moveRight, 100)"
+              @mouseup="stopHold('right')"
+              @mouseleave="stopHold('right')"
+              @touchstart.passive="startHold('right', moveRight, 100)"
+              @touchend="stopHold('right')"
+              @touchcancel="stopHold('right')"
+            >
+              <span class="icon">→</span><span class="text">向右</span>
+            </button>
+            <!-- 第二行：垂直运动 -->
+            <button
+              class="action-btn accent"
+              @mousedown="startHold('ascend1', ascend, 100)"
+              @mouseup="stopHold('ascend1')"
+              @mouseleave="stopHold('ascend1')"
+              @touchstart.passive="startHold('ascend1', ascend, 100)"
+              @touchend="stopHold('ascend1')"
+              @touchcancel="stopHold('ascend1')"
+            >
+              <span class="icon">⤒</span><span class="text">向上</span>
+            </button>
+            <button
+              class="action-btn accent"
+              @mousedown="startHold('descend1', descend, 100)"
+              @mouseup="stopHold('descend1')"
+              @mouseleave="stopHold('descend1')"
+              @touchstart.passive="startHold('descend1', descend, 100)"
+              @touchend="stopHold('descend1')"
+              @touchcancel="stopHold('descend1')"
+            >
+              <span class="icon">⤓</span><span class="text">向下</span>
+            </button>
+            <button
+              class="action-btn accent"
+              @mousedown="startHold('descend2', descend, 100)"
+              @mouseup="stopHold('descend2')"
+              @mouseleave="stopHold('descend2')"
+              @touchstart.passive="startHold('descend2', descend, 100)"
+              @touchend="stopHold('descend2')"
+              @touchcancel="stopHold('descend2')"
+            >
+              <span class="icon">⤓</span><span class="text">下潜</span>
+            </button>
+            <!-- 第三行：模式/返航/上浮 -->
+            <button class="action-btn warn" @click="toggleManualDebounced">
+              <span class="icon">⚙️</span><span class="text">人工模式</span
+              ><span class="state" :class="manualMode ? 'on' : 'off'">{{
+                manualMode ? '开' : '关'
+              }}</span>
+            </button>
+            <button class="action-btn info" @click="returnHomeDebounced">
+              <span class="icon">🏠</span><span class="text">返航</span>
+            </button>
+            <button
+              class="action-btn accent"
+              @mousedown="startHold('ascend2', ascend, 100)"
+              @mouseup="stopHold('ascend2')"
+              @mouseleave="stopHold('ascend2')"
+              @touchstart.passive="startHold('ascend2', ascend, 100)"
+              @touchend="stopHold('ascend2')"
+              @touchcancel="stopHold('ascend2')"
+            >
+              <span class="icon">⤒</span><span class="text">上浮</span>
+            </button>
+            <!-- 第四行：功耗与灯光 -->
+            <button class="action-btn warn" @click="toggleLowPowerDebounced">
+              <span class="icon">🌙</span><span class="text">低功耗模式</span
+              ><span class="state" :class="lowPowerMode ? 'on' : 'off'">{{
+                lowPowerMode ? '开' : '关'
+              }}</span>
+            </button>
+            <button class="action-btn info" @click="setLightOnDebounced">
+              <span class="icon">💡</span><span class="text">灯开</span>
+            </button>
+            <button class="action-btn info" @click="setLightOffDebounced">
+              <span class="icon">💡</span><span class="text">灯关</span>
+            </button>
           </div>
         </div>
       </div>
     </div>
     <!-- 视频查看弹窗：单目/双目切换 -->
-    <el-dialog v-model="videoDialogVisible" :title="currentVideoTitle" width="60%" class="video-dialog"
-      @close="onVideoDialogClose">
+    <el-dialog
+      v-model="videoDialogVisible"
+      :title="currentVideoTitle"
+      width="60%"
+      class="video-dialog"
+      @close="onVideoDialogClose"
+    >
       <div class="video-toolbar">
         <el-button-group>
-          <el-button type="primary" :plain="videoMode !== 'mono'" @click="videoMode = 'mono'">单目视频</el-button>
-          <el-button type="primary" :plain="videoMode !== 'stereo'" @click="videoMode = 'stereo'">双目视频</el-button>
+          <el-button type="primary" :plain="videoMode !== 'mono'" @click="videoMode = 'mono'"
+            >单目视频</el-button
+          >
+          <el-button type="primary" :plain="videoMode !== 'stereo'" @click="videoMode = 'stereo'"
+            >双目视频</el-button
+          >
         </el-button-group>
       </div>
       <div class="video-body">
@@ -566,16 +864,35 @@ watch(selectedId, (): void => {
         </template>
       </div>
     </el-dialog>
-    const showVideoPlayer = ref(true)
-    function onVideoDialogClose() {
-    showVideoPlayer.value = false
-    setTimeout(() => {
-    showVideoPlayer.value = true
-    }, 100)
-    videoDialogVisible.value = false
-    }
+    <!-- 报警图片弹窗：有图则直接展示 -->
+    <el-dialog v-model="alertImageDialogVisible" title="报警图片" width="50%" class="image-dialog">
+      <div
+        style="
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          padding: 10px;
+          background: linear-gradient(135deg, #1f2230, #25293a);
+        "
+      >
+        <template v-if="currentAlertImageUrl">
+          <img :src="currentAlertImageUrl" alt="报警图片" style="width: 100%; border-radius: 8px" />
+        </template>
+        <template v-else>
+          <div
+            style="
+              height: 320px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #9fb2ff;
+            "
+          >
+            暂无图片信息
+          </div>
+        </template>
+      </div>
+    </el-dialog>
   </section>
-
 </template>
 
 <style lang="scss" scoped src="./index.scss"></style>

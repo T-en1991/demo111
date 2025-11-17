@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { UploadFile, UploadFiles } from 'element-plus'
 
 type UploadKind = 'video' | 'data' | 'alarm'
-interface UFile { name: string; size: number; type?: string }
+interface UFile {
+  name: string
+  size: number
+  type?: string
+}
 
 const activeTab = ref<UploadKind>('video')
 const videoFiles = ref<UFile[]>([])
@@ -18,13 +23,37 @@ function filesToUFiles(fileList: UploadFiles): UFile[] {
   }))
 }
 
-function onVideoChange(_file: UploadFile, fileList: UploadFiles): void { videoFiles.value = filesToUFiles(fileList) }
-function onDataChange(_file: UploadFile, fileList: UploadFiles): void { dataFiles.value = filesToUFiles(fileList) }
-function onAlarmChange(_file: UploadFile, fileList: UploadFiles): void { alarmFiles.value = filesToUFiles(fileList) }
+function onVideoChange(_file: UploadFile, fileList: UploadFiles): void {
+  videoFiles.value = filesToUFiles(fileList)
+}
+function onDataChange(_file: UploadFile, fileList: UploadFiles): void {
+  dataFiles.value = filesToUFiles(fileList)
+}
+function onAlarmChange(_file: UploadFile, fileList: UploadFiles): void {
+  alarmFiles.value = filesToUFiles(fileList)
+}
 
-function clearVideo(): void { videoFiles.value = [] }
-function clearData(): void { dataFiles.value = [] }
-function clearAlarm(): void { alarmFiles.value = [] }
+function clearVideo(): void {
+  videoFiles.value = []
+}
+function clearData(): void {
+  dataFiles.value = []
+}
+function clearAlarm(): void {
+  alarmFiles.value = []
+}
+
+async function openWinSCP(): Promise<void> {
+  try {
+    const ok = await window.api.openWinSCP()
+    if (!ok) {
+      ElMessage.error('无法打开 WinSCP，请确认本机已安装')
+    }
+  } catch (e) {
+    console.error('Open WinSCP failed:', e)
+    ElMessage.error('打开 WinSCP 失败')
+  }
+}
 </script>
 
 <template>
@@ -35,6 +64,9 @@ function clearAlarm(): void { alarmFiles.value = [] }
     </header>
 
     <el-card class="upload-card" shadow="hover">
+      <div class="actions">
+        <el-button type="primary" plain @click="openWinSCP">打开 WinSCP</el-button>
+      </div>
       <el-tabs v-model="activeTab" class="upload-tabs">
         <el-tab-pane label="视频上传" name="video">
           <div class="upload-inline">
@@ -53,7 +85,7 @@ function clearAlarm(): void { alarmFiles.value = [] }
               </template>
             </el-upload>
 
-            <div class="upload-list" v-if="videoFiles.length">
+            <div v-if="videoFiles.length" class="upload-list">
               <div class="list-head">
                 <span>已选择 {{ videoFiles.length }} 个文件</span>
                 <el-button text type="danger" @click="clearVideo">清空</el-button>
@@ -85,7 +117,7 @@ function clearAlarm(): void { alarmFiles.value = [] }
               </template>
             </el-upload>
 
-            <div class="upload-list" v-if="dataFiles.length">
+            <div v-if="dataFiles.length" class="upload-list">
               <div class="list-head">
                 <span>已选择 {{ dataFiles.length }} 个文件</span>
                 <el-button text type="danger" @click="clearData">清空</el-button>
@@ -113,11 +145,13 @@ function clearAlarm(): void { alarmFiles.value = [] }
               <i class="el-icon-upload" />
               <div class="el-upload__text">拖拽到此或 <em>点击选择报警数据</em></div>
               <template #tip>
-                <div class="el-upload__tip">支持 JSON/CSV 报警数据格式，字段建议包含：id、time、level、content 等</div>
+                <div class="el-upload__tip">
+                  支持 JSON/CSV 报警数据格式，字段建议包含：id、time、level、content 等
+                </div>
               </template>
             </el-upload>
 
-            <div class="upload-list" v-if="alarmFiles.length">
+            <div v-if="alarmFiles.length" class="upload-list">
               <div class="list-head">
                 <span>已选择 {{ alarmFiles.length }} 个文件</span>
                 <el-button text type="danger" @click="clearAlarm">清空</el-button>

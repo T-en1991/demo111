@@ -4,6 +4,28 @@
   box-sizing: border-box;
 }
 
+/* 图片弹窗样式（与视频弹窗保持一致的质感） */
+:global(.image-dialog) {
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1f2130, #262a3c);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 20px 48px rgba(0,0,0,0.55);
+}
+:global(.image-dialog) .el-dialog__header {
+  margin: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+:global(.image-dialog) .el-dialog__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e7ebff;
+}
+:global(.image-dialog) .el-dialog__body {
+  padding: 16px 18px 18px 18px;
+  background: linear-gradient(145deg, rgba(40,45,60,0.9), rgba(32,36,50,0.9));
+}
+
 /* 视频弹窗样式优化 */
 :global(.video-dialog) {
   border-radius: 14px;
@@ -249,7 +271,7 @@
   }
   .alert-card {
     display: grid;
-    grid-template-columns: 30px 1fr auto;
+    grid-template-columns: 30px 1fr auto; /* 序号 / 主体 / 等级 */
     align-items: center;
     padding: 8px 10px;
     border-radius: 10px;
@@ -317,6 +339,27 @@
   .alert-level.lv-mid { color: #f59e0b; border-color: #f59e0b55; background: #2a2620; }
   .alert-level.lv-low { color: #3b82f6; border-color: #3b82f655; background: #1f2430; }
 
+  /* 标题行与省略号按钮 */
+  .alerts-card .section-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 2px 0 10px 2px;
+  }
+  .alerts-card .section-header .section-title { margin: 0; }
+  .section-more {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: #9fb2ff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.12s ease, color 0.12s ease, transform 0.12s ease;
+  }
+  .section-more:hover { border-color: rgba(100,126,255,0.35); color: #e7ebff; transform: translateY(-1px); }
+
   .console-section { margin-top: 16px; }
   .console-header {
     font-size: 15px;
@@ -330,14 +373,7 @@
     gap: 12px;
   }
   /* 圆盘式方向键 */
-  .console-pad {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    flex-direction: row;
-  }
+  .console-pad { display: none; }
   .pad-circle {
     position: relative;
     width: 220px;
@@ -585,3 +621,34 @@
     color: #ffffff;
   }
 }
+
+/* 新的控制台动作网格与按钮样式 */
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(48,51,66,0.95), rgba(36,39,54,0.95));
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.45);
+  color: #e7ebff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, filter 0.12s ease;
+}
+.action-btn:hover { transform: translateY(-1px); border-color: rgba(100,126,255,0.35); box-shadow: 0 14px 32px rgba(0,0,0,0.5); filter: brightness(1.06); }
+.action-btn .icon { font-size: 18px; color: #9fb2ff; }
+.action-btn .text { font-size: 14px; }
+.action-btn .state { margin-left: 4px; font-size: 12px; color: #9fb2ff; }
+.action-btn .state.on { color: #60a5fa; }
+.action-btn.primary { border-color: #3b82f655; }
+.action-btn.accent { border-color: #60a5fa55; }
+.action-btn.warn { border-color: #f59e0b55; }
+.action-btn.info { border-color: #a695ff55; }

@@ -69,16 +69,16 @@ export const userService = {
 export const alertService = {
   // 创建告警
   async create(data: {
-    title: string;
-    message?: string;
-    level?: 'info' | 'warning' | 'error' | 'critical';
-    type?: string;
-    source?: string;
-    status?: 'active' | 'resolved' | 'acknowledged';
-    fishId?: number | null;
-    imgFile?: string | null;
-    lat?: number | null;
-    lon?: number | null;
+    title: string
+    message?: string
+    level?: 'info' | 'warning' | 'error' | 'critical'
+    type?: string
+    source?: string
+    status?: 'active' | 'resolved' | 'acknowledged'
+    fishId?: number | null
+    imgFile?: string | null
+    lat?: number | null
+    lon?: number | null
   }): Promise<Alert> {
     return prisma.alert.create({ data })
   },
@@ -120,14 +120,17 @@ export const alertService = {
   },
 
   // 更新告警
-  async update(id: number, data: {
-    title?: string;
-    message?: string;
-    level?: 'info' | 'warning' | 'error' | 'critical';
-    type?: string;
-    source?: string;
-    status?: 'active' | 'resolved' | 'acknowledged';
-  }): Promise<Alert> {
+  async update(
+    id: number,
+    data: {
+      title?: string
+      message?: string
+      level?: 'info' | 'warning' | 'error' | 'critical'
+      type?: string
+      source?: string
+      status?: 'active' | 'resolved' | 'acknowledged'
+    }
+  ): Promise<Alert> {
     return prisma.alert.update({
       where: { id },
       data
@@ -173,23 +176,28 @@ export const alertService = {
 export const fishService = {
   // 创建机器鱼
   async create(data: {
-    name: string;
-    ip?: string | null;
-    port?: number | null;
-    rtspUrl?: string | null;
-    rtsp2?: string | null;
-    type?: string;
-    status?: 'running' | 'stopped';
-    ascendCommand?: string | null;
-    descendCommand?: string | null;
-    forwardCommand?: string | null;
-    leftCommand?: string | null;
-    rightCommand?: string | null;
-    manualCommand?: string | null;
-    exitManualCommand?: string | null;
-    returnCommand?: string | null;
-    description?: string | null;
-    track?: Prisma.JsonValue | null;
+    name: string
+    ip?: string | null
+    port?: number | null
+    rtspUrl?: string | null
+    rtsp2?: string | null
+    satcomIp?: string | null
+    satcomPort1?: number | null
+    satcomPort2?: number | null
+    microwaveIp?: string | null
+    microwavePort?: number | null
+    type?: string
+    status?: 'running' | 'stopped'
+    ascendCommand?: string | null
+    descendCommand?: string | null
+    forwardCommand?: string | null
+    leftCommand?: string | null
+    rightCommand?: string | null
+    manualCommand?: string | null
+    exitManualCommand?: string | null
+    returnCommand?: string | null
+    description?: string | null
+    track?: Prisma.JsonValue | null
   }): Promise<Fish> {
     const payload = {
       name: data.name,
@@ -199,6 +207,11 @@ export const fishService = {
       port: data.port ?? null,
       rtspUrl: data.rtspUrl ?? null,
       rtsp2: data.rtsp2 ?? null,
+      satcomIp: data.satcomIp ?? null,
+      satcomPort1: data.satcomPort1 ?? null,
+      satcomPort2: data.satcomPort2 ?? null,
+      microwaveIp: data.microwaveIp ?? null,
+      microwavePort: data.microwavePort ?? null,
       ascendCommand: data.ascendCommand ?? null,
       descendCommand: data.descendCommand ?? null,
       forwardCommand: data.forwardCommand ?? null,
@@ -256,9 +269,9 @@ export const fishService = {
 
   // 搜索机器鱼（按名称模糊查询）
   async search(query: {
-    name?: string;
-    type?: string;
-    status?: 'running' | 'stopped';
+    name?: string
+    type?: string
+    status?: 'running' | 'stopped'
   }): Promise<Fish[]> {
     const where: Prisma.FishWhereInput = {}
 
@@ -285,25 +298,33 @@ export const fishService = {
   },
 
   // 更新机器鱼
-  async update(id: number, data: {
-    name?: string;
-    ip?: string | null;
-    port?: number | null;
-    rtspUrl?: string | null;
-    rtsp2?: string | null;
-    type?: string;
-    status?: 'running' | 'stopped';
-    ascendCommand?: string | null;
-    descendCommand?: string | null;
-    forwardCommand?: string | null;
-    leftCommand?: string | null;
-    rightCommand?: string | null;
-    manualCommand?: string | null;
-    exitManualCommand?: string | null;
-    returnCommand?: string | null;
-    description?: string | null;
-    track?: Prisma.JsonValue | null;
-  }): Promise<Fish> {
+  async update(
+    id: number,
+    data: {
+      name?: string
+      ip?: string | null
+      port?: number | null
+      rtspUrl?: string | null
+      rtsp2?: string | null
+      satcomIp?: string | null
+      satcomPort1?: number | null
+      satcomPort2?: number | null
+      microwaveIp?: string | null
+      microwavePort?: number | null
+      type?: string
+      status?: 'running' | 'stopped'
+      ascendCommand?: string | null
+      descendCommand?: string | null
+      forwardCommand?: string | null
+      leftCommand?: string | null
+      rightCommand?: string | null
+      manualCommand?: string | null
+      exitManualCommand?: string | null
+      returnCommand?: string | null
+      description?: string | null
+      track?: Prisma.JsonValue | null
+    }
+  ): Promise<Fish> {
     const payload = {
       ...data,
       track:
@@ -346,11 +367,7 @@ export const fishService = {
       const name = `机器人-${String(idx).padStart(3, '0')}`
       const type = types[i % types.length]
       const status = statuses[i % statuses.length]
-      // 随机分配部分 IP/端口
-      const hasNet = Math.random() < 0.25
-      const ip = hasNet ? '0.0.0.0' : null
-      const port = hasNet ? (9000 + Math.floor(Math.random() * 1000)) : null
-      return { name, type, status, ip, port }
+      return { name, type, status }
     })
     // 使用 createMany 提高插入效率
     return prisma.fish.createMany({ data: rows })
