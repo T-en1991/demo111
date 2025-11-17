@@ -18,7 +18,7 @@ export function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOptions) {
   wss = new WebSocketServer({ port: wsPort });
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected');
-    ffmpeg = spawn('ffmpeg', [
+  ffmpeg = spawn('C://Program Files//ffmpeg//bin//ffmpeg.exe', [
        '-rtsp_transport', 'tcp',
         '-analyzeduration', '10000000',
         '-probesize', '10000000',

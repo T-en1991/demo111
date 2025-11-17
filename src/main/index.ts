@@ -1,29 +1,30 @@
 import { app, BrowserWindow } from 'electron'
 import { setupApp } from './app'
 import { startRtspRelay } from './rtspRelay'
+import { prisma } from './database/index'
 import { createMainWindow } from './windows/mainWindow'
 import { registerIpc } from './ipc'
 import { startListenersForAllFish } from './network/tcpManager'
 import logger from './logger'
 async function bootstrap(): Promise<void> {
   await setupApp()
-  // Ensure Electron app is ready before creating BrowserWindow
   await app.whenReady()
-  // 启动 RTSP relay 服务（可根据需要修改 RTSP 地址）
-  startRtspRelay({ rtspUrl: process.env.RTSP_URL || 'rtsp://localhost:8554/live', wsPort: 8085 })
-  // Create main window and register IPC handlers
+  // 从数据库读取第一个fish的rtspUrl作为推流地址
+  let dbRtspUrl = 'rtsp://localhost:8554/live'
+  try {
+    const firstFish = await prisma.fish.findFirst({ where: { rtspUrl: { not: null } }, orderBy: { id: 'asc' } })
+    if (firstFish && firstFish.rtspUrl) dbRtspUrl = firstFish.rtspUrl
+  } catch (e) {
+    logger.error('Failed to load fish RTSP url from DB:', e)
+  }
+  startRtspRelay({ rtspUrl: process.env.RTSP_URL || dbRtspUrl, wsPort: 8085 })
   createMainWindow()
   registerIpc()
-  // Start TCP listeners for fish that have ip/port configured
   startListenersForAllFish().catch((err) => logger.error('Failed to start fish listeners:', err))
-
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
   })
 }
-
 bootstrap()
 
 // In this file you can include the rest of your app's specific main process

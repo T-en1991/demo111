@@ -554,10 +554,10 @@ watch(selectedId, (): void => {
       </div>
       <div class="video-body">
         <template v-if="showVideoPlayer && videoMode === 'mono'">
-          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
+          <VideoPlayerJSMpeg url="rtsp://192.168.1.160:8554/0" />
         </template>
         <template v-else-if="showVideoPlayer && videoMode === 'stereo'">
-          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
+          <VideoPlayerJSMpeg url="rtsp://192.168.1.160:8554/0" />
         </template>
         <template v-else>
           <div class="video-placeholder">
