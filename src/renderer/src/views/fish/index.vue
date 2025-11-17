@@ -456,19 +456,17 @@ function formatDate(input?: string | Date | null): string {
               <el-button type="primary" plain @click="addTrackPoint">添加轨迹点</el-button>
             </div>
             <el-table :data="form.track" border stripe style="width: 100%" size="small">
-              <el-table-column label="经度">
+              <el-table-column label="经度" >
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.000001"
-                    controls-position="right" />
+                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.000001" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="纬度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.000001"
-                    controls-position="right" />
+                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.000001" controls-position="right" />
                 </template>
               </el-table-column>
-              <el-table-column label="高度">
+              <el-table-column label="高度" >
                 <template #default="{ $index }">
                   <el-input-number v-model="form.track[$index].alt" :min="0" :step="0.1" controls-position="right" />
                 </template>
@@ -485,8 +483,13 @@ function formatDate(input?: string | Date | null): string {
               </el-table-column>
             </el-table>
             <div v-if="trackErrors.length" style="margin-top: 8px">
-              <el-alert type="error" show-icon :closable="false" :title="'轨迹校验失败：高度与深度必须二选一'"
-                :description="trackErrorDesc" />
+              <el-alert
+                type="error"
+                show-icon
+                :closable="false"
+                :title="'轨迹校验失败：高度与深度必须二选一'"
+                :description="trackErrorDesc"
+              />
             </div>
           </div>
         </el-form-item>
