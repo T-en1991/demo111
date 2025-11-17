@@ -213,9 +213,18 @@ const currentVideoUrl = computed((): string | undefined => {
   const vs = videoUrls[selectedId.value] ?? {}
   return videoMode.value === 'mono' ? vs.mono : vs.stereo
 })
+const showVideoPlayer = ref(true)
 function openVideo(mode: VideoMode): void {
   videoMode.value = mode
+  showVideoPlayer.value = true
   videoDialogVisible.value = true
+}
+function onVideoDialogClose() {
+  showVideoPlayer.value = false
+  setTimeout(() => {
+    showVideoPlayer.value = true
+  }, 100)
+  videoDialogVisible.value = false
 }
 
 type RoutePoint = { lng: number; lat: number; altitude: number; depth: number }
@@ -535,7 +544,8 @@ watch(selectedId, (): void => {
       </div>
     </div>
     <!-- 视频查看弹窗：单目/双目切换 -->
-    <el-dialog v-model="videoDialogVisible" :title="currentVideoTitle" width="60%" class="video-dialog">
+    <el-dialog v-model="videoDialogVisible" :title="currentVideoTitle" width="60%" class="video-dialog"
+      @close="onVideoDialogClose">
       <div class="video-toolbar">
         <el-button-group>
           <el-button type="primary" :plain="videoMode !== 'mono'" @click="videoMode = 'mono'">单目视频</el-button>
@@ -543,10 +553,10 @@ watch(selectedId, (): void => {
         </el-button-group>
       </div>
       <div class="video-body">
-        <template v-if="videoMode === 'mono'">
+        <template v-if="showVideoPlayer && videoMode === 'mono'">
           <VideoPlayerJSMpeg url="ws://localhost:8085/" />
         </template>
-        <template v-else-if="videoMode === 'stereo'">
+        <template v-else-if="showVideoPlayer && videoMode === 'stereo'">
           <VideoPlayerJSMpeg url="ws://localhost:8085/" />
         </template>
         <template v-else>
@@ -556,6 +566,14 @@ watch(selectedId, (): void => {
         </template>
       </div>
     </el-dialog>
+    const showVideoPlayer = ref(true)
+    function onVideoDialogClose() {
+    showVideoPlayer.value = false
+    setTimeout(() => {
+    showVideoPlayer.value = true
+    }, 100)
+    videoDialogVisible.value = false
+    }
   </section>
 
 </template>

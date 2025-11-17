@@ -43,6 +43,8 @@ export function registerDatabaseIpc(): void {
     name: string;
     ip?: string | null;
     port?: number | null;
+    rtspUrl?: string | null;
+    rtsp2?: string | null;
     type?: string;
     status?: 'running' | 'stopped';
     ascendCommand?: string | null;
@@ -69,6 +71,8 @@ export function registerDatabaseIpc(): void {
     name?: string;
     ip?: string | null;
     port?: number | null;
+    rtspUrl?: string | null;
+    rtsp2?: string | null;
     type?: string;
     status?: 'running' | 'stopped';
     ascendCommand?: string | null;

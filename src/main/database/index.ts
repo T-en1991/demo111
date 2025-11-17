@@ -176,6 +176,8 @@ export const fishService = {
     name: string;
     ip?: string | null;
     port?: number | null;
+    rtspUrl?: string | null;
+    rtsp2?: string | null;
     type?: string;
     status?: 'running' | 'stopped';
     ascendCommand?: string | null;
@@ -195,6 +197,8 @@ export const fishService = {
       status: data.status ?? 'stopped',
       ip: data.ip ?? null,
       port: data.port ?? null,
+      rtspUrl: data.rtspUrl ?? null,
+      rtsp2: data.rtsp2 ?? null,
       ascendCommand: data.ascendCommand ?? null,
       descendCommand: data.descendCommand ?? null,
       forwardCommand: data.forwardCommand ?? null,
@@ -285,6 +289,8 @@ export const fishService = {
     name?: string;
     ip?: string | null;
     port?: number | null;
+    rtspUrl?: string | null;
+    rtsp2?: string | null;
     type?: string;
     status?: 'running' | 'stopped';
     ascendCommand?: string | null;

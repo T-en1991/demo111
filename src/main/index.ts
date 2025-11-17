@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import { setupApp } from './app'
+import { startRtspRelay } from './rtspRelay'
 import { createMainWindow } from './windows/mainWindow'
 import { registerIpc } from './ipc'
 import { startListenersForAllFish } from './network/tcpManager'
@@ -8,6 +9,8 @@ async function bootstrap(): Promise<void> {
   await setupApp()
   // Ensure Electron app is ready before creating BrowserWindow
   await app.whenReady()
+  // 启动 RTSP relay 服务（可根据需要修改 RTSP 地址）
+  startRtspRelay({ rtspUrl: process.env.RTSP_URL || 'rtsp://localhost:8554/live', wsPort: 8085 })
   // Create main window and register IPC handlers
   createMainWindow()
   registerIpc()

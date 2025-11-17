@@ -7,6 +7,8 @@ interface Fish {
   name: string
   ip?: string
   port?: number
+  rtspUrl?: string
+  rtsp2?: string
   createdAt: string
   updatedAt: string
   ascendCommand?: string
@@ -27,6 +29,8 @@ type FishFromBackend = {
   name: string
   ip: string | null
   port: number | null
+  rtspUrl?: string | null
+  rtsp2?: string | null
   createdAt: string | Date
   updatedAt: string | Date
   type?: string
@@ -57,6 +61,8 @@ interface FishForm {
   name: string
   ip?: string
   port?: number
+  rtspUrl: string
+  rtsp2: string
   cmdUp: string
   cmdDown: string
   cmdForward: string
@@ -105,6 +111,8 @@ async function loadFish(): Promise<void> {
       name: f.name,
       ip: f.ip ?? undefined,
       port: f.port ?? undefined,
+      rtspUrl: f.rtspUrl ?? undefined,
+      rtsp2: f.rtsp2 ?? undefined,
       createdAt: typeof f.createdAt === 'string' ? f.createdAt : new Date(f.createdAt).toISOString(),
       updatedAt: typeof f.updatedAt === 'string' ? f.updatedAt : new Date(f.updatedAt).toISOString(),
       ascendCommand: f.ascendCommand ?? undefined,
@@ -142,6 +150,8 @@ const form = reactive<FishForm>({
   name: '',
   ip: '',
   port: 9200,
+  rtspUrl: '',
+  rtsp2: '',
   cmdUp: '',
   cmdDown: '',
   cmdForward: '',
@@ -161,6 +171,8 @@ function openCreate(): void {
     name: '',
     ip: '',
     port: 9200,
+    rtspUrl: '',
+    rtsp2: '',
     cmdUp: '',
     cmdDown: '',
     cmdForward: '',
@@ -182,6 +194,8 @@ function openEdit(row: Fish): void {
     name: row.name,
     ip: row.ip ?? '',
     port: row.port ?? 9200,
+    rtspUrl: row.rtspUrl ?? '',
+    rtsp2: row.rtsp2 ?? '',
     // 从后端读取的命令与描述
     cmdUp: row.ascendCommand ?? '',
     cmdDown: row.descendCommand ?? '',
@@ -230,6 +244,7 @@ const trackErrorDesc = computed(() =>
 )
 
 async function save(): Promise<void> {
+  let rtspChanged = false
   if (!form.name.trim()) {
     ElMessage.error('请填写名称')
     return
@@ -248,11 +263,18 @@ async function save(): Promise<void> {
   saving.value = true
   try {
     if (isEdit.value) {
+      // 检查rtspUrl/rtsp2是否变更
+      const oldFish = allFish.value.find(f => f.id === form.id)
+      if (oldFish && (oldFish.rtspUrl !== form.rtspUrl || oldFish.rtsp2 !== form.rtsp2)) {
+        rtspChanged = true
+      }
       // 更新机器鱼
       await window.api.fish.update(form.id, {
         name: form.name.trim(),
         ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
         port: form.port && form.port > 0 ? form.port : undefined,
+        rtspUrl: form.rtspUrl || null,
+        rtsp2: form.rtsp2 || null,
         ascendCommand: form.cmdUp || null,
         descendCommand: form.cmdDown || null,
         forwardCommand: form.cmdForward || null,
@@ -276,6 +298,8 @@ async function save(): Promise<void> {
         name: form.name.trim(),
         ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
         port: form.port && form.port > 0 ? form.port : undefined,
+        rtspUrl: form.rtspUrl || null,
+        rtsp2: form.rtsp2 || null,
         ascendCommand: form.cmdUp || null,
         descendCommand: form.cmdDown || null,
         forwardCommand: form.cmdForward || null,
@@ -297,6 +321,9 @@ async function save(): Promise<void> {
 
     dialogVisible.value = false
     await loadFish() // 重新加载数据
+    if (rtspChanged) {
+      ElMessageBox.alert('RTSP流地址已变更，需重启应用才能生效。', '提示', { type: 'warning' })
+    }
   } catch (error) {
     console.error('保存失败:', error)
     ElMessage.error('保存失败')
@@ -465,6 +492,12 @@ function formatDate(input?: string | Date | null): string {
               />
             </div>
           </div>
+        </el-form-item>
+        <el-form-item label="RTSP流地址1">
+          <el-input v-model="form.rtspUrl" placeholder="rtsp://..." />
+        </el-form-item>
+        <el-form-item label="RTSP流地址2">
+          <el-input v-model="form.rtsp2" placeholder="rtsp://... (第二路, 可选)" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input type="textarea" v-model="form.description" placeholder="描述" :rows="3" />

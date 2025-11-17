@@ -26,6 +26,8 @@ model Fish {
   type      String     @default("default")
   ip        String?    // optional IP to bind for this fish (e.g. "0.0.0.0")
   port      Int?       // optional port to bind for this fish
+  rtspUrl   String?    // RTSP 单目视频流地址
+  rtsp2     String?    // RTSP 双目视频流地址
   alerts    Alert[]
   status    FishStatus @default(running)
   // 控制命令（可选）
