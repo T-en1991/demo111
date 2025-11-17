@@ -2,6 +2,7 @@
 // Electron 主进程：RTSP 转 WebSocket 推流服务
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import { WebSocketServer, WebSocket } from 'ws';
+import { prisma } from './database/index';
 
 let wss: WebSocketServer | null = null;
 let ffmpeg: ChildProcessWithoutNullStreams | null = null;
@@ -11,9 +12,15 @@ export interface RtspRelayOptions {
   wsPort?: number;
 }
 
-export function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOptions) {
-  // 优先使用环境变量 RTSP_URL
-  const finalRtspUrl = process.env.RTSP_URL || rtspUrl;
+export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOptions) {
+  // 优先使用数据库 fish.rtspUrl 字段
+  let finalRtspUrl = rtspUrl;
+  try {
+    const firstFish = await prisma.fish.findFirst({ where: { rtspUrl: { not: null } }, orderBy: { id: 'asc' } });
+    if (firstFish && firstFish.rtspUrl) finalRtspUrl = firstFish.rtspUrl;
+  } catch (e) {
+    // ignore, fallback to param
+  }
   if (wss) return; // 已启动
   wss = new WebSocketServer({ port: wsPort });
   wss.on('connection', (ws: WebSocket) => {
