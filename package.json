@@ -27,12 +27,14 @@
     "db:studio": "prisma studio --config src/main/prisma/prisma.config.ts"
   },
   "dependencies": {
+    "@cycjimmy/jsmpeg-player": "^6.1.2",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@element-plus/icons-vue": "^2.3.2",
     "dotenv": "^17.2.3",
     "electron-updater": "^6.3.9",
     "element-plus": "^2.11.7",
+    "jsmpeg-player": "^3.0.3",
     "leaflet": "^1.9.4",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.7.1",

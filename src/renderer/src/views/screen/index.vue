@@ -1,8 +1,10 @@
 <script setup lang="ts">
+
 import { onMounted, onUnmounted, reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { loadBMapGL } from '../../utils/baiduMap'
 import { loadOfflineBMap } from '../../utils/offlineBMap'
+import VideoPlayerJSMpeg from '../../components/VideoPlayerJSMpeg.vue'
 
 const AK = 'iWyOxtxr32YCdQBu9yYeICmRKBb6Jm1h'
 // 使用项目静态资源作为标注图标
@@ -150,8 +152,8 @@ const alerts = reactive<AlertItem[]>([
   { id: 'al-2', time: new Date(Date.now() - 30 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0008, lat: robots[0].lat - 0.0006, level: '中' },
   { id: 'al-3', time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng + 0.0024, lat: robots[0].lat - 0.0014, level: '低' },
   { id: 'al-4', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-    { id: 'al-5', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
-    { id: 'al-6', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
+  { id: 'al-5', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
+  { id: 'al-6', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
   { id: 'al-7', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
   { id: 'al-8', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
   { id: 'al-9', time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), lng: robots[0].lng - 0.0032, lat: robots[0].lat + 0.0022, level: '中' },
@@ -278,7 +280,7 @@ async function fetchFishData(
   id: string,
   prevRoute: RoutePoint[]
 ): Promise<{ info: RobotStatus; route: RoutePoint[]; alarm: AlertItem[] }> {
-  const base = robots.find(r => r.id === id) ?? robots[0]
+  const base = robots.find((r) => r.id === id) ?? robots[0]
   // 模拟当前位置在基础点附近随机漂移
   const jitter = (): number => (Math.random() - 0.5) * 0.0012
   const nextLng = base.lng + jitter()
@@ -289,7 +291,7 @@ async function fetchFishData(
   const nextPitch = Math.max(-90, Math.min(90, base.pitch + Math.round((Math.random() - 0.5) * 4)))
   const nextRoll = Math.max(-180, Math.min(180, base.roll + Math.round((Math.random() - 0.5) * 6)))
   const nextBattery = Math.max(0, base.battery - (Math.random() < 0.3 ? 1 : 0))
-  const nextAcoustic: SignalLevel = Math.random() < 0.7 ? base.acoustic : (['strong','medium','weak'][Math.floor(Math.random()*3)] as SignalLevel)
+  const nextAcoustic: SignalLevel = Math.random() < 0.7 ? base.acoustic : (['strong', 'medium', 'weak'][Math.floor(Math.random() * 3)] as SignalLevel)
 
   const info: RobotStatus = {
     ...base,
@@ -330,7 +332,7 @@ async function loadSelectedFishData(recenter = false): Promise<void> {
   const id = selectedId.value
   const res = await fetchFishData(id, routePoints.value)
   // 将 info 映射回当前选中机器人，驱动右侧基本信息展示
-  const target = robots.find(r => r.id === id)
+  const target = robots.find((r) => r.id === id)
   if (target) {
     target.lng = res.info.lng
     target.lat = res.info.lat
@@ -474,7 +476,8 @@ watch(selectedId, (): void => {
             </div>
             <div class="stat-card signal">
               <div class="stat-value">
-                <span :class="['sig', currentAcoustic === 'strong' ? 's-strong' : currentAcoustic === 'medium' ? 's-medium' : 's-weak']">
+                <span
+                  :class="['sig', currentAcoustic === 'strong' ? 's-strong' : currentAcoustic === 'medium' ? 's-medium' : 's-weak']">
                   {{ currentAcoustic === 'strong' ? '强' : currentAcoustic === 'medium' ? '中' : '弱' }}
                 </span>
               </div>
@@ -502,56 +505,27 @@ watch(selectedId, (): void => {
           <div class="console-pad">
             <!-- 左侧：上浮 -->
             <div class="pad-vertical">
-              <div
-                class="vert-btn ascend"
-                @click="ascend"
-                @pointerdown="pressStart('ascend')"
-                @pointerup="pressStop('ascend')"
-                @pointerleave="pressStop('ascend')"
-              >
+              <div class="vert-btn ascend" @click="ascend" @pointerdown="pressStart('ascend')"
+                @pointerup="pressStop('ascend')" @pointerleave="pressStop('ascend')">
                 <span class="icon">⤒</span>
                 <span class="text">上浮</span>
               </div>
             </div>
             <div class="dpad">
-              <div
-                class="pad-btn up"
-                @click="moveForward"
-                @pointerdown="pressStart('forward')"
-                @pointerup="pressStop('forward')"
-                @pointerleave="pressStop('forward')"
-              ><span class="icon">↑</span></div>
-              <div
-                class="pad-btn left"
-                @click="moveLeft"
-                @pointerdown="pressStart('left')"
-                @pointerup="pressStop('left')"
-                @pointerleave="pressStop('left')"
-              ><span class="icon">←</span></div>
-              <div
-                class="pad-btn right"
-                @click="moveRight"
-                @pointerdown="pressStart('right')"
-                @pointerup="pressStop('right')"
-                @pointerleave="pressStop('right')"
-              ><span class="icon">→</span></div>
-              <div
-                class="pad-btn down"
-                @click="moveBackward"
-                @pointerdown="pressStart('backward')"
-                @pointerup="pressStop('backward')"
-                @pointerleave="pressStop('backward')"
-              ><span class="icon">↓</span></div>
+              <div class="pad-btn up" @click="moveForward" @pointerdown="pressStart('forward')"
+                @pointerup="pressStop('forward')" @pointerleave="pressStop('forward')"><span class="icon">↑</span></div>
+              <div class="pad-btn left" @click="moveLeft" @pointerdown="pressStart('left')"
+                @pointerup="pressStop('left')" @pointerleave="pressStop('left')"><span class="icon">←</span></div>
+              <div class="pad-btn right" @click="moveRight" @pointerdown="pressStart('right')"
+                @pointerup="pressStop('right')" @pointerleave="pressStop('right')"><span class="icon">→</span></div>
+              <div class="pad-btn down" @click="moveBackward" @pointerdown="pressStart('backward')"
+                @pointerup="pressStop('backward')" @pointerleave="pressStop('backward')"><span class="icon">↓</span>
+              </div>
             </div>
             <!-- 右侧：下潜 -->
             <div class="pad-vertical">
-              <div
-                class="vert-btn descend"
-                @click="descend"
-                @pointerdown="pressStart('descend')"
-                @pointerup="pressStop('descend')"
-                @pointerleave="pressStop('descend')"
-              >
+              <div class="vert-btn descend" @click="descend" @pointerdown="pressStart('descend')"
+                @pointerup="pressStop('descend')" @pointerleave="pressStop('descend')">
                 <span class="icon">⤓</span>
                 <span class="text">下潜</span>
               </div>
@@ -569,8 +543,11 @@ watch(selectedId, (): void => {
         </el-button-group>
       </div>
       <div class="video-body">
-        <template v-if="currentVideoUrl">
-          <video :src="currentVideoUrl" controls autoplay style="width: 100%; height: 560px; background: #000"></video>
+        <template v-if="videoMode === 'mono'">
+          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
+        </template>
+        <template v-else-if="videoMode === 'stereo'">
+          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
         </template>
         <template v-else>
           <div class="video-placeholder">

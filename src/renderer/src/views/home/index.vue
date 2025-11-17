@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { ref } from 'vue'
+import VideoDialog from './VideoDialog.vue'
 const router = useRouter()
+const videoDialog = ref()
 
 function go(name: string): void {
   router.push({ name })
+}
+
+function openVideoDialog() {
+  videoDialog.value?.open()
 }
 </script>
 
@@ -54,6 +61,13 @@ function go(name: string): void {
         </div>
       </el-col>
     </el-row>
+
+    <!-- 视频弹窗和按钮 -->
+    <VideoDialog ref="videoDialog" url="ws://localhost:8085/" />
+    <el-button type="primary" style="position: fixed; bottom: 32px; right: 32px; z-index: 1000;"
+      @click="openVideoDialog">
+      查看实时视频
+    </el-button>
   </section>
 </template>
 
