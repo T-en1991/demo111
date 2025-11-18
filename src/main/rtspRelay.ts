@@ -1,6 +1,6 @@
 // src/main/rtspRelay.ts
 // Electron 主进程：RTSP 转 WebSocket 推流服务
-import { spawn, ChildProcess } from 'child_process'
+import { spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { WebSocketServer, WebSocket } from 'ws'
 
@@ -27,9 +27,9 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
   const wss = new WebSocketServer({ port: wsPort })
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected')
-    const ffmpegCmd = resolveFfmpegPath()
-    ffmpeg = spawn(
-      ffmpegCmd,
+    //const ffmpegCmd = resolveFfmpegPath()
+    const child = spawn(
+      'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
       [
         '-rtsp_transport',
         'tcp',
@@ -63,7 +63,7 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
       ],
       { stdio: ['ignore', 'pipe', 'ignore'] }
     )
-    const out = ffmpeg.stdout
+    const out = child.stdout
     if (out) {
       out.on('data', (data) => {
         if (ws.readyState === ws.OPEN) {
@@ -71,19 +71,19 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
         }
       })
     }
-    ffmpeg.on('error', (err) => {
+    child.on('error', (err) => {
       console.error('FFmpeg spawn error:', err)
       try { ws.close() } catch {}
     })
-    ffmpeg.on('close', (code) => {
+    child.on('close', (code) => {
       console.log('ffmpeg process closed, code', code)
       ws.close()
     })
     ws.on('close', () => {
-      ffmpeg && ffmpeg.kill('SIGINT')
+      child && child.kill('SIGINT')
     })
     ws.on('error', () => {
-      ffmpeg && ffmpeg.kill('SIGINT')
+      child && child.kill('SIGINT')
     })
   })
   // 存储WebSocket服务器实例
@@ -95,8 +95,16 @@ function resolveFfmpegPath(): string {
   const envPath = process.env.FFMPEG_PATH
   if (envPath && existsSync(envPath)) return envPath
   if (process.platform === 'win32') {
-    const winDefault = 'C\\Program Files\\ffmpeg\\bin\\ffmpeg.exe'.replace(/\\/g, '\\')
-    if (existsSync(winDefault)) return winDefault
+    const programFiles = process.env['ProgramFiles'] || 'C\\Program Files'
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C\\Program Files (x86)'
+    const candidates = [
+      `${programFiles}\\ffmpeg\\bin\\ffmpeg.exe`,
+      `${programFilesX86}\\ffmpeg\\bin\\ffmpeg.exe`,
+      'C\\ffmpeg\\bin\\ffmpeg.exe'
+    ]
+    for (const p of candidates) {
+      if (existsSync(p)) return p
+    }
   }
   if (process.platform === 'darwin') {
     const macHomebrew = '/opt/homebrew/bin/ffmpeg'

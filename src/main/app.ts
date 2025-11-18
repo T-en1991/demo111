@@ -64,7 +64,7 @@ export async function setupApp(): Promise<void> {
     // 启动单目视频流 (默认端口 8085)
     await startRtspRelay({ rtspUrl: monocularRtspUrl, wsPort: 8085 })
     // 启动双目视频流 (默认端口 8086)
-    await startRtspRelay({ rtspUrl: binocularRtspUrl, wsPort: 8086 })
+ //   await startRtspRelay({ rtspUrl: binocularRtspUrl, wsPort: 8086 })
   } catch (error) {
     console.error('Error starting RTSP relays:', error)
   }

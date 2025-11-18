@@ -4,3 +4,6 @@ out
 .DS_Store
 .eslintcache
 *.log*
+src/main/prisma/src/main/prisma/dev.db
+logs/.650555e4b283f45b7606bbc25af036c0cee3690c-audit.json
+src/main/prisma/src/main/prisma/dev.db
