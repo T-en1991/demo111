@@ -8,20 +8,6 @@
     <div class="jsmpeg-controls">
       <el-button size="small" @click="togglePlay">{{ isPlaying ? '暂停' : '播放' }}</el-button>
       <div class="progress-volume-row">
-        <label style="margin-right: 8px">进度</label>
-        <input
-          v-model="progress"
-          type="range"
-          min="0"
-          :max="duration"
-          step="0.01"
-          style="width: 180px"
-          @input="onSeek"
-        />
-        />
-        <span style="margin-left: 8px"
-          >{{ formatTime(progress) }} / {{ formatTime(duration) }}</span
-        >
         <label style="margin: 0 8px 0 24px">音量</label>
         <input
           v-model.number="volume"
@@ -31,7 +17,6 @@
           step="0.01"
           style="width: 80px"
           @input="onVolume"
-        />
         />
         <span style="margin-left: 8px">{{ Math.round(volume * 100) }}%</span>
       </div>
@@ -48,10 +33,7 @@ const props = defineProps<{ url: string }>()
 const videoContainer = ref<HTMLElement | null>(null)
 let player: any = null
 const isPlaying = ref(false)
-const progress = ref(0)
-const duration = ref(0)
 const volume = ref(1)
-let progressTimer: any = null
 
 function togglePlay() {
   if (!player) return
@@ -62,13 +44,6 @@ function togglePlay() {
     player.play()
     isPlaying.value = true
   }
-}
-
-function onSeek(e: Event) {
-  if (!player || !player.player) return
-  const val = Number((e.target as HTMLInputElement).value)
-  player.player.currentTime = val
-  progress.value = val
 }
 
 function onVolume(e: Event) {
@@ -85,13 +60,6 @@ function formatTime(sec: number) {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-function syncProgress() {
-  if (!player || !player.player) return
-  progress.value = player.player.currentTime
-  duration.value = player.player.duration || 0
-  isPlaying.value = player.player.isPlaying
-}
-
 onMounted(() => {
   if (videoContainer.value) {
     player = new JSMpeg.VideoElement(videoContainer.value, props.url, {
@@ -103,15 +71,12 @@ onMounted(() => {
     setTimeout(() => {
       if (player && player.player) {
         player.player.volume = volume.value
-        syncProgress()
       }
     }, 500)
-    progressTimer = setInterval(syncProgress, 500)
   }
 })
 
 onBeforeUnmount(() => {
-  if (progressTimer) clearInterval(progressTimer)
   if (player && player.destroy) player.destroy()
 })
 </script>

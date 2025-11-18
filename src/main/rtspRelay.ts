@@ -3,10 +3,10 @@
 import { spawn, ChildProcess } from 'child_process'
 import { existsSync } from 'fs'
 import { WebSocketServer, WebSocket } from 'ws'
-import { prisma } from './database/index'
 
-let wss: WebSocketServer | null = null
-let ffmpeg: ChildProcess | null = null
+
+// 管理多个RTSP中继实例
+const relays = new Map<number, WebSocketServer>()
 
 export interface RtspRelayOptions {
   rtspUrl: string
@@ -14,24 +14,17 @@ export interface RtspRelayOptions {
 }
 
 export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOptions) {
-  // 优先使用数据库 fish.rtspUrl 字段
-  let finalRtspUrl = rtspUrl
-  try {
-    const firstFish = await prisma.fish.findFirst({
-      where: { rtspUrl: { not: null } },
-      orderBy: { id: 'asc' }
-    })
-    if (firstFish && firstFish.rtspUrl) finalRtspUrl = firstFish.rtspUrl
-    if (!finalRtspUrl) {
-      console.warn('use default rtspUrl value')
-      finalRtspUrl = 'rtsp://192.168.1.160:8555/0'
-    }
-    console.warn('use rtspUrl from db:', finalRtspUrl)
-  } catch (e) {
-    // ignore, fallback to param
+  // 检查是否提供了rtspUrl
+  if (!rtspUrl) {
+    console.warn('No RTSP URL provided, skipping RTSP relay startup')
+    return
   }
-  if (wss) return // 已启动
-  wss = new WebSocketServer({ port: wsPort })
+  const finalRtspUrl = rtspUrl
+  // 如果该端口已存在服务，先关闭
+  if (relays.has(wsPort)) {
+    stopRtspRelay(wsPort)
+  }
+  const wss = new WebSocketServer({ port: wsPort })
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected')
     const ffmpegCmd = resolveFfmpegPath()
@@ -93,6 +86,8 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
       ffmpeg && ffmpeg.kill('SIGINT')
     })
   })
+  // 存储WebSocket服务器实例
+  relays.set(wsPort, wss)
   console.log(`RTSP relay started. RTSP: ${finalRtspUrl} => ws://localhost:${wsPort}/`)
 }
 
@@ -112,13 +107,19 @@ function resolveFfmpegPath(): string {
   return 'ffmpeg'
 }
 
-export function stopRtspRelay() {
-  if (wss) {
+export function stopRtspRelay(wsPort?: number) {
+  if (wsPort && relays.has(wsPort)) {
+    // 关闭特定端口的服务器
+    const wss = relays.get(wsPort)!
     wss.close()
-    wss = null
-  }
-  if (ffmpeg) {
-    ffmpeg.kill('SIGINT')
-    ffmpeg = null
+    relays.delete(wsPort)
+    console.log(`RTSP relay stopped on port ${wsPort}`)
+  } else if (!wsPort) {
+    // 关闭所有服务器
+    relays.forEach((wss, port) => {
+      wss.close()
+      console.log(`RTSP relay stopped on port ${port}`)
+    })
+    relays.clear()
   }
 }

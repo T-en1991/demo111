@@ -3,8 +3,10 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { getMainWindow } from './windows/mainWindow'
 import { connectDatabase, disconnectDatabase } from './database'
 import logger from './logger'
+import { prisma } from './database/index'
 
 import { stopAllListeners } from './network/tcpManager'
+import { startRtspRelay, stopRtspRelay } from './rtspRelay'
 
 export async function setupApp(): Promise<void> {
   // Check for single instance lock
@@ -48,13 +50,32 @@ export async function setupApp(): Promise<void> {
     }
   })
 
-  // Start UDP listener if configured
+  // Start RTSP to WebSocket relays for both cameras
+  try {
+    // 从数据库获取鱼的信息
+    const firstFish = await prisma.fish.findFirst({
+      where: { OR: [{ rtspUrl: { not: null } }, { rtsp2: { not: null } }] },
+      orderBy: { id: 'asc' }
+    })
+    
+    const monocularRtspUrl = firstFish?.rtspUrl || ''
+    const binocularRtspUrl = firstFish?.rtsp2 || ''
+    
+    // 启动单目视频流 (默认端口 8085)
+    await startRtspRelay({ rtspUrl: monocularRtspUrl, wsPort: 8085 })
+    // 启动双目视频流 (默认端口 8086)
+    await startRtspRelay({ rtspUrl: binocularRtspUrl, wsPort: 8086 })
+  } catch (error) {
+    console.error('Error starting RTSP relays:', error)
+  }
 
   app.on('before-quit', async () => {
     try {
       await stopAllListeners()
+      // 停止所有 RTSP 中继服务
+      stopRtspRelay()
     } catch (e) {
-      logger.error('Error stopping TCP listeners:', e)
+      logger.error('Error stopping TCP listeners or RTSP relays:', e)
     }
     await disconnectDatabase()
   })
