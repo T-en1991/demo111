@@ -1,0 +1,98 @@
+// src/main/ipc/rtsp.ts
+// RTSP流控制的IPC处理函数
+import { ipcMain } from 'electron'
+import { startRtspRelay, stopRtspRelay } from '../rtspRelay'
+import logger from '../logger'
+import { fishService } from '../database'
+
+// 存储当前使用的RTSP URL信息
+interface ActiveStreamInfo {
+  rtspUrl: string
+  type: 'mono' | 'stereo'
+}
+
+let activeStream: ActiveStreamInfo | null = null
+
+/**
+ * 注册RTSP相关的IPC处理函数
+ * 允许前端按需控制RTSP流的启动和停止
+ */
+export function registerRtspIpc(): void {
+  // 启动RTSP流（使用参数控制流类型和源地址）
+  ipcMain.handle('rtsp:start', async (_, fishId: number, streamType?: 'mono' | 'stereo') => {
+    try {
+      // 固定使用8085端口
+      const wsPort = 8085
+      
+      // 根据streamType参数选择RTSP源地址
+      const selectedStreamType = streamType || 'mono'
+      
+      // 从数据库获取机器鱼配置
+      const fishs = await fishService.findAll();
+     
+      
+      if (fishs.length ==0) {
+        throw new Error(`未找到ID为 ${fishId} 的机器鱼配置`)
+      }
+       const fish = fishs[0];
+      // 根据流类型选择对应的RTSP URL
+      let actualRtspUrl: string
+      if (selectedStreamType === 'mono') {
+        // 单目模式使用rtspUrl字段
+        actualRtspUrl = fish.rtspUrl || 'rtsp://localhost:8554/live' // 默认URL作为备份
+      } else {
+        // 双目模式使用rtsp2字段
+        actualRtspUrl = fish.rtsp2 || 'rtsp://localhost:8554/live2' // 默认URL作为备份
+      }
+      
+      logger.info(`尝试启动RTSP流: ${actualRtspUrl} (类型: ${selectedStreamType}) 到端口 ${wsPort}`)
+      await startRtspRelay({ rtspUrl: actualRtspUrl, wsPort })
+      
+      // 更新当前活动流信息
+      activeStream = {
+        rtspUrl: actualRtspUrl,
+        type: selectedStreamType
+      }
+      
+      logger.info(`RTSP流已成功启动: ${actualRtspUrl} -> ws://localhost:${wsPort}/ (类型: ${activeStream.type})`)
+      
+      return {
+        success: true,
+        message: `RTSP流启动成功 (类型: ${activeStream.type})`,
+        wsPort,
+        streamType: activeStream.type
+      }
+    } catch (error) {
+      logger.error(`启动RTSP流失败: ${error instanceof Error ? error.message : String(error)}`)
+      return {
+        success: false,
+        message: `启动RTSP流失败: ${error instanceof Error ? error.message : String(error)}`
+      }
+    }
+  })
+
+  // 停止RTSP流
+  ipcMain.handle('rtsp:stop', async () => {
+    try {
+      // 固定停止8085端口的流
+      logger.info('尝试停止RTSP流')
+      stopRtspRelay(8085)
+      activeStream = null
+      return {
+        success: true,
+        message: 'RTSP流已停止'
+      }
+    } catch (error) {
+      logger.error(`停止RTSP流失败: ${error instanceof Error ? error.message : String(error)}`)
+      return {
+        success: false,
+        message: `停止RTSP流失败: ${error instanceof Error ? error.message : String(error)}`
+      }
+    }
+  })
+  
+  // 获取当前活动流信息
+  ipcMain.handle('rtsp:getActiveStream', () => {
+    return activeStream
+  })
+}

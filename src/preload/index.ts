@@ -65,6 +65,16 @@ const api = {
     delete: (id: number) => ipcRenderer.invoke('fish:delete', id),
     deleteMany: (ids: number[]) => ipcRenderer.invoke('fish:deleteMany', ids),
     seed: (count: number) => ipcRenderer.invoke('fish:seed', count)
+  },
+  
+  // RTSP流控制接口
+  rtsp: {
+    // 启动RTSP流（使用参数控制流类型）
+    start: (rtspUrl: string, streamType?: 'monocular' | 'binocular') => ipcRenderer.invoke('rtsp:start', rtspUrl, streamType),
+    // 停止RTSP流
+    stop: () => ipcRenderer.invoke('rtsp:stop'),
+    // 获取当前活动流信息
+    getActiveStream: () => ipcRenderer.invoke('rtsp:getActiveStream')
   }
 }
 

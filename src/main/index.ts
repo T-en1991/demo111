@@ -10,8 +10,7 @@ async function bootstrap(): Promise<void> {
   await setupApp()
   // Ensure Electron app is ready before creating BrowserWindow
   await app.whenReady()
-  // 启动 RTSP relay 服务（可根据需要修改 RTSP 地址）
-  startRtspRelay({ rtspUrl: process.env.RTSP_URL || 'rtsp://localhost:8554/live', wsPort: 8085 })
+  // RTSP relay 服务现在将根据需要在app.ts中启动，而不是默认启动
   // Create main window and register IPC handlers
   createMainWindow()
   registerIpc()

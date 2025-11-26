@@ -366,6 +366,34 @@ type VideoMode = 'mono' | 'stereo'
 const videoDialogVisible = ref(false)
 const videoMode = ref<VideoMode>('mono')
 const videoUrls = reactive<Record<string, { mono?: string; stereo?: string }>>({})
+const videoLoading = ref(false)
+
+// 监听videoMode变化，切换RTSP流类型
+watch(videoMode, async (newMode) => {
+  if (current.value && videoDialogVisible.value) {
+    try {
+      // 显示加载框
+      videoLoading.value = true
+      
+      // 调用RTSP API切换流类型，传递fishId和正确的流类型
+      const result = await window.electron.ipcRenderer.invoke('rtsp:start', current.value.id, newMode)
+      if (result.success) {
+        console.log(`已切换到${newMode === 'mono' ? '单目' : '双目'}视频流`)
+      } else {
+        console.error('切换RTSP流类型失败:', result.message)
+        ElMessage.error('切换视频流失败: ' + result.message)
+      }
+    } catch (error) {
+      console.error('切换RTSP流类型失败:', error)
+      ElMessage.error('切换视频流失败，请检查连接')
+    } finally {
+      // 无论成功失败，都关闭加载框
+      setTimeout(() => {
+        videoLoading.value = false
+      }, 300) // 添加短暂延迟让用户能看到加载状态
+    }
+  }
+})
 // 使用本地示例视频，同时作为单目与双目演示源
 const mockVideoUrl = new URL('../../assets/mock.mp4', import.meta.url).href
 videoUrls['A1'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
@@ -843,25 +871,33 @@ watch(selectedId, (): void => {
       <div class="video-toolbar">
         <el-button-group>
           <el-button type="primary" :plain="videoMode !== 'mono'" @click="videoMode = 'mono'"
-            >单目视频</el-button
+            :loading="videoLoading">单目视频</el-button
           >
           <el-button type="primary" :plain="videoMode !== 'stereo'" @click="videoMode = 'stereo'"
-            >双目视频</el-button
+            :loading="videoLoading">双目视频</el-button
           >
         </el-button-group>
       </div>
       <div class="video-body">
-        <template v-if="showVideoPlayer && videoMode === 'mono'">
-          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
-        </template>
-        <template v-else-if="showVideoPlayer && videoMode === 'stereo'">
-          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
-        </template>
-        <template v-else>
-          <div class="video-placeholder">
-            未配置视频流地址（{{ currentVideoTitle }}）。请接入真实 URL。
-          </div>
-        </template>
+        <div :class="['video-container', { 'video-loading': videoLoading }]">
+          <el-loading
+            v-loading="videoLoading"
+            text="正在切换视频流..."
+            background="rgba(0, 0, 0, 0.8)"
+          >
+            <template v-if="showVideoPlayer && videoMode === 'mono'">
+              <VideoPlayerJSMpeg url="ws://localhost:8085/" />
+            </template>
+            <template v-else-if="showVideoPlayer && videoMode === 'stereo'">
+              <VideoPlayerJSMpeg url="ws://localhost:8085/" />
+            </template>
+            <template v-else>
+              <div class="video-placeholder">
+                未配置视频流地址（{{ currentVideoTitle }}）。请接入真实 URL。
+              </div>
+            </template>
+          </el-loading>
+        </div>
       </div>
     </el-dialog>
     <!-- 报警图片弹窗：有图则直接展示 -->

@@ -48,6 +48,18 @@
   background: linear-gradient(145deg, rgba(40,45,60,0.9), rgba(32,36,50,0.9));
 }
 
+.video-container {
+  width: 100%;
+  position: relative;
+}
+
+.video-loading .el-loading-mask {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
 .video-toolbar {
   display: flex;
   align-items: center;

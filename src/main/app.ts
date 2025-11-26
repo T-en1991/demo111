@@ -50,7 +50,7 @@ export async function setupApp(): Promise<void> {
     }
   })
 
-  // Start RTSP to WebSocket relays for both cameras
+  // 启动RTSP流转换服务（如果有鱼配置了RTSP URL）
   try {
     // 从数据库获取鱼的信息
     const firstFish = await prisma.fish.findFirst({
@@ -58,15 +58,18 @@ export async function setupApp(): Promise<void> {
       orderBy: { id: 'asc' }
     })
     
-    const monocularRtspUrl = firstFish?.rtspUrl || ''
-    const binocularRtspUrl = firstFish?.rtsp2 || ''
-    
-    // 启动单目视频流 (默认端口 8085)
-    await startRtspRelay({ rtspUrl: monocularRtspUrl, wsPort: 8085 })
-    // 启动双目视频流 (默认端口 8086)
- //   await startRtspRelay({ rtspUrl: binocularRtspUrl, wsPort: 8086 })
+    // 只取第一条配置了RTSP URL的鱼
+    if (firstFish) {
+      // 默认启动单目RTSP流（如果有配置）
+      if (firstFish.rtspUrl) {
+        await startRtspRelay({ rtspUrl: firstFish.rtspUrl, wsPort: 8085 })
+        console.log('RTSP流已启动（默认使用单目）')
+      }
+    } else {
+      console.log('没有找到配置了RTSP URL的鱼数据，RTSP中继服务未启动')
+    }
   } catch (error) {
-    console.error('Error starting RTSP relays:', error)
+    console.error('启动RTSP流时出错:', error)
   }
 
   app.on('before-quit', async () => {

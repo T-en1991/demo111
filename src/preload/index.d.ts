@@ -3,6 +3,12 @@ type Prisma = import('@prisma/client').Prisma
 type Fish = import('@prisma/client').Fish
 
 declare global {
+  interface RtspResponse {
+    success: boolean
+    message: string
+    wsPort?: number
+  }
+
   interface Window {
     electron: ElectronAPI
     api: {
@@ -75,6 +81,15 @@ declare global {
         deleteMany(ids: number[]): Promise<Prisma.BatchPayload>
         seed(count: number): Promise<Prisma.BatchPayload>
       }
+      // RTSP流控制接口
+  rtsp: {
+    // 启动RTSP流（使用参数控制流类型）
+    start(rtspUrl: string, streamType?: 'monocular' | 'binocular'): Promise<RtspResponse>
+    // 停止RTSP流
+    stop(): Promise<RtspResponse>
+    // 获取当前活动流信息
+    getActiveStream(): Promise<{rtspUrl: string, type: 'monocular' | 'binocular'} | null>
+  }
     }
   }
 }
