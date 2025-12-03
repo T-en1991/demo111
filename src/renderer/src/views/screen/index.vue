@@ -119,27 +119,110 @@ robots.forEach((r): void => {
   initialDepths[r.id] = r.depth
 })
 
+type FishCmdInfo = {
+  ip?: string | null
+  port?: number | null
+  satcomIp?: string | null
+  satcomPort1?: number | null
+  microwaveIp?: string | null
+  microwavePort?: number | null
+  ascendCommand?: string | null
+  descendCommand?: string | null
+  forwardCommand?: string | null
+  leftCommand?: string | null
+  rightCommand?: string | null
+  manualCommand?: string | null
+  exitManualCommand?: string | null
+  returnCommand?: string | null
+}
+
+const fishCmd = ref<FishCmdInfo | null>(null)
+
+function resolveEndpoint(info: FishCmdInfo | null): { ip: string; port: number } | null {
+  if (!info) return null
+  const ip = (info.ip ?? '') as string
+  const port = Number(info.port ?? 0)
+  if (ip.trim().length > 0 && port > 0) {
+    return { ip: ip.trim(), port }
+  }
+  return null
+}
+
+async function loadFishCmd(): Promise<void> {
+  try {
+    const list = (await (window as any).api.fish.findAll()) as Array<Partial<FishCmdInfo & { id: number }>>
+    if (list && list.length > 0) {
+      const f = list[0]
+      fishCmd.value = {
+        ip: (f.ip as string | null) ?? null,
+        port: (f.port as number | null) ?? null,
+        satcomIp: (f.satcomIp as string | null) ?? null,
+        satcomPort1: (f.satcomPort1 as number | null) ?? null,
+        microwaveIp: (f.microwaveIp as string | null) ?? null,
+        microwavePort: (f.microwavePort as number | null) ?? null,
+        ascendCommand: (f.ascendCommand as string | null) ?? null,
+        descendCommand: (f.descendCommand as string | null) ?? null,
+        forwardCommand: (f.forwardCommand as string | null) ?? null,
+        leftCommand: (f.leftCommand as string | null) ?? null,
+        rightCommand: (f.rightCommand as string | null) ?? null,
+        manualCommand: (f.manualCommand as string | null) ?? null,
+        exitManualCommand: (f.exitManualCommand as string | null) ?? null,
+        returnCommand: (f.returnCommand as string | null) ?? null
+      }
+    }
+  } catch (e) {
+    console.error('加载鱼指令失败:', e)
+  }
+}
+
+async function sendRawCommand(field: keyof FishCmdInfo): Promise<void> {
+  const info = fishCmd.value
+  const endpoint = resolveEndpoint(info)
+  const payload = info ? (info[field] as string | null) : null
+  if (!endpoint || !payload || payload.trim().length === 0) {
+    console.warn('指令或端点未配置，跳过发送', { endpoint, field })
+    return
+  }
+  try {
+    const res = await (window as any).api.tcp.send(endpoint.ip, endpoint.port, payload.trim())
+    if (!res?.success) {
+      console.error('TCP 发送失败:', res)
+    }
+  } catch (e) {
+    console.error('TCP 发送异常:', e)
+  }
+}
+
+onMounted((): void => {
+  void loadFishCmd()
+})
+
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
 function ascend(): void {
   const r = current.value
   if (!r) return
   r.depth = Math.max(0, r.depth - 5)
   ElMessage.success(`上浮：当前深度 ${r.depth}m`)
+  void sendRawCommand('ascendCommand')
 }
 function descend(): void {
   const r = current.value
   if (!r) return
   r.depth = r.depth + 5
   ElMessage.success(`下潜：当前深度 ${r.depth}m`)
+  void sendRawCommand('descendCommand')
 }
 function moveForward(): void {
   console.log('[tap] forward')
+  void sendRawCommand('forwardCommand')
 }
 function moveLeft(): void {
   console.log('[tap] left')
+  void sendRawCommand('leftCommand')
 }
 function moveRight(): void {
   console.log('[tap] right')
+  void sendRawCommand('rightCommand')
 }
 
 // 按住持续触发：开始/停止
@@ -188,6 +271,7 @@ const lightOn = ref(false)
 function toggleManual(): void {
   manualMode.value = !manualMode.value
   ElMessage.success(`人工模式：${manualMode.value ? '开启' : '关闭'}`)
+  void sendRawCommand(manualMode.value ? 'manualCommand' : 'exitManualCommand')
 }
 function toggleLowPower(): void {
   lowPowerMode.value = !lowPowerMode.value
@@ -211,6 +295,7 @@ function returnHome(): void {
     target.lat = home.lat
     ElMessage.success('已返航至初始位置')
   }
+  void sendRawCommand('returnCommand')
 }
 
 // 报警信息数据结构与示例

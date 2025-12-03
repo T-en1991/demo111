@@ -1,7 +1,6 @@
 import 'dotenv/config'
 import { app, BrowserWindow } from 'electron'
 import { setupApp } from './app'
-import { startRtspRelay } from './rtspRelay'
 import { createMainWindow } from './windows/mainWindow'
 import { registerIpc } from './ipc'
 import { startListenersForAllFish } from './network/tcpManager'

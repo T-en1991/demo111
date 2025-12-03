@@ -1,7 +1,6 @@
 // src/main/rtspRelay.ts
 // Electron 主进程：RTSP 转 WebSocket 推流服务
 import { spawn } from 'child_process'
-import { existsSync } from 'fs'
 import { WebSocketServer, WebSocket } from 'ws'
 
 
@@ -91,29 +90,6 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
   console.log(`RTSP relay started. RTSP: ${finalRtspUrl} => ws://localhost:${wsPort}/`)
 }
 
-function resolveFfmpegPath(): string {
-  const envPath = process.env.FFMPEG_PATH
-  if (envPath && existsSync(envPath)) return envPath
-  if (process.platform === 'win32') {
-    const programFiles = process.env['ProgramFiles'] || 'C\\Program Files'
-    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C\\Program Files (x86)'
-    const candidates = [
-      `${programFiles}\\ffmpeg\\bin\\ffmpeg.exe`,
-      `${programFilesX86}\\ffmpeg\\bin\\ffmpeg.exe`,
-      'C\\ffmpeg\\bin\\ffmpeg.exe'
-    ]
-    for (const p of candidates) {
-      if (existsSync(p)) return p
-    }
-  }
-  if (process.platform === 'darwin') {
-    const macHomebrew = '/opt/homebrew/bin/ffmpeg'
-    const macUsrLocal = '/usr/local/bin/ffmpeg'
-    if (existsSync(macHomebrew)) return macHomebrew
-    if (existsSync(macUsrLocal)) return macUsrLocal
-  }
-  return 'ffmpeg'
-}
 
 export function stopRtspRelay(wsPort?: number) {
   if (wsPort && relays.has(wsPort)) {

@@ -185,3 +185,43 @@ export async function stopAllListeners(): Promise<void> {
   }
   await Promise.all(stops)
 }
+
+export async function sendRaw(ip: string, port: number, payload: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    try {
+      const socket = net.createConnection({ host: ip, port }, () => {
+        try {
+          const body = payload.endsWith('\n') ? payload : payload + '\n'
+          const data = Buffer.from(body, 'utf8')
+          socket.write(data, (err) => {
+            if (err) {
+              logger.error(`[TCP] sendRaw write error to ${ip}:${port}:`, err)
+              try { socket.destroy() } catch {}
+              resolve(false)
+            } else {
+              socket.end()
+              resolve(true)
+            }
+          })
+        } catch (e) {
+          logger.error('[TCP] sendRaw buffer/write error:', e)
+          try { socket.destroy() } catch {}
+          resolve(false)
+        }
+      })
+
+      socket.setTimeout(5000, () => {
+        logger.warn(`[TCP] sendRaw timeout to ${ip}:${port}`)
+        try { socket.destroy() } catch {}
+        resolve(false)
+      })
+      socket.on('error', (err) => {
+        logger.error(`[TCP] sendRaw connection error to ${ip}:${port}:`, err)
+        resolve(false)
+      })
+    } catch (err) {
+      logger.error('[TCP] sendRaw unexpected error:', err)
+      resolve(false)
+    }
+  })
+}

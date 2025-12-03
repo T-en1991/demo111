@@ -76,6 +76,10 @@ const api = {
     // 获取当前活动流信息
     getActiveStream: () => ipcRenderer.invoke('rtsp:getActiveStream')
   }
+  ,
+  tcp: {
+    send: (ip: string, port: number, payload: string) => ipcRenderer.invoke('tcp:send', ip, port, payload)
+  }
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
