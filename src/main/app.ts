@@ -57,7 +57,7 @@ export async function setupApp(): Promise<void> {
       where: { OR: [{ rtspUrl: { not: null } }, { rtsp2: { not: null } }] },
       orderBy: { id: 'asc' }
     })
-    
+
     // 只取第一条配置了RTSP URL的鱼
     if (firstFish) {
       // 默认启动单目RTSP流（如果有配置）

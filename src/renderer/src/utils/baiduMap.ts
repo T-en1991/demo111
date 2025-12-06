@@ -16,7 +16,7 @@ export function loadBMapGL(ak: string): Promise<void> {
 
     const script2d = document.createElement('script')
     // 使用 2D API v2.0，稳定性更好
-    script2d.src = `https://api.map.baidu.com/api?v=2.0&ak=${ak}&callback=${callbackName}`
+    script2d.src = `http://api.map.baidu.com/api?v=2.0&ak=${ak}&callback=${callbackName}`
     // 使用事件监听修复 OnErrorEventHandler 类型不兼容问题
     script2d.addEventListener('error', (e) => {
       cleanup()

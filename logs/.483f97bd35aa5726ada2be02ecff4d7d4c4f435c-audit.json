@@ -1,50 +1,20 @@
 {
-    "keep": {
-        "days": true,
-        "amount": 14
+  "keep": {
+    "days": true,
+    "amount": 14
+  },
+  "auditLog": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/.483f97bd35aa5726ada2be02ecff4d7d4c4f435c-audit.json",
+  "files": [
+    {
+      "date": 1764831045216,
+      "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-04.log",
+      "hash": "98b1b46f4a03680a72cf53d75d43190779d659abc8234d8a1bef36c84c5d35d6"
     },
-    "auditLog": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/.483f97bd35aa5726ada2be02ecff4d7d4c4f435c-audit.json",
-    "files": [
-        {
-            "date": 1762354084405,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-05.log",
-            "hash": "23eb2e15a44abd4bab8fce9bb49f043e28b293bbab1f5fac2c44a789daa8ff0a"
-        },
-        {
-            "date": 1762529383881,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-07.log",
-            "hash": "a4b9561356492f197185c2273f70a48fc3a4a4201f22777a8f32acc005956d99"
-        },
-        {
-            "date": 1762588673810,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-08.log",
-            "hash": "940c537aed4dd67fade69030e49491f127b7b902935ec09cace77c4d9ee8a834"
-        },
-        {
-            "date": 1762668405265,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-09.log",
-            "hash": "92719252d0c2c70fbcabb2cf3d4e92a14255957330fe9516018d23643422698b"
-        },
-        {
-            "date": 1762751775822,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-10.log",
-            "hash": "18b0fedd4af65472bed60769012ed08524e7ba4c4979f901621b13837b703ff3"
-        },
-        {
-            "date": 1762791832866,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-11.log",
-            "hash": "2ce0182b97a116e116b5b653f14a802807f7394b07610dcbc3e18196059b794f"
-        },
-        {
-            "date": 1763394872597,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-17.log",
-            "hash": "6a164ad41e8c08e914222cdf19945e7a4acc235e92493574b9b3b75755fd6838"
-        },
-        {
-            "date": 1763395527555,
-            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-11-18.log",
-            "hash": "6eccb61880343c6e368a052d0ab7d80599b766333cea3df318006779a44eb1ac"
-        }
-    ],
-    "hashType": "sha256"
+    {
+      "date": 1764998616280,
+      "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-06.log",
+      "hash": "1e66efbc2930dbf315e1d5e8a4181d0b953fe07b5cad894705d0ff608bef72da"
+    }
+  ],
+  "hashType": "sha256"
 }

@@ -1,16 +1,35 @@
 <template>
   <div class="jsmpeg-player-wrapper">
-    <div ref="videoContainer" class="jsmpeg-player" style="width: 640px; height: 360px; background: #000"></div>
+    <div
+      ref="videoContainer"
+      class="jsmpeg-player"
+      style="width: 640px; height: 360px; background: #000"
+    ></div>
     <div class="jsmpeg-controls">
       <el-button size="small" @click="togglePlay">{{ isPlaying ? '暂停' : '播放' }}</el-button>
       <div class="progress-volume-row">
         <label style="margin-right: 8px">进度</label>
-        <input v-model="progress" type="range" min="0" :max="duration" step="0.01" style="width: 180px"
-          @input="onSeek" />
+        <input
+          v-model="progress"
+          type="range"
+          min="0"
+          :max="duration"
+          step="0.01"
+          style="width: 180px"
+          @input="onSeek"
+        />
 
         <span style="margin-left: 8px">{{ formatTime(progress) }} </span>
         <label style="margin: 0 8px 0 24px">音量</label>
-        <input v-model.number="volume" type="range" min="0" max="1" step="0.01" style="width: 80px" @input="onVolume" />
+        <input
+          v-model.number="volume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          style="width: 80px"
+          @input="onVolume"
+        />
 
         <span style="margin-left: 8px">{{ Math.round(volume * 100) }}%</span>
       </div>

@@ -5,7 +5,10 @@ import { useRouter } from 'vue-router'
 import { loadBMapGL } from '../../utils/baiduMap'
 import { loadOfflineBMap } from '../../utils/offlineBMap'
 import VideoPlayerJSMpeg from '../../components/VideoPlayerJSMpeg.vue'
+import { useAppStore } from '../../store/app'
+import { INITIAL_ROBOTS, type RobotStatus, type SignalLevel } from '../../constants/robots'
 
+const appStore = useAppStore()
 const AK = 'iWyOxtxr32YCdQBu9yYeICmRKBb6Jm1h'
 // 使用项目静态资源作为标注图标
 const fishIconUrl = new URL('../../assets/images/fish.svg', import.meta.url).href
@@ -35,64 +38,8 @@ interface BMap2DApi {
   Polyline: new (points: unknown[], opts?: unknown) => unknown
 }
 
-type SignalLevel = 'strong' | 'medium' | 'weak'
-interface RobotStatus {
-  id: string
-  name: string
-  battery: number // %
-  depth: number // m
-  altitude: number // m
-  yaw: number // °
-  pitch: number // °
-  roll: number // °
-  lng: number
-  lat: number
-  acoustic: SignalLevel
-}
-
-const robots = reactive<RobotStatus[]>([
-  // 将默认选中的 A1 初始位置设置为经度 53.573275、纬度 24.281445
-  {
-    id: 'A1',
-    name: '鲸鲨01号',
-    battery: 98,
-    depth: 100,
-    altitude: 5,
-    yaw: 260,
-    pitch: 15,
-    roll: 2,
-    lng: 53.573275,
-    lat: 24.281445,
-    acoustic: 'strong'
-  },
-  {
-    id: 'B2',
-    name: '鲸鲨02号',
-    battery: 86,
-    depth: 80,
-    altitude: 8,
-    yaw: 120,
-    pitch: 8,
-    roll: 5,
-    lng: 121.4737,
-    lat: 31.2304,
-    acoustic: 'medium'
-  },
-  {
-    id: 'C3',
-    name: '鲸鲨03号',
-    battery: 72,
-    depth: 60,
-    altitude: 3,
-    yaw: 45,
-    pitch: 12,
-    roll: 3,
-    lng: 113.2644,
-    lat: 23.1291,
-    acoustic: 'weak'
-  }
-])
-const selectedId = ref<string>(robots[0].id)
+const robots = reactive<RobotStatus[]>(JSON.parse(JSON.stringify(INITIAL_ROBOTS)))
+const selectedId = computed(() => appStore.selectedRobotId || INITIAL_ROBOTS[0].id)
 const current = computed<RobotStatus | undefined>(() =>
   robots.find((r) => r.id === selectedId.value)
 )
@@ -150,7 +97,10 @@ function resolveEndpoint(info: FishCmdInfo | null): { ip: string; port: number }
 
 async function loadFishCmd(): Promise<void> {
   try {
-    const list = (await (window as any).api.fish.findAll()) as Array<Partial<FishCmdInfo & { id: number }>>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const list = (await (window as any).api.fish.findAll()) as Array<
+      Partial<FishCmdInfo & { id: number }>
+    >
     if (list && list.length > 0) {
       const f = list[0]
       fishCmd.value = {
@@ -184,6 +134,7 @@ async function sendRawCommand(field: keyof FishCmdInfo): Promise<void> {
     return
   }
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = await (window as any).api.tcp.send(endpoint.ip, endpoint.port, payload.trim())
     if (!res?.success) {
       console.error('TCP 发送失败:', res)
@@ -213,8 +164,22 @@ function descend(): void {
   void sendRawCommand('descendCommand')
 }
 function moveForward(): void {
-  console.log('[tap] forward')
-  void sendRawCommand('forwardCommand')
+  console.log('[tap] forward - DEMO')
+  // Demo test: send specific command to 192.168.1.212:9200
+  const ip = '192.168.1.212'
+  const port = 9200
+  const payload = '+++AT*SENDIM,7,2,ack,FORWARD'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(window as any).api.tcp
+    .sendAndReceive(ip, port, payload)
+    .then((res: { success: boolean; data?: string; error?: string }) => {
+      console.log('TCP Response:', res)
+      if (res.success) {
+        ElMessage.success(`收到回复: ${res.data}`)
+      } else {
+        ElMessage.error(`发送/接收失败: ${res.error || '未知错误'}`)
+      }
+    })
 }
 function moveLeft(): void {
   console.log('[tap] left')
@@ -258,24 +223,59 @@ function debounce<T extends (...args: unknown[]) => void>(
 
 // 为非连续性操作创建防抖包装
 const toggleManualDebounced = debounce(toggleManual, 300)
-const toggleLowPowerDebounced = debounce(toggleLowPower, 300)
+const toggleNavigateDebounced = debounce(toggleNavigate, 300)
 const setLightOnDebounced = debounce((): void => setLight(true), 300)
 const setLightOffDebounced = debounce((): void => setLight(false), 300)
 const returnHomeDebounced = debounce(returnHome, 500)
 // 已移除“返航/初始定高”按钮与方法（保留示例方向与深度控制）
-// 控制台新状态：人工模式、低功耗、灯光
+// 控制台新状态：人工模式、导航模式、灯光
 const manualMode = ref(false)
-const lowPowerMode = ref(false)
+const navigateMode = ref(false)
 const lightOn = ref(false)
 
 function toggleManual(): void {
   manualMode.value = !manualMode.value
   ElMessage.success(`人工模式：${manualMode.value ? '开启' : '关闭'}`)
-  void sendRawCommand(manualMode.value ? 'manualCommand' : 'exitManualCommand')
+
+  if (manualMode.value) {
+    const ip = '192.168.1.212'
+    const port = 9200
+    const payload = '+++AT*SENDIM,3,2,ack,MAN'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.tcp
+      .sendAndReceive(ip, port, payload)
+      .then((res: { success: boolean; data?: string; error?: string }) => {
+        if (res.success) {
+          ElMessage.success(`收到回复: ${res.data}`)
+        } else {
+          ElMessage.error(`发送/接收失败: ${res.error || '未知错误'}`)
+        }
+      })
+  } else {
+    // 关闭时保留原有逻辑或发送特定关闭指令（如有）
+    void sendRawCommand('exitManualCommand')
+  }
 }
-function toggleLowPower(): void {
-  lowPowerMode.value = !lowPowerMode.value
-  ElMessage.success(`低功耗模式：${lowPowerMode.value ? '开启' : '关闭'}`)
+function toggleNavigate(): void {
+  navigateMode.value = !navigateMode.value
+  ElMessage.success(`导航模式：${navigateMode.value ? '开启' : '关闭'}`)
+
+  if (navigateMode.value) {
+    // Send demo command to 192.168.1.212:9200
+    const ip = '192.168.1.212'
+    const port = 9200
+    const payload = '+++AT*SENDIM,8,2,noack,NAVIGATE'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).api.tcp
+      .sendAndReceive(ip, port, payload)
+      .then((res: { success: boolean; data?: string; error?: string }) => {
+        if (res.success) {
+          ElMessage.success(`收到回复: ${res.data}`)
+        } else {
+          ElMessage.error(`发送/接收失败: ${res.error || '未知错误'}`)
+        }
+      })
+  }
 }
 function setLight(on: boolean): void {
   lightOn.value = on
@@ -459,9 +459,13 @@ watch(videoMode, async (newMode) => {
     try {
       // 显示加载框
       videoLoading.value = true
-      
+
       // 调用RTSP API切换流类型，传递fishId和正确的流类型
-      const result = await window.electron.ipcRenderer.invoke('rtsp:start', current.value.id, newMode)
+      const result = await window.electron.ipcRenderer.invoke(
+        'rtsp:start',
+        current.value.id,
+        newMode
+      )
       if (result.success) {
         console.log(`已切换到${newMode === 'mono' ? '单目' : '双目'}视频流`)
       } else {
@@ -491,7 +495,7 @@ function openVideo(mode: VideoMode): void {
   showVideoPlayer.value = true
   videoDialogVisible.value = true
 }
-function onVideoDialogClose() {
+function onVideoDialogClose(): void {
   showVideoPlayer.value = false
   setTimeout(() => {
     showVideoPlayer.value = true
@@ -749,14 +753,9 @@ watch(selectedId, (): void => {
         <div class="panel-card">
           <div class="section-title">基本信息</div>
           <div class="panel-header single-select">
-            <el-select
-              v-model="selectedId"
-              size="large"
-              class="robot-select"
-              placeholder="选择机器人"
-            >
-              <el-option v-for="r in robots" :key="r.id" :label="r.name" :value="r.id" />
-            </el-select>
+            <div class="robot-name-display">
+              当前设备：{{ current?.name || '未知设备' }}
+            </div>
           </div>
           <div class="status-grid">
             <div class="stat-card">
@@ -929,10 +928,10 @@ watch(selectedId, (): void => {
               <span class="icon">⤒</span><span class="text">上浮</span>
             </button>
             <!-- 第四行：功耗与灯光 -->
-            <button class="action-btn warn" @click="toggleLowPowerDebounced">
-              <span class="icon">🌙</span><span class="text">低功耗模式</span
-              ><span class="state" :class="lowPowerMode ? 'on' : 'off'">{{
-                lowPowerMode ? '开' : '关'
+            <button class="action-btn warn" @click="toggleNavigateDebounced">
+              <span class="icon">🌙</span><span class="text">进入导航模式</span
+              ><span class="state" :class="navigateMode ? 'on' : 'off'">{{
+                navigateMode ? '开' : '关'
               }}</span>
             </button>
             <button class="action-btn info" @click="setLightOnDebounced">
@@ -955,11 +954,19 @@ watch(selectedId, (): void => {
     >
       <div class="video-toolbar">
         <el-button-group>
-          <el-button type="primary" :plain="videoMode !== 'mono'" @click="videoMode = 'mono'"
-            :loading="videoLoading">单目视频</el-button
+          <el-button
+            type="primary"
+            :plain="videoMode !== 'mono'"
+            :loading="videoLoading"
+            @click="videoMode = 'mono'"
+            >单目视频</el-button
           >
-          <el-button type="primary" :plain="videoMode !== 'stereo'" @click="videoMode = 'stereo'"
-            :loading="videoLoading">双目视频</el-button
+          <el-button
+            type="primary"
+            :plain="videoMode !== 'stereo'"
+            :loading="videoLoading"
+            @click="videoMode = 'stereo'"
+            >双目视频</el-button
           >
         </el-button-group>
       </div>

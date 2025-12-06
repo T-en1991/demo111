@@ -200,14 +200,17 @@ export function registerDatabaseIpc(): void {
     }
   )
 
-  ipcMain.handle('video:list', async (_, params: { page?: number; pageSize?: number; keyword?: string }) => {
-    try {
-      return await videoService.list(params || {})
-    } catch (error) {
-      console.error('Error listing videos:', error)
-      throw error
+  ipcMain.handle(
+    'video:list',
+    async (_, params: { page?: number; pageSize?: number; keyword?: string }) => {
+      try {
+        return await videoService.list(params || {})
+      } catch (error) {
+        console.error('Error listing videos:', error)
+        throw error
+      }
     }
-  })
+  )
 
   ipcMain.handle('video:get', async (_, id: number) => {
     try {
@@ -235,5 +238,4 @@ export function registerDatabaseIpc(): void {
       throw error
     }
   })
-
 }

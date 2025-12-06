@@ -3,7 +3,8 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: radial-gradient(1200px 600px at 20% -10%, #1b2033 0%, transparent 70%),
+  background:
+    radial-gradient(1200px 600px at 20% -10%, #1b2033 0%, transparent 70%),
     radial-gradient(1000px 600px at 120% 20%, #0f1324 0%, transparent 70%),
     linear-gradient(135deg, #0d1220 0%, #12182a 100%);
 }
@@ -71,7 +72,9 @@
   border: 1px solid var(--ev-c-gray-2);
   background: #1e2030;
   color: var(--ev-c-text-1);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
   &:focus {
     border-color: #647eff;
     box-shadow: 0 0 0 3px #647eff33;

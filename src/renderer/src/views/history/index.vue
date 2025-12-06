@@ -236,62 +236,64 @@ function batteryClass(percent?: number): string {
       <el-tab-pane label="数据历史" name="data">
         <el-card class="table-card" shadow="never">
           <el-table :data="currentPageData" border stripe style="width: 100%">
-        <el-table-column prop="id" label="ID" width="100" />
-        <el-table-column prop="lon" label="经度" width="140" />
-        <el-table-column prop="lat" label="纬度" width="140" />
-        <el-table-column prop="depth" label="深度" width="120" />
-        <el-table-column prop="height" label="高度" width="120" />
-        <el-table-column label="电量(%)" width="180">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.battery ?? 0"
-              :stroke-width="10"
-              :status="
-                row.battery != null && row.battery < 20
-                  ? 'exception'
-                  : row.battery != null && row.battery >= 80
-                    ? 'success'
-                    : undefined
-              "
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="信号强度(dBm)" width="200">
-          <template #default="{ row }">
-            <div class="signal-cell">
-              <span class="signal-bars" :class="signalClass(row.signalStrength)">
-                <span
-                  v-for="i in 5"
-                  :key="i"
-                  class="bar"
-                  :class="{ 'is-on': i <= getSignalLevel(row.signalStrength) }"
-                ></span>
-              </span>
-              <span class="signal-text">{{ row.signalStrength ?? '-' }} dBm</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="time" label="时间" width="180" />
-        <el-table-column prop="content" label="报警内容" min-width="240" />
-        <el-table-column label="操作" width="120" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" plain @click="openDetail(row)">详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+            <el-table-column prop="id" label="ID" width="100" />
+            <el-table-column prop="lon" label="经度" width="140" />
+            <el-table-column prop="lat" label="纬度" width="140" />
+            <el-table-column prop="depth" label="深度" width="120" />
+            <el-table-column prop="height" label="高度" width="120" />
+            <el-table-column label="电量(%)" width="180">
+              <template #default="{ row }">
+                <el-progress
+                  :percentage="row.battery ?? 0"
+                  :stroke-width="10"
+                  :status="
+                    row.battery != null && row.battery < 20
+                      ? 'exception'
+                      : row.battery != null && row.battery >= 80
+                        ? 'success'
+                        : undefined
+                  "
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="信号强度(dBm)" width="200">
+              <template #default="{ row }">
+                <div class="signal-cell">
+                  <span class="signal-bars" :class="signalClass(row.signalStrength)">
+                    <span
+                      v-for="i in 5"
+                      :key="i"
+                      class="bar"
+                      :class="{ 'is-on': i <= getSignalLevel(row.signalStrength) }"
+                    ></span>
+                  </span>
+                  <span class="signal-text">{{ row.signalStrength ?? '-' }} dBm</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="time" label="时间" width="180" />
+            <el-table-column prop="content" label="报警内容" min-width="240" />
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" type="primary" plain @click="openDetail(row)"
+                  >详情</el-button
+                >
+              </template>
+            </el-table-column>
+          </el-table>
 
-      <div class="pagination">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          :page-size="pageSize"
-          :current-page="page"
-          :page-sizes="[10, 20, 50]"
-          @size-change="onSizeChange"
-          @current-change="onPageChange"
-        />
-        </div>
+          <div class="pagination">
+            <el-pagination
+              background
+              layout="total, sizes, prev, pager, next, jumper"
+              :total="total"
+              :page-size="pageSize"
+              :current-page="page"
+              :page-sizes="[10, 20, 50]"
+              @size-change="onSizeChange"
+              @current-change="onPageChange"
+            />
+          </div>
         </el-card>
       </el-tab-pane>
 

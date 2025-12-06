@@ -94,13 +94,13 @@ declare global {
         seed(count: number): Promise<Prisma.BatchPayload>
       }
       // RTSP流控制接口
-  rtsp: {
-    // 启动RTSP流（使用参数控制流类型）
-    start(rtspUrl: string, streamType?: 'monocular' | 'binocular'): Promise<RtspResponse>
-    // 停止RTSP流
-    stop(): Promise<RtspResponse>
-    // 获取当前活动流信息
-    getActiveStream(): Promise<{rtspUrl: string, type: 'monocular' | 'binocular'} | null>
+      rtsp: {
+        // 启动RTSP流（使用参数控制流类型）
+        start(rtspUrl: string, streamType?: 'monocular' | 'binocular'): Promise<RtspResponse>
+        // 停止RTSP流
+        stop(): Promise<RtspResponse>
+        // 获取当前活动流信息
+        getActiveStream(): Promise<{ rtspUrl: string; type: 'monocular' | 'binocular' } | null>
       }
     }
   }

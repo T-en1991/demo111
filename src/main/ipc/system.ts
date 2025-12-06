@@ -23,26 +23,26 @@ export function registerSystemIpc(): void {
             resolve(false)
           })
           child.on('exit', (code) => resolve(code === 0))
-  })
+        })
 
-  ipcMain.handle('dialog:openVideos', async () => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile', 'multiSelections'],
-      filters: [
-        { name: 'Videos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv'] },
-        { name: 'All Files', extensions: ['*'] }
-      ]
-    })
-    if (result.canceled) return []
-    return result.filePaths.map((p) => {
-      let size = 0
-      try {
-        size = statSync(p).size
-      } catch {}
-      return { path: p, name: basename(p), size }
-    })
-  })
-}
+        ipcMain.handle('dialog:openVideos', async () => {
+          const result = await dialog.showOpenDialog({
+            properties: ['openFile', 'multiSelections'],
+            filters: [
+              { name: 'Videos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv'] },
+              { name: 'All Files', extensions: ['*'] }
+            ]
+          })
+          if (result.canceled) return []
+          return result.filePaths.map((p) => {
+            let size = 0
+            try {
+              size = statSync(p).size
+            } catch {}
+            return { path: p, name: basename(p), size }
+          })
+        })
+      }
       if (process.platform === 'win32') {
         const programFiles = process.env['ProgramFiles'] || 'C\\Program Files'
         const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C\\Program Files (x86)'
@@ -74,5 +74,4 @@ export function registerSystemIpc(): void {
       return false
     }
   })
-
 }

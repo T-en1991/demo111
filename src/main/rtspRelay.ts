@@ -3,7 +3,6 @@
 import { spawn } from 'child_process'
 import { WebSocketServer, WebSocket } from 'ws'
 
-
 // 管理多个RTSP中继实例
 const relays = new Map<number, WebSocketServer>()
 
@@ -72,7 +71,9 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
     }
     child.on('error', (err) => {
       console.error('FFmpeg spawn error:', err)
-      try { ws.close() } catch {}
+      try {
+        ws.close()
+      } catch {}
     })
     child.on('close', (code) => {
       console.log('ffmpeg process closed, code', code)
@@ -89,7 +90,6 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
   relays.set(wsPort, wss)
   console.log(`RTSP relay started. RTSP: ${finalRtspUrl} => ws://localhost:${wsPort}/`)
 }
-
 
 export function stopRtspRelay(wsPort?: number) {
   if (wsPort && relays.has(wsPort)) {

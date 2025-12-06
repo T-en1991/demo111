@@ -38,11 +38,12 @@ export function startListenerForFish(fishId: number, ip: string, port: number): 
           try {
             asText = data.toString('utf8')
             // try parse JSON
-          } catch (e) {
+          } catch {
             // not JSON or not text
           }
 
           // Build alert payload
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const alertData: any = {
             title: `Alarm from fish ${fishId}`,
             message: undefined as string | undefined,
@@ -196,32 +197,96 @@ export async function sendRaw(ip: string, port: number, payload: string): Promis
           socket.write(data, (err) => {
             if (err) {
               logger.error(`[TCP] sendRaw write error to ${ip}:${port}:`, err)
-              try { socket.destroy() } catch {}
+              try {
+                socket.destroy()
+              } catch {
+                /* ignore */
+              }
               resolve(false)
             } else {
-              socket.end()
+              // success
+              socket.end() // close after write? Or just destroy? Usually for fire-and-forget we might just destroy after some time or let it close.
+              // For simple send, we can destroy after write callback
+              setTimeout(() => {
+                try {
+                  socket.destroy()
+                } catch {
+                  /* ignore */
+                }
+              }, 100)
               resolve(true)
             }
           })
-        } catch (e) {
-          logger.error('[TCP] sendRaw buffer/write error:', e)
-          try { socket.destroy() } catch {}
+        } catch (wErr) {
+          logger.error(`[TCP] sendRaw write exception:`, wErr)
+          try {
+            socket.destroy()
+          } catch {
+            /* ignore */
+          }
           resolve(false)
         }
       })
 
-      socket.setTimeout(5000, () => {
-        logger.warn(`[TCP] sendRaw timeout to ${ip}:${port}`)
-        try { socket.destroy() } catch {}
-        resolve(false)
-      })
       socket.on('error', (err) => {
         logger.error(`[TCP] sendRaw connection error to ${ip}:${port}:`, err)
         resolve(false)
       })
-    } catch (err) {
-      logger.error('[TCP] sendRaw unexpected error:', err)
+    } catch (e) {
+      logger.error(`[TCP] sendRaw exception:`, e)
       resolve(false)
+    }
+  })
+}
+
+export async function sendAndReceive(
+  ip: string,
+  port: number,
+  payload: string,
+  timeoutMs = 5000
+): Promise<{ success: boolean; data?: string; error?: string }> {
+  return new Promise((resolve) => {
+    let socket: net.Socket | null = null
+    let received = ''
+    let isResolved = false
+    const done = (result: { success: boolean; data?: string; error?: string }): void => {
+      if (isResolved) return
+      isResolved = true
+      resolve(result)
+      if (socket) {
+        try {
+          // socket.destroy()
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    try {
+      socket = net.createConnection({ host: ip, port }, () => {
+        const body = payload.endsWith('\n') ? payload : payload + '\n'
+        socket!.write(body, (err) => {
+          if (err) {
+            done({ success: false, error: err.message })
+          }
+        })
+      })
+
+      socket.on('data', (chunk) => {
+        received += chunk.toString()
+        console.log(`[TCP] Received data: ${received}`)
+        done({ success: true, data: received })
+      })
+
+      socket.on('error', (err) => {
+        done({ success: false, error: err.message })
+      })
+
+      socket.setTimeout(timeoutMs, () => {
+        done({ success: false, error: 'Timeout' })
+      })
+    } catch (e) {
+      done({ success: false, error: e instanceof Error ? e.message : String(e) })
     }
   })
 }

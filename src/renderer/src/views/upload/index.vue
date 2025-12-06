@@ -110,7 +110,12 @@ async function saveVideos(): Promise<void> {
         path: p,
         name: f.name,
         size: f.size,
-        camera: typeStr.toLowerCase() === 'bcam' ? 'mono' : typeStr.toLowerCase() === 'mcam' ? 'stereo' : 'unknown',
+        camera:
+          typeStr.toLowerCase() === 'bcam'
+            ? 'mono'
+            : typeStr.toLowerCase() === 'mcam'
+              ? 'stereo'
+              : 'unknown',
         recordedAt: isoString
       })
       ok++
@@ -134,14 +139,18 @@ async function selectVideosAndSave(): Promise<void> {
   try {
     const items = await window.api.dialog.openVideos()
     if (!items || items.length === 0) return
-    videoFiles.value = items.map((it) => ({ name: it.name, size: it.size, type: undefined, path: it.path }))
+    videoFiles.value = items.map((it) => ({
+      name: it.name,
+      size: it.size,
+      type: undefined,
+      path: it.path
+    }))
     await saveVideos()
   } catch (e) {
     console.error('open dialog failed:', e)
     ElMessage.error('选择视频失败')
   }
 }
-
 
 async function openWinSCP(): Promise<void> {
   try {
@@ -189,9 +198,11 @@ async function openWinSCP(): Promise<void> {
             <div v-if="videoFiles.length" class="upload-list">
               <div class="list-head">
                 <span>已选择 {{ videoFiles.length }} 个文件</span>
-                <div style="display:flex; gap:8px; align-items:center">
+                <div style="display: flex; gap: 8px; align-items: center">
                   <el-button type="primary" text @click="saveVideos">保存</el-button>
-                  <el-button type="primary" text @click="selectVideosAndSave">系统选择并保存</el-button>
+                  <el-button type="primary" text @click="selectVideosAndSave"
+                    >系统选择并保存</el-button
+                  >
                   <el-button text type="danger" @click="clearVideo">清空</el-button>
                 </div>
               </div>
@@ -218,7 +229,7 @@ async function openWinSCP(): Promise<void> {
             <div v-if="dataFiles.length" class="upload-list">
               <div class="list-head">
                 <span>已选择 {{ dataFiles.length }} 个文件</span>
-                <div style="display:flex; gap:8px; align-items:center">
+                <div style="display: flex; gap: 8px; align-items: center">
                   <el-button type="primary" text @click="importData">导入到历史</el-button>
                   <el-button text type="danger" @click="clearData">清空</el-button>
                 </div>
@@ -266,4 +277,3 @@ async function openWinSCP(): Promise<void> {
 </template>
 
 <style scoped src="./index.scss"></style>
-

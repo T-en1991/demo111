@@ -2,6 +2,7 @@
 import { reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '../../store/app'
+import { INITIAL_ROBOTS } from '../../constants/robots'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -12,6 +13,7 @@ const VALID_PASSWORD = 'admin_123'
 const form = reactive({
   username: 'admin_123',
   password: 'admin_123',
+  robotId: INITIAL_ROBOTS[0].id,
   showPassword: false
 })
 
@@ -32,6 +34,7 @@ function submit(): void {
     const ok = form.username === VALID_USERNAME && form.password === VALID_PASSWORD
     if (ok) {
       appStore.login()
+      appStore.setSelectedRobotId(form.robotId)
       router.push({ name: 'home' })
     } else {
       error.value = '账号或密码错误'
@@ -54,6 +57,23 @@ function onEnter(e: KeyboardEvent): void {
       </div>
 
       <div class="form">
+        <label class="field">
+          <span class="label">选择机器人</span>
+          <el-select
+            v-model="form.robotId"
+            placeholder="请选择机器人"
+            size="large"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in INITIAL_ROBOTS"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
+          </el-select>
+        </label>
+
         <label class="field">
           <span class="label">账号</span>
           <input
@@ -79,6 +99,23 @@ function onEnter(e: KeyboardEvent): void {
               {{ form.showPassword ? '隐藏' : '显示' }}
             </button>
           </div>
+        </label>
+
+        <label class="field">
+          <span class="label">选择机器人</span>
+          <el-select
+            v-model="form.robotId"
+            placeholder="请选择机器人"
+            size="large"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in INITIAL_ROBOTS"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
+          </el-select>
         </label>
 
         <p v-if="error" class="error">{{ error }}</p>

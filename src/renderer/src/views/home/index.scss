@@ -32,7 +32,9 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
     cursor: pointer;
-    transition: transform 0.16s ease, box-shadow 0.16s ease;
+    transition:
+      transform 0.16s ease,
+      box-shadow 0.16s ease;
     h3 {
       margin: 0 0 4px 0;
       font-size: 18px;
@@ -76,7 +78,7 @@
 .upload-box {
   border: 1px dashed var(--el-border-color);
   border-radius: 12px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
 .upload-list .list-head {
   display: flex;
@@ -96,8 +98,8 @@
   justify-content: space-between;
   padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 .upload-list .name {
   max-width: 70%;

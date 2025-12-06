@@ -122,7 +122,9 @@ const api = {
   },
   tcp: {
     send: (ip: string, port: number, payload: string) =>
-      ipcRenderer.invoke('tcp:send', ip, port, payload)
+      ipcRenderer.invoke('tcp:send', ip, port, payload),
+    sendAndReceive: (ip: string, port: number, payload: string) =>
+      ipcRenderer.invoke('tcp:send-and-receive', ip, port, payload)
   }
 }
 

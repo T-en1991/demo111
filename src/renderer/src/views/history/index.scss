@@ -44,17 +44,33 @@
 }
 .signal-bars .bar {
   width: 4px;
-  background-color: #E4E7ED;
+  background-color: #e4e7ed;
   border-radius: 2px;
 }
-.signal-bars .bar:nth-child(1) { height: 4px; }
-.signal-bars .bar:nth-child(2) { height: 8px; }
-.signal-bars .bar:nth-child(3) { height: 12px; }
-.signal-bars .bar:nth-child(4) { height: 16px; }
-.signal-bars .bar:nth-child(5) { height: 20px; }
-.signal-bars .bar.is-on { background-color: #67C23A; }
-.signal-bars.level-weak .bar.is-on { background-color: #E6A23C; }
-.signal-bars.level-bad .bar.is-on { background-color: #F56C6C; }
+.signal-bars .bar:nth-child(1) {
+  height: 4px;
+}
+.signal-bars .bar:nth-child(2) {
+  height: 8px;
+}
+.signal-bars .bar:nth-child(3) {
+  height: 12px;
+}
+.signal-bars .bar:nth-child(4) {
+  height: 16px;
+}
+.signal-bars .bar:nth-child(5) {
+  height: 20px;
+}
+.signal-bars .bar.is-on {
+  background-color: #67c23a;
+}
+.signal-bars.level-weak .bar.is-on {
+  background-color: #e6a23c;
+}
+.signal-bars.level-bad .bar.is-on {
+  background-color: #f56c6c;
+}
 
 // 详情弹窗紧凑头部样式
 .history-dialog {
@@ -105,9 +121,15 @@
 .meta-line .sep {
   color: var(--el-border-color);
 }
-.text-good { color: #67C23A; }
-.text-weak { color: #E6A23C; }
-.text-bad { color: #F56C6C; }
+.text-good {
+  color: #67c23a;
+}
+.text-weak {
+  color: #e6a23c;
+}
+.text-bad {
+  color: #f56c6c;
+}
 .mini-signal-bars {
   display: inline-flex;
   align-items: flex-end;
@@ -116,14 +138,30 @@
 }
 .mini-signal-bars .bar {
   width: 3px;
-  background-color: #E4E7ED;
+  background-color: #e4e7ed;
   border-radius: 2px;
 }
-.mini-signal-bars .bar:nth-child(1) { height: 4px; }
-.mini-signal-bars .bar:nth-child(2) { height: 7px; }
-.mini-signal-bars .bar:nth-child(3) { height: 10px; }
-.mini-signal-bars .bar:nth-child(4) { height: 12px; }
-.mini-signal-bars .bar:nth-child(5) { height: 14px; }
-.mini-signal-bars .bar.is-on { background-color: #67C23A; }
-.mini-signal-bars.level-weak .bar.is-on { background-color: #E6A23C; }
-.mini-signal-bars.level-bad .bar.is-on { background-color: #F56C6C; }
+.mini-signal-bars .bar:nth-child(1) {
+  height: 4px;
+}
+.mini-signal-bars .bar:nth-child(2) {
+  height: 7px;
+}
+.mini-signal-bars .bar:nth-child(3) {
+  height: 10px;
+}
+.mini-signal-bars .bar:nth-child(4) {
+  height: 12px;
+}
+.mini-signal-bars .bar:nth-child(5) {
+  height: 14px;
+}
+.mini-signal-bars .bar.is-on {
+  background-color: #67c23a;
+}
+.mini-signal-bars.level-weak .bar.is-on {
+  background-color: #e6a23c;
+}
+.mini-signal-bars.level-bad .bar.is-on {
+  background-color: #f56c6c;
+}

@@ -23,18 +23,17 @@ export function registerRtspIpc(): void {
     try {
       // 固定使用8085端口
       const wsPort = 8085
-      
+
       // 根据streamType参数选择RTSP源地址
       const selectedStreamType = streamType || 'mono'
-      
+
       // 从数据库获取机器鱼配置
-      const fishs = await fishService.findAll();
-     
-      
-      if (fishs.length ==0) {
+      const fishs = await fishService.findAll()
+
+      if (fishs.length == 0) {
         throw new Error(`未找到ID为 ${fishId} 的机器鱼配置`)
       }
-       const fish = fishs[0];
+      const fish = fishs[0]
       // 根据流类型选择对应的RTSP URL
       let actualRtspUrl: string
       if (selectedStreamType === 'mono') {
@@ -44,18 +43,20 @@ export function registerRtspIpc(): void {
         // 双目模式使用rtsp2字段
         actualRtspUrl = fish.rtsp2 || 'rtsp://localhost:8554/live2' // 默认URL作为备份
       }
-      
+
       logger.info(`尝试启动RTSP流: ${actualRtspUrl} (类型: ${selectedStreamType}) 到端口 ${wsPort}`)
       await startRtspRelay({ rtspUrl: actualRtspUrl, wsPort })
-      
+
       // 更新当前活动流信息
       activeStream = {
         rtspUrl: actualRtspUrl,
         type: selectedStreamType
       }
-      
-      logger.info(`RTSP流已成功启动: ${actualRtspUrl} -> ws://localhost:${wsPort}/ (类型: ${activeStream.type})`)
-      
+
+      logger.info(
+        `RTSP流已成功启动: ${actualRtspUrl} -> ws://localhost:${wsPort}/ (类型: ${activeStream.type})`
+      )
+
       return {
         success: true,
         message: `RTSP流启动成功 (类型: ${activeStream.type})`,
@@ -90,7 +91,7 @@ export function registerRtspIpc(): void {
       }
     }
   })
-  
+
   // 获取当前活动流信息
   ipcMain.handle('rtsp:getActiveStream', () => {
     return activeStream

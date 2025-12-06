@@ -29,7 +29,11 @@ function toFileUrl(p: string): string {
 async function fetchList(): Promise<void> {
   loading.value = true
   try {
-    const res = await window.api.video.list({ page: page.value, pageSize: pageSize.value, keyword: keyword.value.trim() || undefined })
+    const res = await window.api.video.list({
+      page: page.value,
+      pageSize: pageSize.value,
+      keyword: keyword.value.trim() || undefined
+    })
     items.value = res.items
     total.value = res.total
   } finally {
@@ -67,10 +71,28 @@ onMounted(() => {
   <div class="video-history">
     <div class="toolbar" style="margin-bottom: 10px; display: flex; gap: 8px">
       <el-input v-model="keyword" placeholder="按名称搜索" clearable style="max-width: 260px" />
-      <el-button type="primary" @click="() => { page = 1 as any; fetchList() }">查询</el-button>
-      <el-button @click="() => { keyword = '' as any; page = 1 as any; fetchList() }">重置</el-button>
+      <el-button
+        type="primary"
+        @click="
+          () => {
+            page = 1 as any
+            fetchList()
+          }
+        "
+        >查询</el-button
+      >
+      <el-button
+        @click="
+          () => {
+            keyword = '' as any
+            page = 1 as any
+            fetchList()
+          }
+        "
+        >重置</el-button
+      >
     </div>
-    <el-table :data="items" border stripe v-loading="loading" style="width: 100%">
+    <el-table v-loading="loading" :data="items" border stripe style="width: 100%">
       <el-table-column prop="id" label="ID" width="90" />
       <el-table-column prop="name" label="名称" min-width="220" />
       <el-table-column prop="camera" label="摄像头" width="120" />
@@ -87,7 +109,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     </el-table>
-    <div class="pagination" style="display:flex; justify-content: flex-end; padding-top:12px">
+    <div class="pagination" style="display: flex; justify-content: flex-end; padding-top: 12px">
       <el-pagination
         background
         layout="total, sizes, prev, pager, next, jumper"
@@ -102,12 +124,17 @@ onMounted(() => {
 
     <el-dialog v-model="playerVisible" width="70vw">
       <template #header>
-        <div style="display:flex; justify-content: space-between; align-items:center">
+        <div style="display: flex; justify-content: space-between; align-items: center">
           <span>{{ activeItem?.name }}</span>
           <span style="color: var(--ev-c-text-2)">{{ activeItem?.path }}</span>
         </div>
       </template>
-      <video :src="activeUrl" controls autoplay style="width: 100%; max-height: 62vh; background: #000" />
+      <video
+        :src="activeUrl"
+        controls
+        autoplay
+        style="width: 100%; max-height: 62vh; background: #000"
+      />
       <template #footer>
         <el-button @click="closePlayer">关闭</el-button>
       </template>
@@ -116,5 +143,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.video-history { }
+.video-history {
+}
 </style>

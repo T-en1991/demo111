@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { } from 'vue'
+import {} from 'vue'
 const router = useRouter()
 
 function go(name: string): void {
   router.push({ name })
 }
-
 </script>
 
 <template>

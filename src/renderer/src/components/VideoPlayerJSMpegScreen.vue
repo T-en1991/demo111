@@ -53,7 +53,6 @@ function onVolume(e: Event) {
   volume.value = val
 }
 
-
 onMounted(() => {
   if (videoContainer.value) {
     player = new JSMpeg.VideoElement(videoContainer.value, props.url, {
