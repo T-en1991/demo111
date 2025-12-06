@@ -10,6 +10,49 @@ const api = {
   openWinSCP(): Promise<boolean> {
     return ipcRenderer.invoke('app:openWinSCP')
   },
+  dialog: {
+    openVideos(): Promise<Array<{ path: string; name: string; size: number }>> {
+      return ipcRenderer.invoke('dialog:openVideos')
+    }
+  },
+  history: {
+    create(data: {
+      time: string
+      content?: string
+      lon?: number | null
+      lat?: number | null
+      depth?: number | null
+      height?: number | null
+      battery?: number | null
+      signalStrength?: number | null
+    }): Promise<any> {
+      return ipcRenderer.invoke('history:create', data)
+    },
+    importXlsx(filePath: string): Promise<any> {
+      return ipcRenderer.invoke('history:importXlsx', filePath)
+    }
+  },
+
+  video: {
+    create(data: {
+      path: string
+      name: string
+      size?: number | null
+      camera?: 'mono' | 'stereo' | 'unknown'
+      recordedAt?: string | Date | null
+    }): Promise<any> {
+      return ipcRenderer.invoke('video:create', data)
+    },
+    list(params: { page?: number; pageSize?: number; keyword?: string } = {}): Promise<any> {
+      return ipcRenderer.invoke('video:list', params)
+    },
+    get(id: number): Promise<any> {
+      return ipcRenderer.invoke('video:get', id)
+    },
+    delete(id: number): Promise<any> {
+      return ipcRenderer.invoke('video:delete', id)
+    }
+  },
 
   // Fish database operations
   fish: {
@@ -66,19 +109,20 @@ const api = {
     deleteMany: (ids: number[]) => ipcRenderer.invoke('fish:deleteMany', ids),
     seed: (count: number) => ipcRenderer.invoke('fish:seed', count)
   },
-  
+
   // RTSP流控制接口
   rtsp: {
     // 启动RTSP流（使用参数控制流类型）
-    start: (rtspUrl: string, streamType?: 'monocular' | 'binocular') => ipcRenderer.invoke('rtsp:start', rtspUrl, streamType),
+    start: (rtspUrl: string, streamType?: 'monocular' | 'binocular') =>
+      ipcRenderer.invoke('rtsp:start', rtspUrl, streamType),
     // 停止RTSP流
     stop: () => ipcRenderer.invoke('rtsp:stop'),
     // 获取当前活动流信息
     getActiveStream: () => ipcRenderer.invoke('rtsp:getActiveStream')
-  }
-  ,
+  },
   tcp: {
-    send: (ip: string, port: number, payload: string) => ipcRenderer.invoke('tcp:send', ip, port, payload)
+    send: (ip: string, port: number, payload: string) =>
+      ipcRenderer.invoke('tcp:send', ip, port, payload)
   }
 }
 

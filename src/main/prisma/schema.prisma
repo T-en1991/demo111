@@ -83,9 +83,34 @@ model History {
   signalStrength Int?
   time           DateTime
   content        String?
+  rollDeg        Float?
+  pitchDeg       Float?
+  yawDeg         Float?
+  axMs2          Float?
+  ayMs2          Float?
+  azMs2          Float?
   createdAt      DateTime  @default(now())
 
   @@map("history")
+  @@unique([time])
+}
+
+model Video {
+  id         Int       @id @default(autoincrement())
+  path       String
+  name       String
+  size       Int?
+  camera     VideoCameraType @default(unknown)
+  recordedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@map("videos")
+}
+
+enum VideoCameraType {
+  mono
+  stereo
+  unknown
 }
 
 enum FishStatus {

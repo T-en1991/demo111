@@ -14,6 +14,18 @@ declare global {
     api: {
       quitApp(): void
       openWinSCP(): Promise<boolean>
+      history: {
+        create(data: {
+          time: string
+          content?: string
+          lon?: number | null
+          lat?: number | null
+          depth?: number | null
+          height?: number | null
+          battery?: number | null
+          signalStrength?: number | null
+        }): Promise<any>
+      }
       fish: {
         findAll(): Promise<Fish[]>
         findById(id: number): Promise<Fish | null>
@@ -89,7 +101,7 @@ declare global {
     stop(): Promise<RtspResponse>
     // 获取当前活动流信息
     getActiveStream(): Promise<{rtspUrl: string, type: 'monocular' | 'binocular'} | null>
-  }
+      }
     }
   }
 }

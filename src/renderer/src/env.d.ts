@@ -21,6 +21,47 @@ declare global {
     api: {
       quitApp(): void
       openWinSCP(): Promise<boolean>
+      dialog: {
+        openVideos(): Promise<Array<{ path: string; name: string; size: number }>>
+      }
+      video: {
+        create(data: {
+          path: string
+          name: string
+          size?: number | null
+          camera?: 'mono' | 'stereo' | 'unknown'
+          recordedAt?: string | Date | null
+        }): Promise<any>
+        list(params?: { page?: number; pageSize?: number; keyword?: string }): Promise<{
+          items: Array<{
+            id: number
+            path: string
+            name: string
+            size: number | null
+            camera: 'mono' | 'stereo' | 'unknown'
+            recordedAt: Date | null
+            createdAt: Date
+          }>
+          total: number
+          page: number
+          pageSize: number
+        }>
+        get(id: number): Promise<any>
+        delete(id: number): Promise<any>
+      }
+      history: {
+        create(data: {
+          time: string
+          content?: string
+          lon?: number | null
+          lat?: number | null
+          depth?: number | null
+          height?: number | null
+          battery?: number | null
+          signalStrength?: number | null
+        }): Promise<any>
+        importXlsx(filePath: string): Promise<any>
+      }
       fish: {
         findAll(): Promise<import('@prisma/client').Fish[]>
         findById(id: number): Promise<import('@prisma/client').Fish | null>

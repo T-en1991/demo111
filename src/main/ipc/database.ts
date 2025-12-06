@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { fishService } from '../database/index.js'
+import { fishService, historyService, videoService, importService } from '../database/index.js'
 
 export function registerDatabaseIpc(): void {
   // Fish CRUD 操作
@@ -152,4 +152,88 @@ export function registerDatabaseIpc(): void {
       throw error
     }
   })
+
+  // 保存历史记录（用于上传视频文件解析后的入库）
+  ipcMain.handle(
+    'history:create',
+    async (
+      _,
+      data: {
+        time: string
+        content?: string
+        lon?: number | null
+        lat?: number | null
+        depth?: number | null
+        height?: number | null
+        battery?: number | null
+        signalStrength?: number | null
+      }
+    ) => {
+      try {
+        return await historyService.create(data)
+      } catch (error) {
+        console.error('Error creating history:', error)
+        throw error
+      }
+    }
+  )
+
+  // 保存视频记录（独立表：videos）
+  ipcMain.handle(
+    'video:create',
+    async (
+      _,
+      data: {
+        path: string
+        name: string
+        size?: number | null
+        camera?: 'mono' | 'stereo' | 'unknown'
+        recordedAt?: string | Date | null
+      }
+    ) => {
+      try {
+        return await videoService.create(data)
+      } catch (error) {
+        console.error('Error creating video:', error)
+        throw error
+      }
+    }
+  )
+
+  ipcMain.handle('video:list', async (_, params: { page?: number; pageSize?: number; keyword?: string }) => {
+    try {
+      return await videoService.list(params || {})
+    } catch (error) {
+      console.error('Error listing videos:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('video:get', async (_, id: number) => {
+    try {
+      return await videoService.get(Number(id))
+    } catch (error) {
+      console.error('Error getting video:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('video:delete', async (_, id: number) => {
+    try {
+      return await videoService.delete(Number(id))
+    } catch (error) {
+      console.error('Error deleting video:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('history:importXlsx', async (_, filePath: string) => {
+    try {
+      return await importService.importHistoryFromXlsx(String(filePath))
+    } catch (error) {
+      console.error('Error importing history from xlsx:', error)
+      throw error
+    }
+  })
+
 }

@@ -41,7 +41,8 @@
     "vue-router": "^4.6.3",
     "winston": "^3.9.0",
     "winston-daily-rotate-file": "^4.7.1",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",

@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import type { User, Alert, Fish } from '@prisma/client'
 import logger from '../logger'
+import * as XLSX from 'xlsx'
 
 const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error']
@@ -17,6 +18,83 @@ export async function connectDatabase(): Promise<void> {
   }
 }
 
+export const importService = {
+  async importHistoryFromXlsx(filePath: string): Promise<{ inserted: number; updated: number; failed: number }> {
+    const wb = XLSX.readFile(filePath, { cellDates: true })
+    const sheetName = wb.SheetNames[0]
+    const ws = wb.Sheets[sheetName]
+    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { raw: false })
+    const norm = (s: string) => s.trim().toLowerCase()
+    const mapKey = (k: string): string => {
+      const s = norm(k)
+      if (['time', '时间'].includes(s)) return 'time'
+      if (['lon', '经度'].includes(s)) return 'lon'
+      if (['lat', '纬度'].includes(s)) return 'lat'
+      if (['depth', '深度'].includes(s)) return 'depth'
+      if (['height', '高度', 'alt', 'dvl_alt[m]'].includes(s)) return 'height'
+      if (['battery', '电量'].includes(s)) return 'battery'
+      if (['signalstrength', '信号强度', 'signal'].includes(s)) return 'signalStrength'
+      if (['content', '内容'].includes(s)) return 'content'
+      if (['roll[deg]', '横滚角', 'roll'].includes(s)) return 'rollDeg'
+      if (['pitch[deg]', '俯仰角', 'pitch'].includes(s)) return 'pitchDeg'
+      if (['yaw[deg]', '偏航角', 'yaw'].includes(s)) return 'yawDeg'
+      if (['ax[m/s^2]', '角速度x', 'ax'].includes(s)) return 'axMs2'
+      if (['ay[m/s^2]', '角速度y', 'ay'].includes(s)) return 'ayMs2'
+      if (['az[m/s^2]', '角速度z', 'az'].includes(s)) return 'azMs2'
+      return k
+    }
+
+    let inserted = 0
+    let updated = 0
+    let failed = 0
+
+    const toPayloads = rows.map((row) => {
+      const obj: any = {}
+      Object.keys(row).forEach((k) => {
+        obj[mapKey(k)] = row[k]
+      })
+      const t = obj.time
+      const time = t instanceof Date ? t : typeof t === 'string' ? new Date(t) : null
+      if (!time || isNaN(time.getTime())) return null
+      const num = (v: unknown) => (v == null || v === '' ? null : Number(v))
+      return {
+        time,
+        content: obj.content ?? null,
+        lon: num(obj.lon),
+        lat: num(obj.lat),
+        depth: num(obj.depth),
+        height: num(obj.height),
+        battery: obj.battery == null || obj.battery === '' ? null : Number(obj.battery),
+        signalStrength: obj.signalStrength == null || obj.signalStrength === '' ? null : Number(obj.signalStrength),
+        rollDeg: num(obj.rollDeg),
+        pitchDeg: num(obj.pitchDeg),
+        yawDeg: num(obj.yawDeg),
+        axMs2: num(obj.axMs2),
+        ayMs2: num(obj.ayMs2),
+        azMs2: num(obj.azMs2)
+      }
+    })
+
+    const payloads = toPayloads.filter(Boolean) as Prisma.HistoryCreateInput[]
+    const chunk = 500
+    for (let i = 0; i < payloads.length; i += chunk) {
+      const part = payloads.slice(i, i + chunk)
+      const ops = part.map((p) => prisma.history.findUnique({ where: { time: p.time } }))
+      const exists = await prisma.$transaction(ops)
+      const upserts = part.map((p) =>
+        prisma.history.upsert({ where: { time: p.time }, update: p, create: p })
+      )
+      await prisma.$transaction(upserts)
+      exists.forEach((e) => {
+        if (e) updated++
+        else inserted++
+      })
+    }
+
+    failed = rows.length - (inserted + updated)
+    return { inserted, updated, failed }
+  }
+}
 // 断开数据库连接
 export async function disconnectDatabase(): Promise<void> {
   try {
@@ -358,20 +436,86 @@ export const fishService = {
     })
   },
 
-  // 批量生成假数据
   async seedMocks(count: number): Promise<Prisma.BatchPayload> {
-    const types = ['A-型', 'B-型', 'C-型'] as const
-    const statuses = ['running', 'stopped'] as const
-    const rows = Array.from({ length: count }, (_, i) => {
-      const idx = i + 1
-      const name = `机器人-${String(idx).padStart(3, '0')}`
-      const type = types[i % types.length]
-      const status = statuses[i % statuses.length]
-      return { name, type, status }
-    })
-    // 使用 createMany 提高插入效率
-    return prisma.fish.createMany({ data: rows })
+    const mocks: any[] = []
+    for (let i = 0; i < count; i++) {
+      mocks.push({
+        name: `Mock Fish ${i + 1}`,
+        ip: `192.168.1.${100 + i}`,
+        status: i % 2 === 0 ? 'running' : 'stopped'
+      })
+    }
+    return prisma.fish.createMany({ data: mocks })
   }
 }
 
 export { prisma }
+
+// History CRUD（当前用于保存上传的视频记录元数据）
+export const historyService = {
+  async create(data: {
+    time: Date | string
+    content?: string | null
+    lon?: number | null
+    lat?: number | null
+    depth?: number | null
+    height?: number | null
+    battery?: number | null
+    signalStrength?: number | null
+  }) {
+    const payload = {
+      time: typeof data.time === 'string' ? new Date(data.time) : data.time,
+      content: data.content ?? null,
+      lon: data.lon ?? null,
+      lat: data.lat ?? null,
+      depth: data.depth ?? null,
+      height: data.height ?? null,
+      battery: data.battery ?? null,
+      signalStrength: data.signalStrength ?? null
+    }
+    return prisma.history.create({ data: payload })
+  }
+}
+
+export const videoService = {
+  async create(data: {
+    path: string
+    name: string
+    size?: number | null
+    camera?: 'mono' | 'stereo' | 'unknown'
+    recordedAt?: Date | string | null
+  }): Promise<any> {
+    const payload = {
+      path: data.path,
+      name: data.name,
+      size: data.size ?? null,
+      camera: data.camera ?? 'unknown',
+      recordedAt:
+        data.recordedAt == null
+          ? null
+          : typeof data.recordedAt === 'string'
+          ? new Date(data.recordedAt)
+          : data.recordedAt
+    }
+    return prisma.video.create({ data: payload as any })
+  }
+  ,
+  async list(params: { page?: number; pageSize?: number; keyword?: string }): Promise<any> {
+    const page = Math.max(1, Number(params.page) || 1)
+    const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 10))
+    const where: Prisma.VideoWhereInput = params.keyword
+      ? { name: { contains: String(params.keyword) } }
+      : {}
+    const [items, total] = await Promise.all([
+      prisma.video.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
+      prisma.video.count({ where })
+    ])
+    return { items, total, page, pageSize }
+  },
+  async get(id: number): Promise<any> {
+    return prisma.video.findUnique({ where: { id } })
+  },
+  async delete(id: number): Promise<any> {
+    return prisma.video.delete({ where: { id } })
+  }
+}

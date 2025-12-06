@@ -232,8 +232,10 @@ function batteryClass(percent?: number): string {
       </el-form>
     </el-card>
 
-    <el-card class="table-card" shadow="never">
-      <el-table :data="currentPageData" border stripe style="width: 100%">
+    <el-tabs class="history-tabs" type="border-card">
+      <el-tab-pane label="数据历史" name="data">
+        <el-card class="table-card" shadow="never">
+          <el-table :data="currentPageData" border stripe style="width: 100%">
         <el-table-column prop="id" label="ID" width="100" />
         <el-table-column prop="lon" label="经度" width="140" />
         <el-table-column prop="lat" label="纬度" width="140" />
@@ -289,8 +291,16 @@ function batteryClass(percent?: number): string {
           @size-change="onSizeChange"
           @current-change="onPageChange"
         />
-      </div>
-    </el-card>
+        </div>
+        </el-card>
+      </el-tab-pane>
+
+      <el-tab-pane label="视频历史" name="video">
+        <el-card class="table-card" shadow="never">
+          <VideoHistory />
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog v-model="detailVisible" width="80vw" class="history-dialog">
       <template #header>
