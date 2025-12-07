@@ -1,6 +1,9 @@
 import net from 'net'
 import logger from '../logger'
 import { fishService, alertService } from '../database'
+import { EventEmitter } from 'events'
+
+export const tcpClientEvents = new EventEmitter()
 
 type ListenerInfo = {
   server: net.Server
@@ -9,6 +12,93 @@ type ListenerInfo = {
 }
 
 const listeners = new Map<number, ListenerInfo>() // key: fishId
+const clientConnections = new Map<string, net.Socket>() // key: "ip:port"
+
+export function getClientConnectionKey(ip: string, port: number): string {
+  return `${ip}:${port}`
+}
+
+export async function connectClient(ip: string, port: number): Promise<boolean> {
+  const key = getClientConnectionKey(ip, port)
+  if (clientConnections.has(key)) {
+    const socket = clientConnections.get(key)
+    if (socket && !socket.destroyed) {
+      return true
+    }
+    clientConnections.delete(key)
+  }
+
+  return new Promise((resolve) => {
+    const socket = new net.Socket()
+
+    const cleanup = () => {
+      clientConnections.delete(key)
+      tcpClientEvents.emit('status', { ip, port, status: 'disconnected' })
+    }
+
+    socket.connect(port, ip, () => {
+      logger.info(`[TCP Client] Connected to ${ip}:${port}`)
+      clientConnections.set(key, socket)
+      tcpClientEvents.emit('status', { ip, port, status: 'connected' })
+      resolve(true)
+    })
+
+    socket.on('data', (data) => {
+      logger.info(`[TCP Client] Received ${data.length} bytes from ${ip}:${port}`)
+      tcpClientEvents.emit('data', { ip, port, data: data.toString() })
+    })
+
+    socket.on('error', (err) => {
+      logger.error(`[TCP Client] Error on ${ip}:${port}:`, err)
+      tcpClientEvents.emit('error', { ip, port, error: err.message })
+      cleanup()
+      // If error happens during connection attempt
+      resolve(false)
+    })
+
+    socket.on('close', () => {
+      logger.info(`[TCP Client] Connection closed ${ip}:${port}`)
+      cleanup()
+    })
+  })
+}
+
+export async function disconnectClient(ip: string, port: number): Promise<void> {
+  const key = getClientConnectionKey(ip, port)
+  const socket = clientConnections.get(key)
+  if (socket) {
+    socket.destroy()
+    clientConnections.delete(key)
+  }
+}
+
+export async function sendClient(ip: string, port: number, payload: string): Promise<boolean> {
+  const key = getClientConnectionKey(ip, port)
+  let socket = clientConnections.get(key)
+
+  if (!socket || socket.destroyed) {
+    // Try to reconnect?
+    logger.info(`[TCP Client] Socket not found for ${ip}:${port}, attempting to connect...`)
+    const connected = await connectClient(ip, port)
+    if (!connected) return false
+    socket = clientConnections.get(key)
+  }
+
+  if (!socket) return false
+
+  return new Promise((resolve) => {
+    const body = payload.endsWith('\n') ? payload : payload + '\n'
+    socket!.write(body, (err) => {
+      if (err) {
+        logger.error(`[TCP Client] Write error to ${ip}:${port}:`, err)
+        resolve(false)
+      } else {
+        resolve(true)
+      }
+    })
+  })
+}
+
 
 export async function startListenersForAllFish(): Promise<void> {
   try {

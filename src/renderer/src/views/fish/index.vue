@@ -25,8 +25,6 @@ interface Fish {
   satcomIp?: string
   satcomPort1?: number
   satcomPort2?: number
-  microwaveIp?: string
-  microwavePort?: number
 }
 
 // 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
@@ -50,12 +48,10 @@ type FishFromBackend = {
   exitManualCommand?: string | null
   returnCommand?: string | null
   description?: string | null
-  // 新增：卫通与微波通信参数（后端直接返回）
+  // 新增：声通与微波通信参数（后端直接返回）
   satcomIp?: string | null
   satcomPort1?: number | null
   satcomPort2?: number | null
-  microwaveIp?: string | null
-  microwavePort?: number | null
   track?: unknown
 }
 
@@ -75,12 +71,10 @@ interface FishForm {
   port?: number
   rtspUrl: string
   rtsp2: string
-  // 额外通信参数：卫通与微波
+  // 额外通信参数：声通与微波
   satcomIp: string
   satcomPort1: number
   satcomPort2: number
-  microwaveIp: string
-  microwavePort: number
   cmdUp: string
   cmdDown: string
   cmdForward: string
@@ -115,8 +109,6 @@ function parseExtraDesc(input: string | null | undefined): {
   satcomIp?: string
   satcomPort1?: number
   satcomPort2?: number
-  microwaveIp?: string
-  microwavePort?: number
 } {
   if (!input) return {}
   try {
@@ -128,17 +120,11 @@ function parseExtraDesc(input: string | null | undefined): {
     const satRaw = isRecord((parsed as Record<string, unknown>).satcom)
       ? (parsed as Record<string, unknown>).satcom
       : {}
-    const micRaw = isRecord((parsed as Record<string, unknown>).microwave)
-      ? (parsed as Record<string, unknown>).microwave
-      : {}
     const sat = satRaw as { ip?: unknown; port1?: unknown; port2?: unknown }
-    const mic = micRaw as { ip?: unknown; port?: unknown }
     const satcomIp = typeof sat.ip === 'string' ? sat.ip : undefined
     const satcomPort1 = sat.port1 != null ? Number(sat.port1) : undefined
     const satcomPort2 = sat.port2 != null ? Number(sat.port2) : undefined
-    const microwaveIp = typeof mic.ip === 'string' ? mic.ip : undefined
-    const microwavePort = mic.port != null ? Number(mic.port) : undefined
-    return { text, satcomIp, satcomPort1, satcomPort2, microwaveIp, microwavePort }
+    return { text, satcomIp, satcomPort1, satcomPort2 }
   } catch {
     return { text: input }
   }
@@ -195,9 +181,7 @@ async function loadFish(): Promise<void> {
         // 额外通信参数：优先使用后端字段，其次兼容旧的 description JSON
         satcomIp: f.satcomIp ?? extra.satcomIp,
         satcomPort1: f.satcomPort1 ?? extra.satcomPort1,
-        satcomPort2: f.satcomPort2 ?? extra.satcomPort2,
-        microwaveIp: f.microwaveIp ?? extra.microwaveIp,
-        microwavePort: f.microwavePort ?? extra.microwavePort
+        satcomPort2: f.satcomPort2 ?? extra.satcomPort2
       }
     })
     allFish.value = normalized
@@ -229,8 +213,6 @@ const form = reactive<FishForm>({
   satcomIp: '',
   satcomPort1: 0,
   satcomPort2: 0,
-  microwaveIp: '',
-  microwavePort: 0,
   cmdUp: '',
   cmdDown: '',
   cmdForward: '',
@@ -255,8 +237,6 @@ function openCreate(): void {
     satcomIp: '',
     satcomPort1: 0,
     satcomPort2: 0,
-    microwaveIp: '',
-    microwavePort: 0,
     cmdUp: '',
     cmdDown: '',
     cmdForward: '',
@@ -283,8 +263,6 @@ function openEdit(row: Fish): void {
     satcomIp: row.satcomIp ?? '',
     satcomPort1: row.satcomPort1 ?? 0,
     satcomPort2: row.satcomPort2 ?? 0,
-    microwaveIp: row.microwaveIp ?? '',
-    microwavePort: row.microwavePort ?? 0,
     // 从后端读取的命令与描述
     cmdUp: row.ascendCommand ?? '',
     cmdDown: row.descendCommand ?? '',
@@ -368,8 +346,6 @@ async function save(): Promise<void> {
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
-        microwaveIp: form.microwaveIp || null,
-        microwavePort: form.microwavePort || null,
         ascendCommand: form.cmdUp || null,
         descendCommand: form.cmdDown || null,
         forwardCommand: form.cmdForward || null,
@@ -402,8 +378,6 @@ async function save(): Promise<void> {
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
-        microwaveIp: form.microwaveIp || null,
-        microwavePort: form.microwavePort || null,
         ascendCommand: form.cmdUp || null,
         descendCommand: form.cmdDown || null,
         forwardCommand: form.cmdForward || null,
@@ -525,38 +499,23 @@ function formatDate(input?: string | Date | null): string {
       class="fish-dialog"
     >
       <el-form label-width="120px">
-        <!-- 第一行：名称、微波IP、微波端口 -->
+        <!-- 第一行：名称 -->
         <el-row :gutter="12">
-          <el-col :span="8">
+          <el-col :span="24">
             <el-form-item label="名称">
               <el-input v-model="form.name" placeholder="请输入名称" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
-            <el-form-item label="微波 IP">
-              <el-input v-model="form.microwaveIp" placeholder="微波 IP" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="微波端口">
-              <el-input-number
-                v-model="form.microwavePort"
-                :min="0"
-                :max="65535"
-                controls-position="right"
-              />
-            </el-form-item>
-          </el-col>
         </el-row>
-        <!-- 第二行：卫通IP、卫通端口1、卫通端口2 -->
+        <!-- 第二行：声通IP、声通端口1、声通端口2 -->
         <el-row :gutter="12">
           <el-col :span="8">
-            <el-form-item label="卫通 IP">
-              <el-input v-model="form.satcomIp" placeholder="卫通 IP" />
+            <el-form-item label="声通 IP">
+              <el-input v-model="form.satcomIp" placeholder="声通 IP" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="卫通端口1">
+            <el-form-item label="声通端口1">
               <el-input-number
                 v-model="form.satcomPort1"
                 :min="0"
@@ -566,7 +525,7 @@ function formatDate(input?: string | Date | null): string {
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="卫通端口2">
+            <el-form-item label="声通端口2">
               <el-input-number
                 v-model="form.satcomPort2"
                 :min="0"

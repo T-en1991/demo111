@@ -102,6 +102,26 @@ declare global {
         // 获取当前活动流信息
         getActiveStream(): Promise<{ rtspUrl: string; type: 'monocular' | 'binocular' } | null>
       }
+      tcp: {
+        send(
+          ip: string,
+          port: number,
+          payload: string
+        ): Promise<{ success: boolean; message?: string }>
+        sendAndReceive(
+          ip: string,
+          port: number,
+          payload: string
+        ): Promise<{ success: boolean; data?: string; error?: string }>
+        connect(ip: string, port: number): Promise<boolean>
+        disconnect(ip: string, port: number): Promise<boolean>
+        sendClient(ip: string, port: number, payload: string): Promise<boolean>
+        onData(callback: (payload: { ip: string; port: number; data: string }) => void): () => void
+        onStatus(
+          callback: (payload: { ip: string; port: number; status: string }) => void
+        ): () => void
+        onError(callback: (payload: { ip: string; port: number; error: string }) => void): () => void
+      }
     }
   }
 }

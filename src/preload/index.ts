@@ -124,7 +124,47 @@ const api = {
     send: (ip: string, port: number, payload: string) =>
       ipcRenderer.invoke('tcp:send', ip, port, payload),
     sendAndReceive: (ip: string, port: number, payload: string) =>
-      ipcRenderer.invoke('tcp:send-and-receive', ip, port, payload)
+      ipcRenderer.invoke('tcp:send-and-receive', ip, port, payload),
+    connect: (ip: string, port: number) => ipcRenderer.invoke('tcp:connect', ip, port),
+    disconnect: (ip: string, port: number) => ipcRenderer.invoke('tcp:disconnect', ip, port),
+    sendClient: (ip: string, port: number, payload: string) =>
+      ipcRenderer.invoke('tcp:send-client', ip, port, payload),
+    onData: (
+      callback: (payload: { ip: string; port: number; data: string }) => void
+    ): (() => void) => {
+      const subscription = (
+        _: unknown,
+        payload: { ip: string; port: number; data: string }
+      ): void => callback(payload)
+      ipcRenderer.on('tcp:data', subscription)
+      return () => {
+        ipcRenderer.removeListener('tcp:data', subscription)
+      }
+    },
+    onStatus: (
+      callback: (payload: { ip: string; port: number; status: string }) => void
+    ): (() => void) => {
+      const subscription = (
+        _: unknown,
+        payload: { ip: string; port: number; status: string }
+      ): void => callback(payload)
+      ipcRenderer.on('tcp:status', subscription)
+      return () => {
+        ipcRenderer.removeListener('tcp:status', subscription)
+      }
+    },
+    onError: (
+      callback: (payload: { ip: string; port: number; error: string }) => void
+    ): (() => void) => {
+      const subscription = (
+        _: unknown,
+        payload: { ip: string; port: number; error: string }
+      ): void => callback(payload)
+      ipcRenderer.on('tcp:error', subscription)
+      return () => {
+        ipcRenderer.removeListener('tcp:error', subscription)
+      }
+    }
   }
 }
 

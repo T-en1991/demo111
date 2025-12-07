@@ -9,7 +9,7 @@ interface AlertItem {
   height?: number
   battery?: number
   signalStrength?: number
-  type?: '记录' | '报警'
+  type: '报警'
   time: string
   content?: string
   imgFile?: string
@@ -44,18 +44,6 @@ const allAlerts = ref<AlertItem[]>([
     content: '检测到滚转角超过阈值'
   },
   {
-    id: 3,
-    time: '2025-10-03 13:05',
-    lon: 121.521,
-    lat: 31.201,
-    depth: 0,
-    height: 0.8,
-    battery: 90,
-    signalStrength: -60,
-    type: '记录',
-    content: '已完成温度传感器校准'
-  },
-  {
     id: 4,
     time: '2025-10-04 09:33',
     lon: 116.4074,
@@ -80,18 +68,6 @@ const allAlerts = ref<AlertItem[]>([
     content: '设备温度达到 75℃，超过告警阈值',
     imgFile: 'https://picsum.photos/800/450',
     camMonoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
-  },
-  {
-    id: 6,
-    time: '2025-10-06 11:09',
-    lon: 118.7969,
-    lat: 32.0603,
-    depth: 3.2,
-    height: 1.7,
-    battery: 88,
-    signalStrength: -62,
-    type: '记录',
-    content: '巡检完成，状态正常'
   }
 ])
 
@@ -102,24 +78,19 @@ defaultStart.setDate(now.getDate() - 1)
 defaultStart.setHours(0, 0, 0, 0)
 type DateRange = [Date, Date] | []
 const query = reactive({
-  range: [defaultStart, now] as DateRange,
-  type: '全部' as '全部' | '记录' | '报警'
+  range: [defaultStart, now] as DateRange
 })
 // 仅在点击“查询”后应用筛选的有效范围（默认采用昨天零点到现在）
 const activeRange = ref<DateRange>([defaultStart, now] as DateRange)
-const activeType = ref<'全部' | '记录' | '报警'>('全部')
 
 function resetQuery(): void {
   query.range = []
   activeRange.value = []
-  query.type = '全部'
-  activeType.value = '全部'
   page.value = 1
 }
 function applyQuery(): void {
   activeRange.value =
     Array.isArray(query.range) && query.range.length === 2 ? [query.range[0], query.range[1]] : []
-  activeType.value = query.type
   page.value = 1
 }
 
@@ -132,8 +103,7 @@ const filtered = computed((): AlertItem[] => {
             return t >= activeRange.value[0] && t <= activeRange.value[1]
           })()
         : true
-    const byType = activeType.value === '全部' ? true : a.type === activeType.value
-    return byRange && byType
+    return byRange
   })
 })
 
@@ -167,7 +137,7 @@ function closeDetail(): void {
 }
 
 function baiduMarkerUrl(lat: number, lon: number, title?: string, time?: string): string {
-  const t = encodeURIComponent(title ?? '记录')
+  const t = encodeURIComponent(title ?? '报警')
   const c = encodeURIComponent(time ?? '')
   // 使用无需AK的 marker 页面以 iframe 嵌入展示
   return `http://api.map.baidu.com/marker?location=${lat},${lon}&title=${t}&content=${c}&output=html&src=ocean-fish`
@@ -202,7 +172,7 @@ function batteryClass(percent?: number): string {
 <template>
   <section class="alerts-page">
     <header class="page-header">
-      <h1>历史记录</h1>
+      <h1>报警记录</h1>
       <p class="sub">支持条件过滤与分页</p>
     </header>
 
@@ -217,13 +187,6 @@ function batteryClass(percent?: number): string {
             end-placeholder="结束日期"
             unlink-panels
           />
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="query.type" placeholder="选择类型" style="width: 160px">
-            <el-option label="全部" value="全部" />
-            <el-option label="记录" value="记录" />
-            <el-option label="报警" value="报警" />
-          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="applyQuery">查询</el-button>
@@ -297,7 +260,7 @@ function batteryClass(percent?: number): string {
         <div class="detail-header">
           <div class="line1">
             <span class="content" :title="detailItem?.content ?? ''">{{
-              detailItem?.content ?? '记录详情'
+              detailItem?.content ?? '报警详情'
             }}</span>
             <span class="time">{{ detailItem?.time }}</span>
           </div>

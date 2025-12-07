@@ -32,26 +32,33 @@ function go(name: string): void {
         </div>
       </el-col>
       <el-col :xs="24" :sm="12" :md="8">
-        <div class="menu-item alerts" @click="go('history')">
-          <h3>历史记录</h3>
-          <p>多条件过滤与列表分页</p>
-          <el-button type="warning" plain>进入</el-button>
+        <div class="menu-item upload" @click="go('upload')">
+          <h3>上传数据</h3>
+          <p>选择文件以导入到系统</p>
+          <el-button type="primary" plain>进入</el-button>
         </div>
       </el-col>
     </el-row>
     <el-row :gutter="18" class="menu" style="margin-top: 12px">
       <el-col :xs="24" :sm="12" :md="8">
+        <div class="menu-item history" @click="go('history')">
+          <h3>历史记录</h3>
+          <p>多条件过滤与列表分页</p>
+          <el-button type="warning" plain>进入</el-button>
+        </div>
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="8">
+        <div class="menu-item alerts" @click="go('alerts')">
+          <h3>报警记录</h3>
+          <p>系统告警与异常事件</p>
+          <el-button type="danger" plain>进入</el-button>
+        </div>
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="8">
         <div class="menu-item logs" @click="go('logs')">
           <h3>日志记录</h3>
           <p>系统运行事件与异常</p>
           <el-button type="info" plain>进入</el-button>
-        </div>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="8">
-        <div class="menu-item upload" @click="go('upload')">
-          <h3>上传数据</h3>
-          <p>选择文件以导入到系统</p>
-          <el-button type="primary" plain>进入</el-button>
         </div>
       </el-col>
     </el-row>

@@ -1,22 +1,34 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { HomeFilled, SwitchButton } from '@element-plus/icons-vue'
 import { useAppStore } from '../store/app'
+import { useFishControlStore } from '../store/fishControl'
 
 const router = useRouter()
 const route = useRoute()
 const app = useAppStore()
+const fishStore = useFishControlStore()
 
 function goHome(): void {
   router.push({ name: 'home' })
 }
 
 function exitApp(): void {
-  // 登出并返回登录页，清除登录态
-  app.logout()
-  router.push({ name: 'login' })
-  ElMessage.success('已退出登录')
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+    .then(() => {
+      // 登出并返回登录页，清除登录态
+      app.logout()
+      router.push({ name: 'login' })
+      ElMessage.success('已退出登录')
+    })
+    .catch(() => {
+      // 取消操作
+    })
 }
 </script>
 
@@ -24,6 +36,9 @@ function exitApp(): void {
   <section v-if="route.name !== 'login'" class="global-topbar">
     <div class="brand-name">深海鲲鹏-鲸鲨监控系统</div>
     <div class="right-actions">
+      <span v-if="fishStore.currentFish" class="current-device">
+        当前设备：{{ fishStore.currentFish.name }}
+      </span>
       <el-tooltip effect="dark" content="返回主页" placement="bottom">
         <el-button type="primary" circle plain @click="goHome">
           <el-icon><HomeFilled /></el-icon>
@@ -68,5 +83,12 @@ function exitApp(): void {
 .right-actions {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+.current-device {
+  font-size: 14px;
+  color: #a6b0c3;
+  margin-right: 8px;
+  font-weight: 500;
 }
 </style>

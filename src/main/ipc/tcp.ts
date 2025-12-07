@@ -1,8 +1,59 @@
 import { ipcMain } from 'electron'
-import { sendRaw, sendAndReceive } from '../network/tcpManager'
+import { sendRaw, sendAndReceive, connectClient, disconnectClient, sendClient, tcpClientEvents } from '../network/tcpManager'
 import logger from '../logger'
+import { getMainWindow } from '../windows/mainWindow'
 
 export function registerTcpIpc(): void {
+  // Forward TCP events to renderer
+  tcpClientEvents.on('data', (payload) => {
+    const win = getMainWindow()
+    if (win) {
+      win.webContents.send('tcp:data', payload)
+    }
+  })
+
+  tcpClientEvents.on('status', (payload) => {
+    const win = getMainWindow()
+    if (win) {
+      win.webContents.send('tcp:status', payload)
+    }
+  })
+
+  tcpClientEvents.on('error', (payload) => {
+    const win = getMainWindow()
+    if (win) {
+      win.webContents.send('tcp:error', payload)
+    }
+  })
+
+  ipcMain.handle('tcp:connect', async (_evt, ip: string, port: number) => {
+    try {
+      return await connectClient(ip, Number(port))
+    } catch (e) {
+      logger.error('tcp:connect failed:', e)
+      return false
+    }
+  })
+
+  ipcMain.handle('tcp:disconnect', async (_evt, ip: string, port: number) => {
+    try {
+      await disconnectClient(ip, Number(port))
+      return true
+    } catch (e) {
+      logger.error('tcp:disconnect failed:', e)
+      return false
+    }
+  })
+
+  ipcMain.handle('tcp:send-client', async (_evt, ip: string, port: number, payload: string) => {
+    try {
+      return await sendClient(ip, Number(port), payload)
+    } catch (e) {
+      logger.error('tcp:send-client failed:', e)
+      return false
+    }
+  })
+
   ipcMain.handle('tcp:send', async (_evt, ip: string, port: number, payload: string) => {
     try {
       if (!ip || !port || !payload) {
@@ -32,3 +83,4 @@ export function registerTcpIpc(): void {
     }
   )
 }
+

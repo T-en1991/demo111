@@ -7,8 +7,10 @@ import { loadOfflineBMap } from '../../utils/offlineBMap'
 import VideoPlayerJSMpeg from '../../components/VideoPlayerJSMpeg.vue'
 import { useAppStore } from '../../store/app'
 import { INITIAL_ROBOTS, type RobotStatus, type SignalLevel } from '../../constants/robots'
+import { useFishControlStore } from '../../store/fishControl'
 
 const appStore = useAppStore()
+const fishControlStore = useFishControlStore()
 const AK = 'iWyOxtxr32YCdQBu9yYeICmRKBb6Jm1h'
 // 使用项目静态资源作为标注图标
 const fishIconUrl = new URL('../../assets/images/fish.svg', import.meta.url).href
@@ -66,86 +68,8 @@ robots.forEach((r): void => {
   initialDepths[r.id] = r.depth
 })
 
-type FishCmdInfo = {
-  ip?: string | null
-  port?: number | null
-  satcomIp?: string | null
-  satcomPort1?: number | null
-  microwaveIp?: string | null
-  microwavePort?: number | null
-  ascendCommand?: string | null
-  descendCommand?: string | null
-  forwardCommand?: string | null
-  leftCommand?: string | null
-  rightCommand?: string | null
-  manualCommand?: string | null
-  exitManualCommand?: string | null
-  returnCommand?: string | null
-}
-
-const fishCmd = ref<FishCmdInfo | null>(null)
-
-function resolveEndpoint(info: FishCmdInfo | null): { ip: string; port: number } | null {
-  if (!info) return null
-  const ip = (info.ip ?? '') as string
-  const port = Number(info.port ?? 0)
-  if (ip.trim().length > 0 && port > 0) {
-    return { ip: ip.trim(), port }
-  }
-  return null
-}
-
-async function loadFishCmd(): Promise<void> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const list = (await (window as any).api.fish.findAll()) as Array<
-      Partial<FishCmdInfo & { id: number }>
-    >
-    if (list && list.length > 0) {
-      const f = list[0]
-      fishCmd.value = {
-        ip: (f.ip as string | null) ?? null,
-        port: (f.port as number | null) ?? null,
-        satcomIp: (f.satcomIp as string | null) ?? null,
-        satcomPort1: (f.satcomPort1 as number | null) ?? null,
-        microwaveIp: (f.microwaveIp as string | null) ?? null,
-        microwavePort: (f.microwavePort as number | null) ?? null,
-        ascendCommand: (f.ascendCommand as string | null) ?? null,
-        descendCommand: (f.descendCommand as string | null) ?? null,
-        forwardCommand: (f.forwardCommand as string | null) ?? null,
-        leftCommand: (f.leftCommand as string | null) ?? null,
-        rightCommand: (f.rightCommand as string | null) ?? null,
-        manualCommand: (f.manualCommand as string | null) ?? null,
-        exitManualCommand: (f.exitManualCommand as string | null) ?? null,
-        returnCommand: (f.returnCommand as string | null) ?? null
-      }
-    }
-  } catch (e) {
-    console.error('加载鱼指令失败:', e)
-  }
-}
-
-async function sendRawCommand(field: keyof FishCmdInfo): Promise<void> {
-  const info = fishCmd.value
-  const endpoint = resolveEndpoint(info)
-  const payload = info ? (info[field] as string | null) : null
-  if (!endpoint || !payload || payload.trim().length === 0) {
-    console.warn('指令或端点未配置，跳过发送', { endpoint, field })
-    return
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (window as any).api.tcp.send(endpoint.ip, endpoint.port, payload.trim())
-    if (!res?.success) {
-      console.error('TCP 发送失败:', res)
-    }
-  } catch (e) {
-    console.error('TCP 发送异常:', e)
-  }
-}
-
-onMounted((): void => {
-  void loadFishCmd()
+onMounted(async (): Promise<void> => {
+  void init()
 })
 
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
@@ -154,40 +78,26 @@ function ascend(): void {
   if (!r) return
   r.depth = Math.max(0, r.depth - 5)
   ElMessage.success(`上浮：当前深度 ${r.depth}m`)
-  void sendRawCommand('ascendCommand')
+  void fishControlStore.sendCommand('ascend')
 }
 function descend(): void {
   const r = current.value
   if (!r) return
   r.depth = r.depth + 5
   ElMessage.success(`下潜：当前深度 ${r.depth}m`)
-  void sendRawCommand('descendCommand')
+  void fishControlStore.sendCommand('descend')
 }
 function moveForward(): void {
-  console.log('[tap] forward - DEMO')
-  // Demo test: send specific command to 192.168.1.212:9200
-  const ip = '192.168.1.212'
-  const port = 9200
-  const payload = '+++AT*SENDIM,7,2,ack,FORWARD'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(window as any).api.tcp
-    .sendAndReceive(ip, port, payload)
-    .then((res: { success: boolean; data?: string; error?: string }) => {
-      console.log('TCP Response:', res)
-      if (res.success) {
-        ElMessage.success(`收到回复: ${res.data}`)
-      } else {
-        ElMessage.error(`发送/接收失败: ${res.error || '未知错误'}`)
-      }
-    })
+  console.log('[tap] forward')
+  void fishControlStore.sendCommand('forward')
 }
 function moveLeft(): void {
   console.log('[tap] left')
-  void sendRawCommand('leftCommand')
+  void fishControlStore.sendCommand('left')
 }
 function moveRight(): void {
   console.log('[tap] right')
-  void sendRawCommand('rightCommand')
+  void fishControlStore.sendCommand('right')
 }
 
 // 按住持续触发：开始/停止
@@ -238,22 +148,9 @@ function toggleManual(): void {
   ElMessage.success(`人工模式：${manualMode.value ? '开启' : '关闭'}`)
 
   if (manualMode.value) {
-    const ip = '192.168.1.212'
-    const port = 9200
-    const payload = '+++AT*SENDIM,3,2,ack,MAN'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(window as any).api.tcp
-      .sendAndReceive(ip, port, payload)
-      .then((res: { success: boolean; data?: string; error?: string }) => {
-        if (res.success) {
-          ElMessage.success(`收到回复: ${res.data}`)
-        } else {
-          ElMessage.error(`发送/接收失败: ${res.error || '未知错误'}`)
-        }
-      })
+    void fishControlStore.sendCommand('manual')
   } else {
-    // 关闭时保留原有逻辑或发送特定关闭指令（如有）
-    void sendRawCommand('exitManualCommand')
+    void fishControlStore.sendCommand('exitManual')
   }
 }
 function toggleNavigate(): void {
@@ -261,20 +158,10 @@ function toggleNavigate(): void {
   ElMessage.success(`导航模式：${navigateMode.value ? '开启' : '关闭'}`)
 
   if (navigateMode.value) {
-    // Send demo command to 192.168.1.212:9200
-    const ip = '192.168.1.212'
-    const port = 9200
-    const payload = '+++AT*SENDIM,8,2,noack,NAVIGATE'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(window as any).api.tcp
-      .sendAndReceive(ip, port, payload)
-      .then((res: { success: boolean; data?: string; error?: string }) => {
-        if (res.success) {
-          ElMessage.success(`收到回复: ${res.data}`)
-        } else {
-          ElMessage.error(`发送/接收失败: ${res.error || '未知错误'}`)
-        }
-      })
+    // Note: Navigate command is not in the standard Fish model yet.
+    // Keeping existing logic or skipping if not supported.
+    // For now, we can try to send 'forward' if that was the intention, or just log warning.
+    console.warn('Navigate command not configured in database schema')
   }
 }
 function setLight(on: boolean): void {
@@ -295,7 +182,7 @@ function returnHome(): void {
     target.lat = home.lat
     ElMessage.success('已返航至初始位置')
   }
-  void sendRawCommand('returnCommand')
+  void fishControlStore.sendCommand('return')
 }
 
 // 报警信息数据结构与示例
@@ -688,7 +575,8 @@ async function init(): Promise<void> {
       map.enableScrollWheelZoom(true)
       map.addControl(new BMap.NavigationControl())
       map.addControl(new BMap.ScaleControl())
-      // 切换为卫星地图（若常量可用）
+      // 默认使用普通地图，不再强制切换为卫星地图
+      /*
       try {
         const sat =
           (window as { BMAP_SATELLITE_MAP?: unknown }).BMAP_SATELLITE_MAP ??
@@ -699,6 +587,7 @@ async function init(): Promise<void> {
       } catch (e) {
         console.warn('Switch to satellite map failed:', e)
       }
+      */
 
       // 初始化加载选中鱼的数据并绘制
       await loadSelectedFishData(true)
@@ -717,9 +606,6 @@ async function init(): Promise<void> {
   }
 }
 
-onMounted((): void => {
-  void init()
-})
 
 onUnmounted((): void => {
   if (pollTimer) {
@@ -752,11 +638,6 @@ watch(selectedId, (): void => {
       <div class="side-panel">
         <div class="panel-card">
           <div class="section-title">基本信息</div>
-          <div class="panel-header single-select">
-            <div class="robot-name-display">
-              当前设备：{{ current?.name || '未知设备' }}
-            </div>
-          </div>
           <div class="status-grid">
             <div class="stat-card">
               <div class="stat-value">{{ Number(currentLng).toFixed(6) }}°</div>

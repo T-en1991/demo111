@@ -32,6 +32,11 @@ const routes: RouteRecordRaw[] = [
     component: History
   },
   {
+    path: '/alerts',
+    name: 'alerts',
+    component: () => import('../views/alerts/index.vue')
+  },
+  {
     path: '/logs',
     name: 'logs',
     component: () => import('../views/logs/index.vue')
