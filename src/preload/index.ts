@@ -166,6 +166,20 @@ const api = {
       }
     }
   }
+  ,
+  serial: {
+    list: (): Promise<Array<{ path: string; manufacturer?: string; serialNumber?: string }>> =>
+      ipcRenderer.invoke('serial:list'),
+    open: (path: string, opts?: { baudRate?: number }): Promise<boolean> =>
+      ipcRenderer.invoke('serial:open', { path, baudRate: opts?.baudRate }),
+    close: (): Promise<boolean> => ipcRenderer.invoke('serial:close'),
+    write: (text: string): Promise<boolean> => ipcRenderer.invoke('serial:write', text),
+    onData(handler: (payload: { line: string; parsed: null | { kind: 'SURF'; time: string; csq: number } }) => void): () => void {
+      const fn = (_: any, payload: any) => handler(payload)
+      ipcRenderer.on('serial:data', fn)
+      return () => ipcRenderer.removeListener('serial:data', fn)
+    }
+  }
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

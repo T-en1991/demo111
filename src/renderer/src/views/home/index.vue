@@ -8,7 +8,6 @@ import {
   WarningFilled,
   Document
 } from '@element-plus/icons-vue'
-
 const router = useRouter()
 
 function go(name: string): void {
@@ -76,6 +75,7 @@ function go(name: string): void {
         </div>
       </el-col>
     </el-row>
+
 
     <!-- 视频弹窗和按钮 -->
     <!-- <VideoDialog ref="videoDialog" url="ws://localhost:8085/" />

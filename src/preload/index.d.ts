@@ -122,6 +122,13 @@ declare global {
         ): () => void
         onError(callback: (payload: { ip: string; port: number; error: string }) => void): () => void
       }
+      serial: {
+        list(): Promise<Array<{ path: string; manufacturer?: string; serialNumber?: string }>>
+        open(path: string, opts?: { baudRate?: number }): Promise<boolean>
+        close(): Promise<boolean>
+        write(text: string): Promise<boolean>
+        onData(handler: (payload: { line: string; parsed: null | { kind: 'SURF'; time: string; csq: number } }) => void): () => void
+      }
     }
   }
 }

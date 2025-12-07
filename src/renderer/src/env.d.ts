@@ -127,6 +127,13 @@ declare global {
         deleteMany(ids: number[]): Promise<import('@prisma/client').Prisma.BatchPayload>
         seed(count: number): Promise<import('@prisma/client').Prisma.BatchPayload>
       }
+      serial: {
+        list(): Promise<Array<{ path: string; manufacturer?: string; serialNumber?: string }>>
+        open(path: string, opts?: { baudRate?: number }): Promise<boolean>
+        close(): Promise<boolean>
+        write(text: string): Promise<boolean>
+        onData(handler: (payload: { line: string; parsed: null | { kind: 'SURF'; time: string; csq: number } }) => void): () => void
+      }
     }
     // 百度地图 WebGL 全局对象挂载到 window
     BMapGL?: unknown

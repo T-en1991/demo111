@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import UsbComConsole from '../home/UsbComConsole.vue'
 
 interface Fish {
   id: number
@@ -472,6 +473,8 @@ function formatDate(input?: string | Date | null): string {
         </el-form-item>
       </el-form>
     </el-card>
+
+    <UsbComConsole />
 
     <el-card v-loading="loading" class="table-card" shadow="never">
       <el-table :data="allFish" border stripe style="width: 100%" height="560">
