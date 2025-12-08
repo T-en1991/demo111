@@ -24,24 +24,6 @@ export function registerSystemIpc(): void {
           })
           child.on('exit', (code) => resolve(code === 0))
         })
-
-        ipcMain.handle('dialog:openVideos', async () => {
-          const result = await dialog.showOpenDialog({
-            properties: ['openFile', 'multiSelections'],
-            filters: [
-              { name: 'Videos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv'] },
-              { name: 'All Files', extensions: ['*'] }
-            ]
-          })
-          if (result.canceled) return []
-          return result.filePaths.map((p) => {
-            let size = 0
-            try {
-              size = statSync(p).size
-            } catch {}
-            return { path: p, name: basename(p), size }
-          })
-        })
       }
       if (process.platform === 'win32') {
         const programFiles = process.env['ProgramFiles'] || 'C\\Program Files'
@@ -73,5 +55,52 @@ export function registerSystemIpc(): void {
       logger.error('Failed to open WinSCP:', e)
       return false
     }
-  })
+    })
+
+    // 打开本地选择 Excel 文件（多选），返回数组或 null
+    ipcMain.handle('dialog:openXlsx', async () => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: '选择 Excel 文件',
+          properties: ['openFile', 'multiSelections'],
+          filters: [{ name: 'Excel', extensions: ['xlsx', 'xls'] }]
+        })
+        if (result.canceled || !result.filePaths || result.filePaths.length === 0) return null
+        return result.filePaths.map((p) => {
+          let size = 0
+          try {
+            size = statSync(p).size
+          } catch {}
+          return { path: p, name: basename(p), size }
+        })
+      } catch (e) {
+        logger.error('dialog:openXlsx failed', e)
+        return null
+      }
+    })
+
+    // 打开本地选择视频文件（多选），返回数组（取消时返回空数组）
+    ipcMain.handle('dialog:openVideos', async () => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: '选择视频文件',
+          properties: ['openFile', 'multiSelections'],
+          filters: [
+            { name: 'Videos', extensions: ['mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        })
+        if (result.canceled || !result.filePaths || result.filePaths.length === 0) return []
+        return result.filePaths.map((p) => {
+          let size = 0
+          try {
+            size = statSync(p).size
+          } catch {}
+          return { path: p, name: basename(p), size }
+        })
+      } catch (e) {
+        logger.error('dialog:openVideos failed', e)
+        return []
+      }
+    })
 }

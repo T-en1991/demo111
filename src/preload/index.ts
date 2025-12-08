@@ -14,6 +14,10 @@ const api = {
     openVideos(): Promise<Array<{ path: string; name: string; size: number }>> {
       return ipcRenderer.invoke('dialog:openVideos')
     }
+    ,
+    openXlsx(): Promise<Array<{ path: string; name: string; size: number }> | null> {
+      return ipcRenderer.invoke('dialog:openXlsx')
+    }
   },
   history: {
     create(data: {
