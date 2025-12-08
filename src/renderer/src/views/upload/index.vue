@@ -16,6 +16,7 @@ const activeTab = ref<UploadKind>('video')
 const videoFiles = ref<UFile[]>([])
 const dataFiles = ref<UFile[]>([])
 const alarmFiles = ref<UFile[]>([])
+const selectedAlarmFolder = ref<string>('')
 const fishControlStore = useFishControlStore()
 
 function filesToUFiles(fileList: UploadFiles): UFile[] {
@@ -25,11 +26,6 @@ function filesToUFiles(fileList: UploadFiles): UFile[] {
     type: f.raw?.type,
     path: (f.raw as any)?.path
   }))
-}
-
-// video selection now uses system dialog (choose via preload), not el-upload drag/drop
-function onAlarmChange(_file: UploadFile, fileList: UploadFiles): void {
-  alarmFiles.value = filesToUFiles(fileList)
 }
 
 function clearVideo(): void {
@@ -42,6 +38,58 @@ function clearData(): void {
 
 function clearAlarm(): void {
   alarmFiles.value = []
+  selectedAlarmFolder.value = ''
+}
+
+// Select alarm folder using system dialog
+async function selectAlarmFolder(): Promise<void> {
+  try {
+    if (typeof window === 'undefined' || !(window as any).api || !(window as any).api.dialog) {
+      ElMessage.error('当前环境不支持系统对话框，请在 Electron 中使用此功能')
+      return
+    }
+    // @ts-ignore
+    const folderPath = await window.api.dialog.openDirectory()
+    if (!folderPath) return
+    
+    selectedAlarmFolder.value = folderPath
+    // List alarm files in the folder
+    // @ts-ignore
+    const files = await window.api.alarm.listFiles(folderPath)
+    alarmFiles.value = files
+  } catch (e) {
+    console.error('selectAlarmFolder failed', e)
+    ElMessage.error('选择文件夹失败')
+  }
+}
+
+// Import alarm data from selected folder
+async function importAlarmData(): Promise<void> {
+  if (!selectedAlarmFolder.value) {
+    ElMessage.warning('请先选择文件夹')
+    return
+  }
+  
+  try {
+    // @ts-ignore
+    const result = await window.api.alarm.importFolder(selectedAlarmFolder.value)
+    
+    if (result.ok > 0) {
+      ElMessage.success(`成功导入 ${result.ok} 条报警记录`)
+    }
+    if (result.fail > 0) {
+      ElMessage.warning(`${result.fail} 条报警记录导入失败`)
+    }
+    if (result.updated > 0) {
+      ElMessage.info(`更新了 ${result.updated} 条报警记录`)
+    }
+    
+    // Clear selection after import
+    clearAlarm()
+  } catch (e) {
+    console.error('importAlarmData failed', e)
+    ElMessage.error('导入报警数据失败')
+  }
 }
 
 function isAbsWinPath(p: string): boolean {
@@ -89,9 +137,9 @@ async function saveVideos(): Promise<void> {
         name: f.name,
         size: f.size,
         camera:
-          typeStr.toLowerCase() === 'bcam'
+          typeStr.toLowerCase() === 'mcam'
             ? 'mono'
-            : typeStr.toLowerCase() === 'mcam'
+            : typeStr.toLowerCase() === 'bcam'
               ? 'stereo'
               : 'unknown',
         recordedAt: isoString
@@ -113,7 +161,7 @@ async function saveVideos(): Promise<void> {
   }
 }
 
-// Save videos but force camera type (mono/stereo/unknown)
+// Save videos but auto-detect camera type from filename prefix (mcam=mono, bcam=stereo)
 async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'): Promise<void> {
   const files = videoFiles.value
   if (!files.length) {
@@ -147,12 +195,19 @@ async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'):
       continue
     }
     try {
+      // Auto-detect camera type from filename prefix
+      let cameraType: 'mono' | 'stereo' | 'unknown' = forceCamera
+      if (typeStr.toLowerCase() === 'mcam') {
+        cameraType = 'mono' // mcam 开头是单目
+      } else if (typeStr.toLowerCase() === 'bcam') {
+        cameraType = 'stereo' // bcam 开头是双目
+      }
+
       await window.api.video.create({
         path: p,
         name: f.name,
         size: f.size,
-        // force camera value passed by caller
-        camera: forceCamera,
+        camera: cameraType,
         recordedAt: isoString
       })
       ok++
@@ -294,9 +349,9 @@ async function openWifi(): Promise<void> {
               <div class="el-upload__text">通过系统对话框选择本地视频文件（支持多选）</div>
               <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
                 <el-button type="primary" @click="selectVideosAndSave">选择文件</el-button>
-                
-                <el-button type="primary" @click="() => saveVideosWithCamera('mono')">保存为单目</el-button>
-                <el-button type="primary" @click="() => saveVideosWithCamera('stereo')">保存为双目</el-button>
+
+
+                <el-button type="primary" @click="() => saveVideosWithCamera('stereo')">保存</el-button>
                 <el-button text type="danger" @click="clearVideo">清空</el-button>
               </div>
 
@@ -341,28 +396,27 @@ async function openWifi(): Promise<void> {
 
         <el-tab-pane label="报警数据上传" name="alarm">
           <div class="upload-inline">
-            <el-upload class="upload-box" drag action="#" :auto-upload="false" accept=".json,.csv"
-              :on-change="onAlarmChange">
-              <i class="el-icon-upload" />
-              <div class="el-upload__text">拖拽到此或 <em>点击选择报警数据</em></div>
-              <template #tip>
-                <div class="el-upload__tip">
-                  支持 JSON/CSV 报警数据格式，字段建议包含：id、time、level、content 等
-                </div>
-              </template>
-            </el-upload>
-
-            <div v-if="alarmFiles.length" class="upload-list">
-              <div class="list-head">
-                <span>已选择 {{ alarmFiles.length }} 个文件</span>
+            <div class="upload-box">
+              <div class="el-upload__text">通过系统对话框选择包含报警数据的文件夹</div>
+              <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
+                <el-button type="primary" @click="selectAlarmFolder">选择文件夹</el-button>
+                <el-button type="primary" @click="importAlarmData" :disabled="!selectedAlarmFolder">导入</el-button>
                 <el-button text type="danger" @click="clearAlarm">清空</el-button>
               </div>
-              <ul>
-                <li v-for="f in alarmFiles" :key="'a:' + f.name + ':' + f.size">
-                  <span class="name" :title="f.name">{{ f.name }}</span>
-                  <span class="size">{{ (f.size / 1024).toFixed(1) }} KB</span>
-                </li>
-              </ul>
+
+              <div v-if="selectedAlarmFolder" class="upload-list" style="margin-top:12px">
+                <div class="list-head">
+                  <span>已选择文件夹：{{ selectedAlarmFolder }}</span>
+                </div>
+                <div v-if="alarmFiles.length > 0" class="list-body">
+                  <div class="sub-title">包含报警文件：</div>
+                  <ul>
+                    <li v-for="f in alarmFiles" :key="'a:' + f.name">
+                      <span class="name" :title="f.name">{{ f.name }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </el-tab-pane>

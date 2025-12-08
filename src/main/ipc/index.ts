@@ -3,6 +3,7 @@ import { registerDatabaseIpc } from './database'
 import { registerRtspIpc } from './rtsp'
 import { registerTcpIpc } from './tcp'
 import { registerSerialIpc } from './serial'
+import { registerAlarmIpc } from './alarm'
 
 export function registerIpc(): void {
   registerSystemIpc()
@@ -10,4 +11,5 @@ export function registerIpc(): void {
   registerRtspIpc()
   registerTcpIpc()
   registerSerialIpc()
+  registerAlarmIpc()
 }

@@ -17,6 +17,17 @@ const api = {
     ,
     openXlsx(): Promise<Array<{ path: string; name: string; size: number }> | null> {
       return ipcRenderer.invoke('dialog:openXlsx')
+    },
+    openDirectory(): Promise<string | null> {
+      return ipcRenderer.invoke('dialog:openDirectory')
+    }
+  },
+  alarm: {
+    listFiles(folderPath: string): Promise<Array<{ name: string; size: number }>> {
+      return ipcRenderer.invoke('alarm:listFiles', folderPath)
+    },
+    importFolder(folderPath: string): Promise<{ ok: number; fail: number; updated: number }> {
+      return ipcRenderer.invoke('alarm:importFolder', folderPath)
     }
   },
   history: {
@@ -34,6 +45,24 @@ const api = {
     },
     importXlsx(filePath: string): Promise<any> {
       return ipcRenderer.invoke('history:importXlsx', filePath)
+    },
+    list(params: {
+      page?: number
+      pageSize?: number
+      startTime?: string
+      endTime?: string
+    } = {}): Promise<any> {
+      return ipcRenderer.invoke('history:list', params)
+    }
+  },
+  alert: {
+    list(params: {
+      page?: number
+      pageSize?: number
+      startTime?: string
+      endTime?: string
+    } = {}): Promise<any> {
+      return ipcRenderer.invoke('alert:list', params)
     }
   },
 

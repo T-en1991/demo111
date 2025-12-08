@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { fishService, historyService, videoService, importService } from '../database/index.js'
+import { fishService, historyService, videoService, importService, alertService } from '../database/index.js'
 
 export function registerDatabaseIpc(): void {
   // Fish CRUD 操作
@@ -237,6 +237,36 @@ export function registerDatabaseIpc(): void {
       console.error('Error importing history from xlsx:', error)
       // Return structured error so renderer can present a clear message
       return { error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  // 获取历史记录列表（支持分页和时间范围）
+  ipcMain.handle('history:list', async (_, params: {
+    page?: number
+    pageSize?: number
+    startTime?: string
+    endTime?: string
+  } = {}) => {
+    try {
+      return await historyService.list(params)
+    } catch (error) {
+      console.error('Error listing history:', error)
+      throw error
+    }
+  })
+
+  // 获取报警记录列表（支持分页和时间范围）
+  ipcMain.handle('alert:list', async (_, params: {
+    page?: number
+    pageSize?: number
+    startTime?: string
+    endTime?: string
+  } = {}) => {
+    try {
+      return await alertService.list(params)
+    } catch (error) {
+      console.error('Error listing alerts:', error)
+      throw error
     }
   })
 }

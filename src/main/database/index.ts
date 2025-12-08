@@ -168,6 +168,107 @@ export const userService = {
   }
 }
 
+// History CRUD 操作
+export const historyService = {
+  // 创建历史记录（如果存在则更新，否则创建）
+  async create(data: {
+    time: Date | string
+    content?: string | null
+    lon?: number | null
+    lat?: number | null
+    depth?: number | null
+    height?: number | null
+    battery?: number | null
+    signalStrength?: number | null
+    rollDeg?: number | null
+    pitchDeg?: number | null
+    yawDeg?: number | null
+    axMs2?: number | null
+    ayMs2?: number | null
+    azMs2?: number | null
+  }) {
+    const timeValue = typeof data.time === 'string' ? new Date(data.time) : data.time
+    const payload = {
+      time: timeValue,
+      content: data.content ?? null,
+      lon: data.lon ?? null,
+      lat: data.lat ?? null,
+      depth: data.depth ?? null,
+      height: data.height ?? null,
+      battery: data.battery ?? null,
+      signalStrength: data.signalStrength ?? null,
+      rollDeg: data.rollDeg ?? null,
+      pitchDeg: data.pitchDeg ?? null,
+      yawDeg: data.yawDeg ?? null,
+      axMs2: data.axMs2 ?? null,
+      ayMs2: data.ayMs2 ?? null,
+      azMs2: data.azMs2 ?? null
+    }
+
+    // First check existence by unique time key
+    // @ts-ignore - Prisma History model typing
+    const existing = await prisma.history.findUnique({ where: { time: timeValue } })
+    if (existing) {
+      // update
+      const rec = await prisma.history.update({ where: { time: timeValue }, data: payload })
+      return { inserted: 0, updated: 1, record: rec }
+    }
+    // create
+    const rec = await prisma.history.create({ data: payload })
+    return { inserted: 1, updated: 0, record: rec }
+  },
+
+  // 获取历史记录列表（支持分页和时间范围）
+  async list(params: {
+    page?: number
+    pageSize?: number
+    startTime?: string
+    endTime?: string
+  } = {}): Promise<{
+    items: any[]
+    total: number
+    page: number
+    pageSize: number
+  }> {
+    const page = Math.max(1, Number(params.page) || 1)
+    const pageSize = Math.max(1, Math.min(100, Number(params.pageSize) || 10))
+    const skip = (page - 1) * pageSize
+
+    const where: any = {}
+    if (params.startTime) {
+      where.time = {
+        ...where.time,
+        gte: new Date(params.startTime)
+      }
+    }
+    if (params.endTime) {
+      where.time = {
+        ...where.time,
+        lte: new Date(params.endTime)
+      }
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.history.findMany({
+        where,
+        orderBy: {
+          time: 'desc'
+        },
+        skip,
+        take: pageSize
+      }),
+      prisma.history.count({ where })
+    ])
+
+    return {
+      items,
+      total,
+      page,
+      pageSize
+    }
+  }
+}
+
 // Alert CRUD 操作
 export const alertService = {
   // 创建告警
@@ -193,6 +294,56 @@ export const alertService = {
         createdAt: 'desc'
       }
     })
+  },
+
+  // 获取告警列表（支持分页和时间范围）
+  async list(params: {
+    page?: number
+    pageSize?: number
+    startTime?: string
+    endTime?: string
+  } = {}): Promise<{
+    items: any[]
+    total: number
+    page: number
+    pageSize: number
+  }> {
+    const page = Math.max(1, Number(params.page) || 1)
+    const pageSize = Math.max(1, Math.min(100, Number(params.pageSize) || 10))
+    const skip = (page - 1) * pageSize
+
+    const where: any = {}
+    if (params.startTime) {
+      where.createdAt = {
+        ...where.createdAt,
+        gte: new Date(params.startTime)
+      }
+    }
+    if (params.endTime) {
+      where.createdAt = {
+        ...where.createdAt,
+        lte: new Date(params.endTime)
+      }
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.alert.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip,
+        take: pageSize
+      }),
+      prisma.alert.count({ where })
+    ])
+
+    return {
+      items,
+      total,
+      page,
+      pageSize
+    }
   },
 
   // 获取活跃告警
@@ -473,56 +624,6 @@ export const fishService = {
 }
 
 export { prisma }
-
-// History CRUD（当前用于保存上传的视频记录元数据）
-export const historyService = {
-  async create(data: {
-    time: Date | string
-    content?: string | null
-    lon?: number | null
-    lat?: number | null
-    depth?: number | null
-    height?: number | null
-    battery?: number | null
-    signalStrength?: number | null
-    rollDeg?: number | null
-    pitchDeg?: number | null
-    yawDeg?: number | null
-    axMs2?: number | null
-    ayMs2?: number | null
-    azMs2?: number | null
-  }) {
-    const timeValue = typeof data.time === 'string' ? new Date(data.time) : data.time
-    const payload = {
-      time: timeValue,
-      content: data.content ?? null,
-      lon: data.lon ?? null,
-      lat: data.lat ?? null,
-      depth: data.depth ?? null,
-      height: data.height ?? null,
-      battery: data.battery ?? null,
-      signalStrength: data.signalStrength ?? null,
-      rollDeg: data.rollDeg ?? null,
-      pitchDeg: data.pitchDeg ?? null,
-      yawDeg: data.yawDeg ?? null,
-      axMs2: data.axMs2 ?? null,
-      ayMs2: data.ayMs2 ?? null,
-      azMs2: data.azMs2 ?? null
-    }
-
-    // First check existence by unique time key
-    // @ts-ignore - Prisma History model typing
-    const existing = await prisma.history.findUnique({ where: { time: timeValue } })
-    if (existing) {
-      // update
-      const rec = await prisma.history.update({ where: { time: timeValue }, data: payload })
-      return { inserted: 0, updated: 1, record: rec }
-    }
-    // create
-    const rec = await prisma.history.create({ data: payload })
-    return { inserted: 1, updated: 0, record: rec }
-  }
-}
 
 export const videoService = {
   async create(data: {

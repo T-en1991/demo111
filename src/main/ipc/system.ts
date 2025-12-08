@@ -103,4 +103,19 @@ export function registerSystemIpc(): void {
         return []
       }
     })
+
+    // 打开本地选择文件夹，返回文件夹路径（取消时返回 null）
+    ipcMain.handle('dialog:openDirectory', async () => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: '选择文件夹',
+          properties: ['openDirectory']
+        })
+        if (result.canceled || !result.filePaths || result.filePaths.length === 0) return null
+        return result.filePaths[0]
+      } catch (e) {
+        logger.error('dialog:openDirectory failed', e)
+        return null
+      }
+    })
 }
