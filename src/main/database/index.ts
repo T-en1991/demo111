@@ -2,6 +2,8 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import type { User, Alert, Fish } from '@prisma/client'
 import logger from '../logger'
 import * as XLSX from 'xlsx'
+import { existsSync } from 'fs'
+import { extname } from 'path'
 
 const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error']
@@ -22,6 +24,16 @@ export const importService = {
   async importHistoryFromXlsx(
     filePath: string
   ): Promise<{ inserted: number; updated: number; failed: number }> {
+    if (!filePath || typeof filePath !== 'string') {
+      throw new Error('Invalid file path')
+    }
+    if (!existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`)
+    }
+    const ext = extname(filePath).toLowerCase()
+    if (ext !== '.xlsx' && ext !== '.xls') {
+      throw new Error('Unsupported file extension: ' + ext)
+    }
     const wb = XLSX.readFile(filePath, { cellDates: true })
     const sheetName = wb.SheetNames[0]
     const ws = wb.Sheets[sheetName]
@@ -29,11 +41,11 @@ export const importService = {
     const norm = (s: string): string => s.trim().toLowerCase()
     const mapKey = (k: string): string => {
       const s = norm(k)
-      if (['time', '时间'].includes(s)) return 'time'
-      if (['lon', '经度'].includes(s)) return 'lon'
-      if (['lat', '纬度'].includes(s)) return 'lat'
-      if (['depth', '深度'].includes(s)) return 'depth'
-      if (['height', '高度', 'alt', 'dvl_alt[m]'].includes(s)) return 'height'
+      if (['time_wall', '时间'].includes(s)) return 'time'
+      if (['fused_lon', '经度'].includes(s)) return 'lon'
+      if (['fused_lat', '纬度'].includes(s)) return 'lat'
+      if (['depth[m]', '深度'].includes(s)) return 'depth'
+      if (['dvl_alt[m]', '高度', 'alt', 'dvl_alt[m]'].includes(s)) return 'height'
       if (['battery', '电量'].includes(s)) return 'battery'
       if (['signalstrength', '信号强度', 'signal'].includes(s)) return 'signalStrength'
       if (['content', '内容'].includes(s)) return 'content'
@@ -88,11 +100,16 @@ export const importService = {
       // @ts-ignore: History uses time as unique key
       const ops = part.map((p) => prisma.history.findUnique({ where: { time: p.time } }))
       const exists = await prisma.$transaction(ops)
-      const upserts = part.map((p) =>
-        // @ts-ignore: History uses time as unique key
-        prisma.history.upsert({ where: { time: p.time }, update: p, create: p })
-      )
-      await prisma.$transaction(upserts)
+      // Use the existence check results to perform update by id or create.
+      const ops2 = part.map((p, idx) => {
+        const e = exists[idx]
+        if (e && e.id) {
+          // update by id to avoid relying on time unique where clause in generated client
+          return prisma.history.update({ where: { id: e.id }, data: p })
+        }
+        return prisma.history.create({ data: p })
+      })
+      await prisma.$transaction(ops2)
       exists.forEach((e) => {
         if (e) updated++
         else inserted++
@@ -468,18 +485,42 @@ export const historyService = {
     height?: number | null
     battery?: number | null
     signalStrength?: number | null
+    rollDeg?: number | null
+    pitchDeg?: number | null
+    yawDeg?: number | null
+    axMs2?: number | null
+    ayMs2?: number | null
+    azMs2?: number | null
   }) {
+    const timeValue = typeof data.time === 'string' ? new Date(data.time) : data.time
     const payload = {
-      time: typeof data.time === 'string' ? new Date(data.time) : data.time,
+      time: timeValue,
       content: data.content ?? null,
       lon: data.lon ?? null,
       lat: data.lat ?? null,
       depth: data.depth ?? null,
       height: data.height ?? null,
       battery: data.battery ?? null,
-      signalStrength: data.signalStrength ?? null
+      signalStrength: data.signalStrength ?? null,
+      rollDeg: data.rollDeg ?? null,
+      pitchDeg: data.pitchDeg ?? null,
+      yawDeg: data.yawDeg ?? null,
+      axMs2: data.axMs2 ?? null,
+      ayMs2: data.ayMs2 ?? null,
+      azMs2: data.azMs2 ?? null
     }
-    return prisma.history.create({ data: payload })
+
+    // First check existence by unique time key
+    // @ts-ignore - Prisma History model typing
+    const existing = await prisma.history.findUnique({ where: { time: timeValue } })
+    if (existing) {
+      // update
+      const rec = await prisma.history.update({ where: { time: timeValue }, data: payload })
+      return { inserted: 0, updated: 1, record: rec }
+    }
+    // create
+    const rec = await prisma.history.create({ data: payload })
+    return { inserted: 1, updated: 0, record: rec }
   }
 }
 
@@ -504,9 +545,18 @@ export const videoService = {
             ? new Date(data.recordedAt)
             : data.recordedAt
     }
+    // Try to find existing record by path. Use findFirst to avoid requiring a unique index on `path`.
+    // If found, update the existing record; otherwise create a new one.
+    const existing = await prisma.video.findFirst({ where: { path: data.path } as any })
+    if (existing && (existing as any).id) {
+      const rec = await prisma.video.update({ where: { id: (existing as any).id }, data: payload as any })
+      return { inserted: 0, updated: 1, record: rec }
+    }
+
     // @ts-ignore: Video model not recognized by client yet
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return prisma.video.create({ data: payload as any })
+    const rec = await prisma.video.create({ data: payload as any })
+    return { inserted: 1, updated: 0, record: rec }
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async list(params: { page?: number; pageSize?: number; keyword?: string }): Promise<any> {

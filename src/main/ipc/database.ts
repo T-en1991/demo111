@@ -153,7 +153,7 @@ export function registerDatabaseIpc(): void {
     }
   })
 
-  // 保存历史记录（用于上传视频文件解析后的入库）
+  // 保存历史记录 
   ipcMain.handle(
     'history:create',
     async (
@@ -235,7 +235,8 @@ export function registerDatabaseIpc(): void {
       return await importService.importHistoryFromXlsx(String(filePath))
     } catch (error) {
       console.error('Error importing history from xlsx:', error)
-      throw error
+      // Return structured error so renderer can present a clear message
+      return { error: error instanceof Error ? error.message : String(error) }
     }
   })
 }
