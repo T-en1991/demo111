@@ -91,3 +91,12 @@ $ npm run build:linux
 - 新增 IPC：在 `src/main/ipc/` 新建文件并在 `ipc/index.ts` 中注册；渲染进程通过 `window.electron.ipcRenderer.send/handle` 使用。
 - 多窗口：如需管理多窗口，可新增 `windows/windowManager.ts`，集中维护窗口实例与路由。
 - 菜单/托盘：可按需新增 `src/main/menu/`、`src/main/tray/` 模块，并在 `index.ts` 入口接入。
+
+## 机器鱼新增与轨迹填写规则
+
+- 新增保存的前端校验：
+  - 名称必填且不超过 20 字。
+  - 轨迹点仅在“同时填写高度与深度”时报错；两者都不填视为留空允许保存。
+- 失败提示：
+  - 保存失败时会显示主进程返回的具体错误信息，便于定位问题（数据库路径/权限、数据类型等）。
+  - 如主进程返回结构化错误 `{ error: string }`，界面直接展示该信息。

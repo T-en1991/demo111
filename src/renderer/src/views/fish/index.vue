@@ -231,11 +231,11 @@ const form = reactive<FishForm>({
   name: '',
   ip: '',
   port: 9200,
-  rtspUrl: '',
-  rtsp2: '',
-  satcomIp: '',
-  satcomPort1: 0,
-  satcomPort2: 0,
+  rtspUrl: 'rtsp://192.168.1.100:8550/single_cam',
+  rtsp2: 'rtsp://192.168.1.100:8550/double_cam',
+  satcomIp: '192.178.1.212',
+  satcomPort1: 9200,
+  satcomPort2: 9201,
   cmdUp: '',
   cmdDown: '',
   cmdSurf: '',
@@ -259,11 +259,11 @@ function openCreate(): void {
     name: '',
     ip: '',
     port: 9200,
-    rtspUrl: '',
-    rtsp2: '',
-    satcomIp: '',
-    satcomPort1: 0,
-    satcomPort2: 0,
+    rtspUrl: 'rtsp://192.168.1.100:8550/single_cam',
+    rtsp2: 'rtsp://192.168.1.100:8550/double_cam',
+    satcomIp: '192.178.1.212',
+    satcomPort1: 9200,
+    satcomPort2: 9201,
     cmdUp: '+++AT*SENDIM,2,2,ack,UP',
     cmdDown: '+++AT*SENDIM,4,2,ack,DOWN',
     cmdSurf: '+++AT*SENDIM,4,2,ack,SURF',
@@ -323,14 +323,14 @@ function removeTrackPoint(index: number): void {
   }
 }
 
-// 轨迹校验：高度与深度必须二选一（有且只有一个）
+// 轨迹校验：仅在填写值时要求高度与深度互斥
 const trackErrors = ref<number[]>([])
 function recomputeTrackErrors(): void {
   const errs: number[] = []
   form.track.forEach((p, idx) => {
     const hasAlt = p.alt !== null && p.alt !== undefined
     const hasDepth = p.depth !== null && p.depth !== undefined
-    if (hasAlt === hasDepth) {
+    if (hasAlt && hasDepth) {
       errs.push(idx)
     }
   })
@@ -358,7 +358,7 @@ async function save(): Promise<void> {
   // 轨迹校验：若存在错误行则阻止保存
   recomputeTrackErrors()
   if (trackErrors.value.length) {
-    ElMessage.error('轨迹校验失败：每行高度与深度必须二选一')
+    ElMessage.error('轨迹校验失败：同一轨迹点不能同时填写高度和深度')
     return
   }
 
@@ -407,7 +407,7 @@ async function save(): Promise<void> {
       ElMessage.success('已更新机器鱼')
     } else {
       // 创建机器鱼
-      await window.api.fish.create({
+      const res = await window.api.fish.create({
         name: form.name.trim(),
         ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
         port: form.port && form.port > 0 ? form.port : undefined,
@@ -440,6 +440,9 @@ async function save(): Promise<void> {
             }))
           : []
       })
+      if (res && (res as any).error) {
+        throw new Error((res as any).error)
+      }
       ElMessage.success('已新增机器鱼')
     }
 
@@ -450,7 +453,8 @@ async function save(): Promise<void> {
     }
   } catch (error) {
     console.error('保存失败:', error)
-    ElMessage.error('保存失败')
+    const msg = error instanceof Error ? error.message : String(error)
+    ElMessage.error(msg || '保存失败')
   } finally {
     saving.value = false
   }

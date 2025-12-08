@@ -449,6 +449,13 @@ export const fishService = {
     rightCommand?: string | null
     manualCommand?: string | null
     returnCommand?: string | null
+    upCommand?: string | null
+    downCommand?: string | null
+    surfCommand?: string | null
+    navigateCommand?: string | null
+    lightOnCommand?: string | null
+    lightOffCommand?: string | null
+    wifiCommand?: string | null
     description?: string | null
     track?: Prisma.JsonValue | null
   }): Promise<Fish> {
@@ -472,6 +479,13 @@ export const fishService = {
       rightCommand: data.rightCommand ?? null,
       manualCommand: data.manualCommand ?? null,
       returnCommand: data.returnCommand ?? null,
+      upCommand: data.upCommand ?? null,
+      downCommand: data.downCommand ?? null,
+      surfCommand: data.surfCommand ?? null,
+      navigateCommand: data.navigateCommand ?? null,
+      lightOnCommand: data.lightOnCommand ?? null,
+      lightOffCommand: data.lightOffCommand ?? null,
+      wifiCommand: data.wifiCommand ?? null,
       description: data.description ?? null,
       track:
         data.track === undefined
@@ -572,6 +586,13 @@ export const fishService = {
       rightCommand?: string | null
       manualCommand?: string | null
       returnCommand?: string | null
+      upCommand?: string | null
+      downCommand?: string | null
+      surfCommand?: string | null
+      navigateCommand?: string | null
+      lightOnCommand?: string | null
+      lightOffCommand?: string | null
+      wifiCommand?: string | null
       description?: string | null
       track?: Prisma.JsonValue | null
     }

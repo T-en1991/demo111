@@ -92,7 +92,7 @@ onMounted(() => {
         >重置</el-button
       >
     </div>
-    <el-table v-loading="loading" :data="items" border stripe style="width: 100%">
+    <el-table v-loading="loading" :data="items" border stripe style="width: 100%" height="560">
       <el-table-column prop="id" label="ID" width="90" />
       <el-table-column prop="name" label="名称" min-width="220" />
       <el-table-column prop="camera" label="摄像头" width="120" />

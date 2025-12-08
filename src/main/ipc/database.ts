@@ -78,7 +78,8 @@ export function registerDatabaseIpc(): void {
         return await fishService.create(data)
       } catch (error) {
         console.error('Error creating fish:', error)
-        throw error
+        const message = error instanceof Error ? error.message : String(error)
+        return { error: message }
       }
     }
   )

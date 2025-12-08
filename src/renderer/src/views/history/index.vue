@@ -187,7 +187,7 @@ onMounted(() => {
     </el-card>
 
     <el-card class="table-card" shadow="never">
-      <el-table :data="currentPageData" border stripe style="width: 100%" v-loading="loading">
+      <el-table :data="currentPageData" border stripe style="width: 100%" v-loading="loading" height="560">
         <el-table-column prop="id" label="ID" width="100" />
         <el-table-column prop="lon" label="经度" width="140" />
         <el-table-column prop="lat" label="纬度" width="140" />
