@@ -90,7 +90,6 @@ declare global {
           leftCommand?: string | null
           rightCommand?: string | null
           manualCommand?: string | null
-          exitManualCommand?: string | null
           returnCommand?: string | null
           description?: string | null
           track?: import('@prisma/client').Prisma.JsonValue | null
@@ -117,7 +116,6 @@ declare global {
             leftCommand?: string | null
             rightCommand?: string | null
             manualCommand?: string | null
-            exitManualCommand?: string | null
             returnCommand?: string | null
             description?: string | null
             track?: import('@prisma/client').Prisma.JsonValue | null

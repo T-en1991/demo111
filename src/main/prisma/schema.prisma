@@ -42,9 +42,15 @@ model Fish {
   forwardCommand  String?
   leftCommand     String?
   rightCommand    String?
+  upCommand       String?
+  downCommand     String?
+  surfCommand     String?
   manualCommand   String?
-  exitManualCommand String?
   returnCommand   String?
+  navigateCommand String?
+  lightOnCommand  String?
+  lightOffCommand String?
+  wifiCommand     String?
   description     String?
   // 轨迹（JSON 数组：{ lon, lat, alt|null, depth|null }[]）
   track Json?
@@ -68,7 +74,7 @@ model Alert {
   fish        Fish?     @relation(fields: [fishId], references: [id], onDelete: SetNull)
   status      AlertStatus @default(active)
   createdAt   DateTime   @default(now())
-  
+
 
   @@map("alerts")
 }

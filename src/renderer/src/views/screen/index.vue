@@ -132,37 +132,23 @@ function debounce<T extends (...args: unknown[]) => void>(
 }
 
 // 为非连续性操作创建防抖包装
-const toggleManualDebounced = debounce(toggleManual, 300)
-const toggleNavigateDebounced = debounce(toggleNavigate, 300)
+const enableManualDebounced = debounce(enableManual, 300)
+const enableNavigateDebounced = debounce(enableNavigate, 300)
 const setLightOnDebounced = debounce((): void => setLight(true), 300)
 const setLightOffDebounced = debounce((): void => setLight(false), 300)
 const returnHomeDebounced = debounce(returnHome, 500)
 // 已移除“返航/初始定高”按钮与方法（保留示例方向与深度控制）
-// 控制台新状态：人工模式、导航模式、灯光
-const manualMode = ref(false)
-const navigateMode = ref(false)
+// 控制台新状态：灯光 (人工/导航模式改为无状态指令)
 const lightOn = ref(false)
 
-function toggleManual(): void {
-  manualMode.value = !manualMode.value
-  ElMessage.success(`人工模式：${manualMode.value ? '开启' : '关闭'}`)
-
-  if (manualMode.value) {
-    void fishControlStore.sendCommand('manual')
-  } else {
-    void fishControlStore.sendCommand('exitManual')
-  }
+function enableManual(): void {
+  ElMessage.success('人工模式指令已发送')
+  void fishControlStore.sendCommand('manual')
 }
-function toggleNavigate(): void {
-  navigateMode.value = !navigateMode.value
-  ElMessage.success(`导航模式：${navigateMode.value ? '开启' : '关闭'}`)
-
-  if (navigateMode.value) {
-    // Note: Navigate command is not in the standard Fish model yet.
-    // Keeping existing logic or skipping if not supported.
-    // For now, we can try to send 'forward' if that was the intention, or just log warning.
-    console.warn('Navigate command not configured in database schema')
-  }
+function enableNavigate(): void {
+  ElMessage.success('导航模式指令已发送')
+  // Note: Navigate command is not in the standard Fish model yet.
+  console.warn('Navigate command not configured in database schema')
 }
 function setLight(on: boolean): void {
   lightOn.value = on
@@ -719,7 +705,7 @@ watch(selectedId, (): void => {
         <div class="panel-card">
           <div class="section-title">控制台</div>
           <div class="actions-grid">
-            <!-- 第一行：方向 -->
+            <!-- 方向控制 -->
             <button
               class="action-btn primary"
               @mousedown="startHold('forward', moveForward, 100)"
@@ -753,7 +739,7 @@ watch(selectedId, (): void => {
             >
               <span class="icon">→</span><span class="text">向右</span>
             </button>
-            <!-- 第二行：垂直运动 -->
+            <!-- 垂直运动 -->
             <button
               class="action-btn accent"
               @mousedown="startHold('ascend1', ascend, 100)"
@@ -787,12 +773,9 @@ watch(selectedId, (): void => {
             >
               <span class="icon">⤓</span><span class="text">下潜</span>
             </button>
-            <!-- 第三行：模式/返航/上浮 -->
-            <button class="action-btn warn" @click="toggleManualDebounced">
-              <span class="icon">⚙️</span><span class="text">人工模式</span
-              ><span class="state" :class="manualMode ? 'on' : 'off'">{{
-                manualMode ? '开' : '关'
-              }}</span>
+            <!-- 模式/返航/上浮 -->
+            <button class="action-btn warn" @click="enableManualDebounced">
+              <span class="icon">⚙️</span><span class="text">人工</span>
             </button>
             <button class="action-btn info" @click="returnHomeDebounced">
               <span class="icon">🏠</span><span class="text">返航</span>
@@ -808,12 +791,9 @@ watch(selectedId, (): void => {
             >
               <span class="icon">⤒</span><span class="text">上浮</span>
             </button>
-            <!-- 第四行：功耗与灯光 -->
-            <button class="action-btn warn" @click="toggleNavigateDebounced">
-              <span class="icon">🌙</span><span class="text">进入导航模式</span
-              ><span class="state" :class="navigateMode ? 'on' : 'off'">{{
-                navigateMode ? '开' : '关'
-              }}</span>
+            <!-- 功耗与灯光 -->
+            <button class="action-btn warn" @click="enableNavigateDebounced">
+              <span class="icon">🌙</span><span class="text">导航</span>
             </button>
             <button class="action-btn info" @click="setLightOnDebounced">
               <span class="icon">💡</span><span class="text">灯开</span>

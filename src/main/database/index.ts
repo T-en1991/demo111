@@ -280,7 +280,6 @@ export const fishService = {
     leftCommand?: string | null
     rightCommand?: string | null
     manualCommand?: string | null
-    exitManualCommand?: string | null
     returnCommand?: string | null
     description?: string | null
     track?: Prisma.JsonValue | null
@@ -304,7 +303,6 @@ export const fishService = {
       leftCommand: data.leftCommand ?? null,
       rightCommand: data.rightCommand ?? null,
       manualCommand: data.manualCommand ?? null,
-      exitManualCommand: data.exitManualCommand ?? null,
       returnCommand: data.returnCommand ?? null,
       description: data.description ?? null,
       track:
@@ -405,7 +403,6 @@ export const fishService = {
       leftCommand?: string | null
       rightCommand?: string | null
       manualCommand?: string | null
-      exitManualCommand?: string | null
       returnCommand?: string | null
       description?: string | null
       track?: Prisma.JsonValue | null

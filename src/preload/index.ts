@@ -76,7 +76,6 @@ const api = {
       leftCommand?: string | null
       rightCommand?: string | null
       manualCommand?: string | null
-      exitManualCommand?: string | null
       returnCommand?: string | null
       description?: string | null
       track?: import('@prisma/client').Prisma.JsonValue | null
@@ -99,7 +98,6 @@ const api = {
         leftCommand?: string | null
         rightCommand?: string | null
         manualCommand?: string | null
-        exitManualCommand?: string | null
         returnCommand?: string | null
         description?: string | null
         track?: import('@prisma/client').Prisma.JsonValue | null

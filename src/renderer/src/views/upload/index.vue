@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { UploadFile, UploadFiles } from 'element-plus'
+import { useFishControlStore } from '@renderer/store/fishControl'
 
 type UploadKind = 'video' | 'data' | 'alarm'
 interface UFile {
@@ -15,6 +16,7 @@ const activeTab = ref<UploadKind>('video')
 const videoFiles = ref<UFile[]>([])
 const dataFiles = ref<UFile[]>([])
 const alarmFiles = ref<UFile[]>([])
+const fishControlStore = useFishControlStore()
 
 function filesToUFiles(fileList: UploadFiles): UFile[] {
   return (fileList ?? []).map((f: UploadFile) => ({
@@ -163,6 +165,15 @@ async function openWinSCP(): Promise<void> {
     ElMessage.error('打开 WinSCP 失败')
   }
 }
+
+async function openWifi(): Promise<void> {
+  try {
+    await fishControlStore.sendCommand('wifi')
+  } catch (e) {
+    console.error('Open WIFI failed:', e)
+    ElMessage.error('发送 WIFI 指令失败')
+  }
+}
 </script>
 
 <template>
@@ -175,6 +186,7 @@ async function openWinSCP(): Promise<void> {
     <el-card class="upload-card" shadow="hover">
       <div class="actions">
         <el-button type="primary" plain @click="openWinSCP">打开 WinSCP</el-button>
+        <el-button type="success" plain @click="openWifi">打开 WIFI</el-button>
       </div>
       <el-tabs v-model="activeTab" class="upload-tabs">
         <el-tab-pane label="视频上传" name="video">

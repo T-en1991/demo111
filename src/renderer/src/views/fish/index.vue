@@ -17,9 +17,15 @@ interface Fish {
   forwardCommand?: string
   leftCommand?: string
   rightCommand?: string
+  upCommand?: string
+  downCommand?: string
+  surfCommand?: string
   manualCommand?: string
-  exitManualCommand?: string
   returnCommand?: string
+  navigateCommand?: string
+  lightOnCommand?: string
+  lightOffCommand?: string
+  wifiCommand?: string
   description?: string
   track?: TrackPoint[]
   // 额外通信参数（解析自 description 的结构化内容）
@@ -45,9 +51,15 @@ type FishFromBackend = {
   forwardCommand?: string | null
   leftCommand?: string | null
   rightCommand?: string | null
+  upCommand?: string | null
+  downCommand?: string | null
+  surfCommand?: string | null
   manualCommand?: string | null
-  exitManualCommand?: string | null
   returnCommand?: string | null
+  navigateCommand?: string | null
+  lightOnCommand?: string | null
+  lightOffCommand?: string | null
+  wifiCommand?: string | null
   description?: string | null
   // 新增：声通与微波通信参数（后端直接返回）
   satcomIp?: string | null
@@ -78,12 +90,16 @@ interface FishForm {
   satcomPort2: number
   cmdUp: string
   cmdDown: string
+  cmdSurf: string
   cmdForward: string
   cmdLeft: string
   cmdRight: string
   cmdManual: string
-  cmdExitManual: string
   cmdReturn: string
+  cmdNavigate: string
+  cmdLightOn: string
+  cmdLightOff: string
+  cmdWifi: string
   description: string
   track: TrackPoint[]
 }
@@ -174,9 +190,15 @@ async function loadFish(): Promise<void> {
         forwardCommand: f.forwardCommand ?? undefined,
         leftCommand: f.leftCommand ?? undefined,
         rightCommand: f.rightCommand ?? undefined,
+        upCommand: f.upCommand ?? undefined,
+        downCommand: f.downCommand ?? undefined,
+        surfCommand: f.surfCommand ?? undefined,
         manualCommand: f.manualCommand ?? undefined,
-        exitManualCommand: f.exitManualCommand ?? undefined,
         returnCommand: f.returnCommand ?? undefined,
+        navigateCommand: f.navigateCommand ?? undefined,
+        lightOnCommand: f.lightOnCommand ?? undefined,
+        lightOffCommand: f.lightOffCommand ?? undefined,
+        wifiCommand: f.wifiCommand ?? undefined,
         description: typeof extra.text === 'string' ? extra.text : (f.description ?? undefined),
         track: toTrackPoints(f.track as unknown),
         // 额外通信参数：优先使用后端字段，其次兼容旧的 description JSON
@@ -216,12 +238,16 @@ const form = reactive<FishForm>({
   satcomPort2: 0,
   cmdUp: '',
   cmdDown: '',
+  cmdSurf: '',
   cmdForward: '',
   cmdLeft: '',
   cmdRight: '',
   cmdManual: '',
-  cmdExitManual: '',
   cmdReturn: '',
+  cmdNavigate: '',
+  cmdLightOn: '',
+  cmdLightOff: '',
+  cmdWifi: '',
   description: '',
   track: []
 })
@@ -238,14 +264,18 @@ function openCreate(): void {
     satcomIp: '',
     satcomPort1: 0,
     satcomPort2: 0,
-    cmdUp: '',
-    cmdDown: '',
-    cmdForward: '',
-    cmdLeft: '',
-    cmdRight: '',
-    cmdManual: '',
-    cmdExitManual: '',
-    cmdReturn: '',
+    cmdUp: '+++AT*SENDIM,2,2,ack,UP',
+    cmdDown: '+++AT*SENDIM,4,2,ack,DOWN',
+    cmdSurf: '+++AT*SENDIM,4,2,ack,SURF',
+    cmdForward: '+++AT*SENDIM,7,2,ack,FORWARD',
+    cmdLeft: '+++AT*SENDIM,4,2,ack,LEFT',
+    cmdRight: '+++AT*SENDIM,5,2,ack,RIGHT',
+    cmdManual: '+++AT*SENDIM,3,2,ack,MAN',
+    cmdReturn: '+++AT*SENDIM,6,2,ack,RETURN',
+    cmdNavigate: '+++AT*SENDIM,8,2,ack,NAVIGATE',
+    cmdLightOn: '+++AT*SENDIM,7,2,ack,LIGHTON',
+    cmdLightOff: '+++AT*SENDIM,8,2,ack,LIGHTOFF',
+    cmdWifi: '+++AT*SENDIM,4,2,ack,WIFI',
     description: '',
     track: []
   })
@@ -265,14 +295,18 @@ function openEdit(row: Fish): void {
     satcomPort1: row.satcomPort1 ?? 0,
     satcomPort2: row.satcomPort2 ?? 0,
     // 从后端读取的命令与描述
-    cmdUp: row.ascendCommand ?? '',
-    cmdDown: row.descendCommand ?? '',
+    cmdUp: row.upCommand ?? '',
+    cmdDown: row.downCommand ?? '',
+    cmdSurf: row.surfCommand ?? '',
     cmdForward: row.forwardCommand ?? '',
     cmdLeft: row.leftCommand ?? '',
     cmdRight: row.rightCommand ?? '',
     cmdManual: row.manualCommand ?? '',
-    cmdExitManual: row.exitManualCommand ?? '',
     cmdReturn: row.returnCommand ?? '',
+    cmdNavigate: row.navigateCommand ?? '',
+    cmdLightOn: row.lightOnCommand ?? '',
+    cmdLightOff: row.lightOffCommand ?? '',
+    cmdWifi: row.wifiCommand ?? '',
     description: row.description ?? '',
     track: (row.track ?? []).map((p) => ({ ...p }))
   })
@@ -347,14 +381,18 @@ async function save(): Promise<void> {
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
-        ascendCommand: form.cmdUp || null,
-        descendCommand: form.cmdDown || null,
+        upCommand: form.cmdUp || null,
+        downCommand: form.cmdDown || null,
+        surfCommand: form.cmdSurf || null,
         forwardCommand: form.cmdForward || null,
         leftCommand: form.cmdLeft || null,
         rightCommand: form.cmdRight || null,
         manualCommand: form.cmdManual || null,
-        exitManualCommand: form.cmdExitManual || null,
         returnCommand: form.cmdReturn || null,
+        navigateCommand: form.cmdNavigate || null,
+        lightOnCommand: form.cmdLightOn || null,
+        lightOffCommand: form.cmdLightOff || null,
+        wifiCommand: form.cmdWifi || null,
         // 描述仅保存纯文本
         description: form.description || null,
         track: form.track.length
@@ -379,14 +417,18 @@ async function save(): Promise<void> {
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
-        ascendCommand: form.cmdUp || null,
-        descendCommand: form.cmdDown || null,
+        upCommand: form.cmdUp || null,
+        downCommand: form.cmdDown || null,
+        surfCommand: form.cmdSurf || null,
         forwardCommand: form.cmdForward || null,
         leftCommand: form.cmdLeft || null,
         rightCommand: form.cmdRight || null,
         manualCommand: form.cmdManual || null,
-        exitManualCommand: form.cmdExitManual || null,
         returnCommand: form.cmdReturn || null,
+        navigateCommand: form.cmdNavigate || null,
+        lightOnCommand: form.cmdLightOn || null,
+        lightOffCommand: form.cmdLightOff || null,
+        wifiCommand: form.cmdWifi || null,
         // 描述仅保存纯文本
         description: form.description || null,
         track: form.track.length
@@ -538,11 +580,14 @@ function formatDate(input?: string | Date | null): string {
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="上浮命令">
-          <el-input v-model="form.cmdUp" placeholder="上浮命令" />
+        <el-form-item label="向上命令">
+          <el-input v-model="form.cmdUp" placeholder="向上命令" />
         </el-form-item>
-        <el-form-item label="下潜命令">
-          <el-input v-model="form.cmdDown" placeholder="下潜命令" />
+        <el-form-item label="向下命令">
+          <el-input v-model="form.cmdDown" placeholder="向下命令" />
+        </el-form-item>
+        <el-form-item label="上浮命令">
+          <el-input v-model="form.cmdSurf" placeholder="上浮命令" />
         </el-form-item>
         <el-form-item label="向前命令">
           <el-input v-model="form.cmdForward" placeholder="向前命令" />
@@ -556,11 +601,20 @@ function formatDate(input?: string | Date | null): string {
         <el-form-item label="人工命令">
           <el-input v-model="form.cmdManual" placeholder="人工命令" />
         </el-form-item>
-        <el-form-item label="退出人工命令">
-          <el-input v-model="form.cmdExitManual" placeholder="退出人工命令" />
-        </el-form-item>
         <el-form-item label="返航命令">
           <el-input v-model="form.cmdReturn" placeholder="返航命令" />
+        </el-form-item>
+        <el-form-item label="导航命令">
+          <el-input v-model="form.cmdNavigate" placeholder="导航命令" />
+        </el-form-item>
+        <el-form-item label="灯开命令">
+          <el-input v-model="form.cmdLightOn" placeholder="灯开命令" />
+        </el-form-item>
+        <el-form-item label="灯关命令">
+          <el-input v-model="form.cmdLightOff" placeholder="灯关命令" />
+        </el-form-item>
+        <el-form-item label="WIFI命令">
+          <el-input v-model="form.cmdWifi" placeholder="WIFI命令" />
         </el-form-item>
         <el-form-item label="轨迹">
           <div style="width: 100%">

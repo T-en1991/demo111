@@ -54,9 +54,15 @@ declare global {
           forwardCommand?: string | null
           leftCommand?: string | null
           rightCommand?: string | null
+          upCommand?: string | null
+          downCommand?: string | null
+          surfCommand?: string | null
           manualCommand?: string | null
-          exitManualCommand?: string | null
           returnCommand?: string | null
+          navigateCommand?: string | null
+          lightOnCommand?: string | null
+          lightOffCommand?: string | null
+          wifiCommand?: string | null
           description?: string | null
           track?: Prisma.JsonValue | null
         }): Promise<Fish>
@@ -82,9 +88,15 @@ declare global {
             forwardCommand?: string | null
             leftCommand?: string | null
             rightCommand?: string | null
+            upCommand?: string | null
+            downCommand?: string | null
+            surfCommand?: string | null
             manualCommand?: string | null
-            exitManualCommand?: string | null
             returnCommand?: string | null
+            navigateCommand?: string | null
+            lightOnCommand?: string | null
+            lightOffCommand?: string | null
+            wifiCommand?: string | null
             description?: string | null
             track?: Prisma.JsonValue | null
           }

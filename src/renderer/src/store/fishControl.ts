@@ -16,9 +16,15 @@ export interface Fish {
   forwardCommand?: string | null
   leftCommand?: string | null
   rightCommand?: string | null
+  upCommand?: string | null
+  downCommand?: string | null
+  surfCommand?: string | null
   manualCommand?: string | null
-  exitManualCommand?: string | null
   returnCommand?: string | null
+  navigateCommand?: string | null
+  lightOnCommand?: string | null
+  lightOffCommand?: string | null
+  wifiCommand?: string | null
 }
 
 export const useFishControlStore = defineStore('fishControl', () => {
@@ -69,7 +75,7 @@ export const useFishControlStore = defineStore('fishControl', () => {
      connectionStatus.value = 'disconnected'
   }
 
-  async function sendCommand(cmdType: 'forward' | 'left' | 'right' | 'manual' | 'exitManual' | 'return' | 'ascend' | 'descend'): Promise<void> {
+  async function sendCommand(cmdType: 'forward' | 'left' | 'right' | 'up' | 'down' | 'surf' | 'manual' | 'return' | 'navigate' | 'lightOn' | 'lightOff' | 'ascend' | 'descend' | 'wifi'): Promise<void> {
      if (!currentFish.value) {
        ElMessage.warning('未选择机器鱼')
        return
@@ -87,11 +93,17 @@ export const useFishControlStore = defineStore('fishControl', () => {
         case 'forward': payload = currentFish.value.forwardCommand; break;
         case 'left': payload = currentFish.value.leftCommand; break;
         case 'right': payload = currentFish.value.rightCommand; break;
+        case 'up': payload = currentFish.value.upCommand; break;
+        case 'down': payload = currentFish.value.downCommand; break;
+        case 'surf': payload = currentFish.value.surfCommand; break;
         case 'manual': payload = currentFish.value.manualCommand; break;
-        case 'exitManual': payload = currentFish.value.exitManualCommand; break;
         case 'return': payload = currentFish.value.returnCommand; break;
+        case 'navigate': payload = currentFish.value.navigateCommand; break;
+        case 'lightOn': payload = currentFish.value.lightOnCommand; break;
+        case 'lightOff': payload = currentFish.value.lightOffCommand; break;
         case 'ascend': payload = currentFish.value.ascendCommand; break;
         case 'descend': payload = currentFish.value.descendCommand; break;
+        case 'wifi': payload = currentFish.value.wifiCommand; break;
      }
 
      if (!payload) {
