@@ -117,6 +117,7 @@ export const useFishControlStore = defineStore('fishControl', () => {
      // eslint-disable-next-line @typescript-eslint/no-explicit-any
      const success = await (window.api as any).tcp.sendClient(satcomIp, satcomPort1, payload)
      if (success) {
+       console.log('发送的控制台命令:', payload)
        ElMessage.success(`发送指令成功`)
        logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${payload}`)
      } else {
@@ -145,6 +146,7 @@ export const useFishControlStore = defineStore('fishControl', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onData = (window.api as any).tcp.onData(({ ip, port, data }) => {
          if (currentFish.value?.satcomIp === ip && currentFish.value?.satcomPort1 === port) {
+            console.log('监听到的内容:', data)
             logs.value.push(`[${new Date().toLocaleTimeString()}] RECV: ${data}`)
             ElMessage.success(`收到数据: ${data}`)
          }
