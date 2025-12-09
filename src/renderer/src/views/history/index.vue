@@ -176,8 +176,14 @@ onMounted(() => {
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="88px">
         <el-form-item label="时间范围">
-          <el-date-picker v-model="query.range" type="daterange" range-separator="至" start-placeholder="开始日期"
-            end-placeholder="结束日期" unlink-panels />
+          <el-date-picker
+            v-model="query.range"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            unlink-panels
+          />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="applyQuery">查询</el-button>
@@ -187,17 +193,24 @@ onMounted(() => {
     </el-card>
 
     <el-card class="table-card" shadow="never">
-      <el-table :data="currentPageData" border stripe style="width: 100%" v-loading="loading" height="560">
-        <el-table-column prop="id" label="ID" width="100" />
-        <el-table-column prop="lon" label="经度" width="140" />
-        <el-table-column prop="lat" label="纬度" width="140" />
-        <el-table-column prop="depth" label="深度" width="120" />
-        <el-table-column prop="height" label="高度" width="120" />
-        <el-table-column prop="rollAngle" label="横滚角" width="120" />
-        <el-table-column prop="pitchAngle" label="俯仰角" width="120" />
-        <el-table-column prop="yawAngle" label="偏航角" width="120" />
+      <el-table
+        :data="currentPageData"
+        border
+        stripe
+        style="width: 100%"
+        v-loading="loading"
+        height="560"
+      >
+        <el-table-column prop="id" label="ID" />
+        <el-table-column prop="lon" label="经度" />
+        <el-table-column prop="lat" label="纬度" />
+        <el-table-column prop="depth" label="深度" />
+        <el-table-column prop="height" label="高度" />
+        <el-table-column prop="rollAngle" label="横滚角" />
+        <el-table-column prop="pitchAngle" label="俯仰角" />
+        <el-table-column prop="yawAngle" label="偏航角" />
         <!-- <el-table-column prop="content" label="内容" min-width="240" /> -->
-        <el-table-column prop="time" label="时间" width="180" />
+        <el-table-column prop="time" label="时间" />
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" plain @click="openDetail(row)">详情</el-button>
@@ -205,8 +218,16 @@ onMounted(() => {
         </el-table-column>
       </el-table>
       <div class="pagination">
-        <el-pagination background layout="total, sizes, prev, pager, next, jumper" :total="total" :page-size="pageSize"
-          :current-page="page" :page-sizes="[10, 20, 50]" @size-change="onSizeChange" @current-change="onPageChange" />
+        <el-pagination
+          background
+          layout="total, sizes, prev, pager, next, jumper"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          :page-sizes="[10, 20, 50]"
+          @size-change="onSizeChange"
+          @current-change="onPageChange"
+        />
       </div>
     </el-card>
 
@@ -230,25 +251,36 @@ onMounted(() => {
             <span class="sep">•</span>
             <span class="meta-item">高度: {{ detailItem?.height ?? '-' }}</span>
             <span class="sep">•</span>
-            <span class="meta-item">电量:
-              <span :class="batteryClass(detailItem?.battery)">{{ detailItem?.battery ?? '-' }}%</span></span>
+            <span class="meta-item"
+              >电量:
+              <span :class="batteryClass(detailItem?.battery)"
+                >{{ detailItem?.battery ?? '-' }}%</span
+              ></span
+            >
             <span class="sep">•</span>
-            <span class="meta-item">信号:
-              <span :class="signalClass(detailItem?.signalStrength)">{{ detailItem?.signalStrength ?? '-' }}
-                dBm</span></span>
+            <span class="meta-item"
+              >信号:
+              <span :class="signalClass(detailItem?.signalStrength)"
+                >{{ detailItem?.signalStrength ?? '-' }} dBm</span
+              ></span
+            >
           </div>
         </div>
       </template>
 
       <div class="map-pane" style="margin-top: 8px">
         <div v-if="detailItem?.lat != null && detailItem?.lon != null">
-          <iframe :src="baiduMarkerUrl(
-            detailItem!.lat!,
-            detailItem!.lon!,
-            detailItem!.content,
-            detailItem!.time
-          )
-            " style="width: 100%; height: 420px; border: 0; border-radius: 8px" />
+          <iframe
+            :src="
+              baiduMarkerUrl(
+                detailItem!.lat!,
+                detailItem!.lon!,
+                detailItem!.content,
+                detailItem!.time
+              )
+            "
+            style="width: 100%; height: 420px; border: 0; border-radius: 8px"
+          />
         </div>
         <el-empty v-else description="暂无坐标信息，无法在地图上标注" />
       </div>
