@@ -76,11 +76,12 @@ export const useFishControlStore = defineStore('fishControl', () => {
   }
 
   async function sendCommand(cmdType: 'forward' | 'left' | 'right' | 'up' | 'down' | 'surf' | 'manual' | 'return' | 'navigate' | 'lightOn' | 'lightOff' | 'ascend' | 'descend' | 'wifi'): Promise<void> {
-     if (!currentFish.value) {
+    console.log('currentFish',currentFish.value)
+    if (!currentFish.value) {
        ElMessage.warning('未选择机器鱼')
        return
      }
-
+ console.log('connectionStatus',connectionStatus.value)
      // Auto-connect if needed
      if (connectionStatus.value !== 'connected') {
         await connect()
@@ -105,7 +106,7 @@ export const useFishControlStore = defineStore('fishControl', () => {
         case 'descend': payload = currentFish.value.descendCommand; break;
         case 'wifi': payload = currentFish.value.wifiCommand; break;
      }
-
+console.log('payload',payload)
      if (!payload) {
         ElMessage.warning(`未配置 ${cmdType} 指令`)
         return

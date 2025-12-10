@@ -73,19 +73,17 @@ onMounted(async (): Promise<void> => {
 })
 
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
-function ascend(): void {
-  const r = current.value
-  if (!r) return
-  r.depth = Math.max(0, r.depth - 5)
-  ElMessage.success(`上浮：当前深度 ${r.depth}m`)
-  void fishControlStore.sendCommand('ascend')
+function controlUp(): void {
+  console.log('[tap] up')
+  void fishControlStore.sendCommand('up')
 }
-function descend(): void {
-  const r = current.value
-  if (!r) return
-  r.depth = r.depth + 5
-  ElMessage.success(`下潜：当前深度 ${r.depth}m`)
-  void fishControlStore.sendCommand('descend')
+function controlDown(): void {
+  console.log('[tap] down')
+  void fishControlStore.sendCommand('down')
+}
+function controlSurf(): void {
+  console.log('[tap] surf')
+  void fishControlStore.sendCommand('surf')
 }
 function moveForward(): void {
   console.log('[tap] forward')
@@ -100,19 +98,6 @@ function moveRight(): void {
   void fishControlStore.sendCommand('right')
 }
 
-// 按住持续触发：开始/停止
-function startHold(key: string, handler: () => void, interval = 200, immediate = true): void {
-  if (holdTimers[key] != null) return
-  if (immediate) handler()
-  holdTimers[key] = window.setInterval(handler, interval)
-}
-function stopHold(key: string): void {
-  const t = holdTimers[key]
-  if (t != null) {
-    clearInterval(t)
-    delete holdTimers[key]
-  }
-}
 
 // 防抖：用于非连续性操作避免短时间内重复触发
 function debounce<T extends (...args: unknown[]) => void>(
@@ -131,7 +116,13 @@ function debounce<T extends (...args: unknown[]) => void>(
   }
 }
 
-// 为非连续性操作创建防抖包装
+// 为所有控制操作创建防抖包装，避免点击过快
+const moveForwardDebounced = debounce(moveForward, 300)
+const moveLeftDebounced = debounce(moveLeft, 300)
+const moveRightDebounced = debounce(moveRight, 300)
+const controlUpDebounced = debounce(controlUp, 300)
+const controlDownDebounced = debounce(controlDown, 300)
+const controlSurfDebounced = debounce(controlSurf, 300)
 const enableManualDebounced = debounce(enableManual, 300)
 const enableNavigateDebounced = debounce(enableNavigate, 300)
 const setLightOnDebounced = debounce((): void => setLight(true), 300)
@@ -147,27 +138,29 @@ function enableManual(): void {
 }
 function enableNavigate(): void {
   ElMessage.success('导航模式指令已发送')
-  // Note: Navigate command is not in the standard Fish model yet.
-  console.warn('Navigate command not configured in database schema')
+  void fishControlStore.sendCommand('navigate')
 }
 function setLight(on: boolean): void {
   lightOn.value = on
   ElMessage.success(`灯光：${on ? '开启' : '关闭'}`)
+  void fishControlStore.sendCommand(on ? 'lightOn' : 'lightOff')
 }
 function returnHome(): void {
-  const BMap = getBMap()
-  if (!BMap || !mapInstance) return
-  const id = selectedId.value
-  const home = homes[id]
-  if (!home) return
-  const point = new BMap.Point(home.lng, home.lat)
-  mapInstance.centerAndZoom(point, 14)
-  const target = robots.find((r) => r.id === id)
-  if (target) {
-    target.lng = home.lng
-    target.lat = home.lat
-    ElMessage.success('已返航至初始位置')
-  }
+  // const BMap = getBMap()
+  // if (!BMap || !mapInstance) return
+  // const id = selectedId.value
+  // const home = homes[id]
+  // if (!home) return
+  // const point = new BMap.Point(home.lng, home.lat)
+  // mapInstance.centerAndZoom(point, 14)
+  // const target = robots.find((r) => r.id === id)
+  // if (target) {
+  //   target.lng = home.lng
+  //   target.lat = home.lat
+  //   ElMessage.success('已返航至初始位置')
+  // }
+    ElMessage.success('返航指令已发送')
+
   void fishControlStore.sendCommand('return')
 }
 
@@ -706,71 +699,23 @@ watch(selectedId, (): void => {
           <div class="section-title">控制台</div>
           <div class="actions-grid">
             <!-- 方向控制 -->
-            <button
-              class="action-btn primary"
-              @mousedown="startHold('forward', moveForward, 100)"
-              @mouseup="stopHold('forward')"
-              @mouseleave="stopHold('forward')"
-              @touchstart.passive="startHold('forward', moveForward, 100)"
-              @touchend="stopHold('forward')"
-              @touchcancel="stopHold('forward')"
-            >
+            <button class="action-btn primary" @click="moveForwardDebounced">
               <span class="icon">↑</span><span class="text">向前</span>
             </button>
-            <button
-              class="action-btn primary"
-              @mousedown="startHold('left', moveLeft, 100)"
-              @mouseup="stopHold('left')"
-              @mouseleave="stopHold('left')"
-              @touchstart.passive="startHold('left', moveLeft, 100)"
-              @touchend="stopHold('left')"
-              @touchcancel="stopHold('left')"
-            >
+            <button class="action-btn primary" @click="moveLeftDebounced">
               <span class="icon">←</span><span class="text">向左</span>
             </button>
-            <button
-              class="action-btn primary"
-              @mousedown="startHold('right', moveRight, 100)"
-              @mouseup="stopHold('right')"
-              @mouseleave="stopHold('right')"
-              @touchstart.passive="startHold('right', moveRight, 100)"
-              @touchend="stopHold('right')"
-              @touchcancel="stopHold('right')"
-            >
+            <button class="action-btn primary" @click="moveRightDebounced">
               <span class="icon">→</span><span class="text">向右</span>
             </button>
             <!-- 垂直运动 -->
-            <button
-              class="action-btn accent"
-              @mousedown="startHold('ascend1', ascend, 100)"
-              @mouseup="stopHold('ascend1')"
-              @mouseleave="stopHold('ascend1')"
-              @touchstart.passive="startHold('ascend1', ascend, 100)"
-              @touchend="stopHold('ascend1')"
-              @touchcancel="stopHold('ascend1')"
-            >
+            <button class="action-btn accent" @click="controlUpDebounced">
               <span class="icon">⤒</span><span class="text">向上</span>
             </button>
-            <button
-              class="action-btn accent"
-              @mousedown="startHold('descend1', descend, 100)"
-              @mouseup="stopHold('descend1')"
-              @mouseleave="stopHold('descend1')"
-              @touchstart.passive="startHold('descend1', descend, 100)"
-              @touchend="stopHold('descend1')"
-              @touchcancel="stopHold('descend1')"
-            >
+            <button class="action-btn accent" @click="controlDownDebounced">
               <span class="icon">⤓</span><span class="text">向下</span>
             </button>
-            <button
-              class="action-btn accent"
-              @mousedown="startHold('descend2', descend, 100)"
-              @mouseup="stopHold('descend2')"
-              @mouseleave="stopHold('descend2')"
-              @touchstart.passive="startHold('descend2', descend, 100)"
-              @touchend="stopHold('descend2')"
-              @touchcancel="stopHold('descend2')"
-            >
+            <button class="action-btn accent" @click="controlDownDebounced">
               <span class="icon">⤓</span><span class="text">下潜</span>
             </button>
             <!-- 模式/返航/上浮 -->
@@ -780,15 +725,7 @@ watch(selectedId, (): void => {
             <button class="action-btn info" @click="returnHomeDebounced">
               <span class="icon">🏠</span><span class="text">返航</span>
             </button>
-            <button
-              class="action-btn accent"
-              @mousedown="startHold('ascend2', ascend, 100)"
-              @mouseup="stopHold('ascend2')"
-              @mouseleave="stopHold('ascend2')"
-              @touchstart.passive="startHold('ascend2', ascend, 100)"
-              @touchend="stopHold('ascend2')"
-              @touchcancel="stopHold('ascend2')"
-            >
+            <button class="action-btn accent" @click="controlSurfDebounced">
               <span class="icon">⤒</span><span class="text">上浮</span>
             </button>
             <!-- 功耗与灯光 -->
