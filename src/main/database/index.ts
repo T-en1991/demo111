@@ -710,3 +710,55 @@ export const videoService = {
     return prisma.video.delete({ where: { id } })
   }
 }
+
+export const systemLogService = {
+  async create(data: { content: string; type: string; time?: Date | string }) {
+    return prisma.systemLog.create({
+      data: {
+        content: data.content,
+        type: data.type,
+        time: data.time ? new Date(data.time) : new Date()
+      }
+    })
+  },
+
+  async list(params: {
+    page?: number
+    pageSize?: number
+    startTime?: string
+    endTime?: string
+    type?: string
+  } = {}) {
+    const { page = 1, pageSize = 20, startTime, endTime, type } = params
+    const skip = (page - 1) * pageSize
+    const where: Prisma.SystemLogWhereInput = {}
+
+    if (startTime && endTime) {
+      where.time = {
+        gte: new Date(startTime),
+        lte: new Date(endTime)
+      }
+    } else if (startTime) {
+      where.time = { gte: new Date(startTime) }
+    } else if (endTime) {
+      where.time = { lte: new Date(endTime) }
+    }
+
+    if (type) {
+      where.type = type
+    }
+
+    const [total, items] = await Promise.all([
+      prisma.systemLog.count({ where }),
+      prisma.systemLog.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { time: 'desc' }
+      })
+    ])
+
+    return { items, total, page, pageSize }
+  }
+}
+

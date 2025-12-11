@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { fishService, historyService, videoService, importService, alertService } from '../database/index.js'
+import { fishService, historyService, videoService, importService, alertService, systemLogService } from '../database/index.js'
 
 export function registerDatabaseIpc(): void {
   // Fish CRUD 操作
@@ -270,4 +270,45 @@ export function registerDatabaseIpc(): void {
       throw error
     }
   })
+
+  // 系统日志操作
+  ipcMain.handle(
+    'systemLog:create',
+    async (
+      _,
+      data: {
+        content: string
+        type: string
+        time?: string
+      }
+    ) => {
+      try {
+        return await systemLogService.create(data)
+      } catch (error) {
+        console.error('Error creating system log:', error)
+        throw error
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'systemLog:list',
+    async (
+      _,
+      params: {
+        page?: number
+        pageSize?: number
+        startTime?: string
+        endTime?: string
+        type?: string
+      } = {}
+    ) => {
+      try {
+        return await systemLogService.list(params)
+      } catch (error) {
+        console.error('Error listing system logs:', error)
+        throw error
+      }
+    }
+  )
 }

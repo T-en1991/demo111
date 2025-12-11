@@ -105,6 +105,16 @@ declare global {
         deleteMany(ids: number[]): Promise<Prisma.BatchPayload>
         seed(count: number): Promise<Prisma.BatchPayload>
       }
+      systemLog: {
+        create(data: { content: string; type: string; time?: string }): Promise<any>
+        list(params: {
+          page?: number
+          pageSize?: number
+          startTime?: string
+          endTime?: string
+          type?: string
+        }): Promise<{ items: any[]; total: number; page: number; pageSize: number }>
+      }
       // RTSP流控制接口
       rtsp: {
         // 启动RTSP流（使用参数控制流类型）

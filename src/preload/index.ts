@@ -141,6 +141,18 @@ const api = {
     seed: (count: number) => ipcRenderer.invoke('fish:seed', count)
   },
 
+  systemLog: {
+    create: (data: { content: string; type: string; time?: string }) =>
+      ipcRenderer.invoke('systemLog:create', data),
+    list: (params: {
+      page?: number
+      pageSize?: number
+      startTime?: string
+      endTime?: string
+      type?: string
+    }) => ipcRenderer.invoke('systemLog:list', params)
+  },
+
   // RTSP流控制接口
   rtsp: {
     // 启动RTSP流（使用参数控制流类型）

@@ -113,6 +113,15 @@ model Video {
   @@map("videos")
 }
 
+model SystemLog {
+  id        Int      @id @default(autoincrement())
+  time      DateTime @default(now())
+  content   String
+  type      String   // 'send' | 'receive'
+  
+  @@map("system_logs")
+}
+
 enum VideoCameraType {
   mono
   stereo
