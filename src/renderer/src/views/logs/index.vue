@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
 
 interface LogItem {
   id: number
@@ -12,7 +13,7 @@ const now = new Date()
 const defaultStart = new Date(now)
 defaultStart.setDate(now.getDate() - 1)
 defaultStart.setHours(0, 0, 0, 0)
-type DateRange = [Date, Date] | []
+type DateRange = [Date, Date] | null
 
 const query = reactive({
   range: [defaultStart, now] as DateRange,
@@ -40,9 +41,9 @@ async function fetchLogs() {
   loading.value = true
   try {
     const startTime =
-      query.range && query.range.length === 2 ? query.range[0].toISOString() : undefined
+      query.range && query.range.length === 2 ? fmt(query.range[0]) : undefined
     const endTime =
-      query.range && query.range.length === 2 ? query.range[1].toISOString() : undefined
+      query.range && query.range.length === 2 ? fmt(query.range[1]) : undefined
 
     const res = await window.api.systemLog.list({
       page: currentPage.value,
@@ -51,6 +52,7 @@ async function fetchLogs() {
       endTime,
       type: query.type || undefined
     })
+    console.log('Query params:', { startTime, endTime, type: query.type }) // Debug log
     logs.value = res.items
     total.value = res.total
   } catch (err) {
@@ -61,7 +63,7 @@ async function fetchLogs() {
 }
 
 function resetQuery() {
-  query.range = []
+  query.range = null
   query.type = ''
   currentPage.value = 1
   fetchLogs()
@@ -81,6 +83,25 @@ function handleSizeChange(size: number) {
   pageSize.value = size
   currentPage.value = 1
   fetchLogs()
+}
+
+async function clearLogs() {
+  try {
+    await ElMessageBox.confirm('确定要清空所有日志记录吗？此操作不可恢复。', '警告', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await window.api.systemLog.clear()
+    ElMessage.success('日志已清空')
+    fetchLogs()
+  } catch (err) {
+    if (err !== 'cancel') {
+      console.error('Failed to clear logs:', err)
+      ElMessage.error('清空日志失败')
+    }
+  }
 }
 
 onMounted(() => {
@@ -116,6 +137,7 @@ onMounted(() => {
         <el-form-item>
           <el-button type="primary" @click="applyQuery">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
+          <el-button type="danger" plain @click="clearLogs">清空日志</el-button>
         </el-form-item>
       </el-form>
     </el-card>

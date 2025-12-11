@@ -150,7 +150,8 @@ const api = {
       startTime?: string
       endTime?: string
       type?: string
-    }) => ipcRenderer.invoke('systemLog:list', params)
+    }) => ipcRenderer.invoke('systemLog:list', params),
+    clear: () => ipcRenderer.invoke('systemLog:clear')
   },
 
   // RTSP流控制接口

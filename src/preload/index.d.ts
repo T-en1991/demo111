@@ -114,6 +114,7 @@ declare global {
           endTime?: string
           type?: string
         }): Promise<{ items: any[]; total: number; page: number; pageSize: number }>
+        clear(): Promise<Prisma.BatchPayload>
       }
       // RTSP流控制接口
       rtsp: {

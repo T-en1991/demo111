@@ -759,6 +759,10 @@ export const systemLogService = {
     ])
 
     return { items, total, page, pageSize }
+  },
+
+  async clear() {
+    return prisma.systemLog.deleteMany()
   }
 }
 

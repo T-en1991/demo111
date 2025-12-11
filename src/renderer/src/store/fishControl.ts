@@ -46,12 +46,27 @@ export const useFishControlStore = defineStore('fishControl', () => {
     // We can assume disconnected or try to connect.
   }
 
+  async function disconnect(): Promise<void> {
+    if (!currentFish.value) return
+    const { satcomIp, satcomPort1, satcomPort2 } = currentFish.value
+    
+    if (satcomIp) {
+      if (satcomPort1) {
+        await (window.api as any).tcp.disconnect(satcomIp, satcomPort1)
+      }
+      if (satcomPort2) {
+        await (window.api as any).tcp.disconnect(satcomIp, satcomPort2)
+      }
+    }
+    connectionStatus.value = 'disconnected'
+  }
+
   function clearLogs(): void {
     logs.value = []
   }
 
   async function connect(): Promise<void> {
-    if (!currentFish.value?.satcomIp || !currentFish.value?.satcomPort1) {
+    if (!currentFish.value?.satcomIp || (!currentFish.value?.satcomPort1 && !currentFish.value?.satcomPort2)) {
       ElMessage.warning('当前机器鱼未配置声通IP或端口')
       return
     }
@@ -59,20 +74,33 @@ export const useFishControlStore = defineStore('fishControl', () => {
     if (connectionStatus.value === 'connected') return
 
     connectionStatus.value = 'connecting'
-    const { satcomIp, satcomPort1 } = currentFish.value
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (window.api as any).tcp.connect(satcomIp, satcomPort1)
-    if (!res) {
+    const { satcomIp, satcomPort1, satcomPort2 } = currentFish.value
+
+    let connected1 = false
+    let connected2 = false
+
+    // Connect Port 1
+    if (satcomPort1) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (window.api as any).tcp.connect(satcomIp, satcomPort1)
+      if (res) connected1 = true
+    }
+
+    // Connect Port 2
+    if (satcomPort2) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (window.api as any).tcp.connect(satcomIp, satcomPort2)
+      if (res) connected2 = true
+    }
+
+    if (!connected1 && !connected2) {
       connectionStatus.value = 'error'
       ElMessage.error('连接失败')
+    } else if (connected1 && !connected2 && satcomPort2) {
+      ElMessage.warning('端口1连接成功，端口2连接失败')
+    } else if (!connected1 && connected2 && satcomPort1) {
+      ElMessage.warning('端口1连接失败，端口2连接成功')
     }
-  }
-
-  async function disconnect(): Promise<void> {
-     if (!currentFish.value?.satcomIp || !currentFish.value?.satcomPort1) return
-     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-     await (window.api as any).tcp.disconnect(currentFish.value.satcomIp, currentFish.value.satcomPort1)
-     connectionStatus.value = 'disconnected'
   }
 
   async function sendCommand(cmdType: 'forward' | 'left' | 'right' | 'up' | 'down' | 'surf' | 'manual' | 'return' | 'navigate' | 'lightOn' | 'lightOff' | 'ascend' | 'descend' | 'wifi'): Promise<void> {
@@ -119,7 +147,7 @@ console.log('payload',payload)
      const success = await (window.api as any).tcp.sendClient(satcomIp, satcomPort1, payload)
      if (success) {
        console.log('发送的控制台命令:', payload)
-       ElMessage.success(`发送指令成功`)
+       // ElMessage.success(`发送指令成功`)
        logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${payload}`)
      } else {
        ElMessage.error(`发送指令失败`)
@@ -133,32 +161,41 @@ console.log('payload',payload)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onStatus = (window.api as any).tcp.onStatus(({ ip, port, status }) => {
-        if (currentFish.value?.satcomIp === ip && currentFish.value?.satcomPort1 === port) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            connectionStatus.value = status as any
-            if (status === 'connected') {
-              // ElMessage.success('已连接')
-            } else if (status === 'disconnected') {
-              // ElMessage.warning('已断开')
+        if (!currentFish.value?.satcomIp) return
+
+        if (currentFish.value.satcomIp === ip) {
+            if (currentFish.value.satcomPort1 === port) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                connectionStatus.value = status as any
             }
+            // We could handle port2 status logging if needed
         }
     })
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onData = (window.api as any).tcp.onData(({ ip, port, data }) => {
-         if (currentFish.value?.satcomIp === ip && currentFish.value?.satcomPort1 === port) {
-            console.log('监听到的内容:', data)
-            logs.value.push(`[${new Date().toLocaleTimeString()}] RECV: ${data}`)
-            ElMessage.success(`收到数据: ${data}`)
+         if (currentFish.value?.satcomIp === ip) {
+             if (currentFish.value?.satcomPort1 === port || currentFish.value?.satcomPort2 === port) {
+                console.log('监听到的内容:', data)
+                // Identify source for clarity
+                const source = port === currentFish.value.satcomPort1 ? 'Port1' : 'Port2'
+                logs.value.push(`[${new Date().toLocaleTimeString()}] RECV(${source}): ${data}`)
+                // ElMessage.success(`收到数据: ${data}`)
+             }
          }
     })
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onError = (window.api as any).tcp.onError(({ ip, port, error }) => {
-         if (currentFish.value?.satcomIp === ip && currentFish.value?.satcomPort1 === port) {
-            connectionStatus.value = 'error'
-            logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${error}`)
-            ElMessage.error(`连接错误: ${error}`)
+         if (currentFish.value?.satcomIp === ip) {
+            if (currentFish.value?.satcomPort1 === port) {
+                connectionStatus.value = 'error'
+                logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR(Port1): ${error}`)
+                ElMessage.error(`连接错误(Port1): ${error}`)
+            } else if (currentFish.value?.satcomPort2 === port) {
+                logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR(Port2): ${error}`)
+                ElMessage.error(`连接错误(Port2): ${error}`)
+            }
          }
     })
 

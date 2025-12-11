@@ -2,6 +2,7 @@ import net from 'net'
 import logger from '../logger'
 import { fishService, alertService } from '../database'
 import { EventEmitter } from 'events'
+import { logSystemEvent, LogType } from '../utils/systemLogger'
 
 export const tcpClientEvents = new EventEmitter()
 
@@ -44,8 +45,10 @@ export async function connectClient(ip: string, port: number): Promise<boolean> 
     })
 
     socket.on('data', (data) => {
+      const dataStr = data.toString()
       logger.info(`[TCP Client] Received ${data.length} bytes from ${ip}:${port}`)
-      tcpClientEvents.emit('data', { ip, port, data: data.toString() })
+      logSystemEvent(LogType.RECEIVE, `[TCP Client ${ip}:${port}] ${dataStr}`)
+      tcpClientEvents.emit('data', { ip, port, data: dataStr })
     })
 
     socket.on('error', (err) => {
@@ -91,8 +94,10 @@ export async function sendClient(ip: string, port: number, payload: string): Pro
     socket!.write(body, (err) => {
       if (err) {
         logger.error(`[TCP Client] Write error to ${ip}:${port}:`, err)
+        logSystemEvent(LogType.SEND, `[TCP Client ${ip}:${port}] Failed to send: ${payload}`)
         resolve(false)
       } else {
+        logSystemEvent(LogType.SEND, `[TCP Client ${ip}:${port}] Sent: ${payload}`)
         resolve(true)
       }
     })
@@ -287,6 +292,7 @@ export async function sendRaw(ip: string, port: number, payload: string): Promis
           socket.write(data, (err) => {
             if (err) {
               logger.error(`[TCP] sendRaw write error to ${ip}:${port}:`, err)
+              logSystemEvent(LogType.SEND, `[TCP Raw ${ip}:${port}] Failed to send: ${payload}`)
               try {
                 socket.destroy()
               } catch {
@@ -294,6 +300,7 @@ export async function sendRaw(ip: string, port: number, payload: string): Promis
               }
               resolve(false)
             } else {
+              logSystemEvent(LogType.SEND, `[TCP Raw ${ip}:${port}] Sent: ${payload}`)
               // success
               socket.end() // close after write? Or just destroy? Usually for fire-and-forget we might just destroy after some time or let it close.
               // For simple send, we can destroy after write callback
@@ -357,7 +364,10 @@ export async function sendAndReceive(
         const body = payload.endsWith('\n') ? payload : payload + '\n'
         socket!.write(body, (err) => {
           if (err) {
+            logSystemEvent(LogType.SEND, `[TCP S&R ${ip}:${port}] Failed to send: ${payload}`)
             done({ success: false, error: err.message })
+          } else {
+            logSystemEvent(LogType.SEND, `[TCP S&R ${ip}:${port}] Sent: ${payload}`)
           }
         })
       })
@@ -365,6 +375,7 @@ export async function sendAndReceive(
       socket.on('data', (chunk) => {
         received += chunk.toString()
         console.log(`[TCP] Received data: ${received}`)
+        logSystemEvent(LogType.RECEIVE, `[TCP S&R ${ip}:${port}] Received: ${received}`)
         done({ success: true, data: received })
       })
 

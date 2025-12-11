@@ -311,4 +311,13 @@ export function registerDatabaseIpc(): void {
       }
     }
   )
+
+  ipcMain.handle('systemLog:clear', async () => {
+    try {
+      return await systemLogService.clear()
+    } catch (error) {
+      console.error('Error clearing system logs:', error)
+      throw error
+    }
+  })
 }

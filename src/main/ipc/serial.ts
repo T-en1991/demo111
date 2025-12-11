@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { SerialPort } from 'serialport'
 import { DelimiterParser } from '@serialport/parser-delimiter'
 import logger from '../logger'
+import { logSystemEvent, LogType } from '../utils/systemLogger'
 
 let port: SerialPort | null = null
 let parser: DelimiterParser | null = null
@@ -44,6 +45,7 @@ export function registerSerialIpc(): void {
         const line = chunk.toString('utf8').replace(/\r$/, '')
         const m = line.match(/^SURF\s+(\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2})\s+CSQ=(\d+)/)
         const parsed = m ? { kind: 'SURF', time: m[1], csq: Number(m[2]) } : null
+        logSystemEvent(LogType.RECEIVE, `[Serial ${cfg.path}] ${line}`)
         sendToRenderer('serial:data', { line, parsed })
       })
       port.on('error', (err) => {
@@ -72,9 +74,11 @@ export function registerSerialIpc(): void {
       if (!port) throw new Error('serial not open')
       const data = text.endsWith('\r\n') ? text : text + '\r\n'
       await new Promise<void>((resolve, reject) => port!.write(data, (err) => (err ? reject(err) : resolve())))
+      logSystemEvent(LogType.SEND, `[Serial ${port.path}] Sent: ${text}`)
       return true
     } catch (e) {
       logger.error('serial:write failed', e)
+      logSystemEvent(LogType.SEND, `[Serial] Failed to send: ${text}`)
       return false
     }
   })
