@@ -154,7 +154,7 @@ export function registerDatabaseIpc(): void {
     }
   })
 
-  // 保存历史记录 
+  // 保存历史记录
   ipcMain.handle(
     'history:create',
     async (
@@ -169,6 +169,9 @@ export function registerDatabaseIpc(): void {
         height?: number | null
         battery?: number | null
         signalStrength?: number | null
+        rollDeg?: number | null
+        pitchDeg?: number | null
+        yawDeg?: number | null
       }
     ) => {
       try {

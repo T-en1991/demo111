@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { realtimeDataParser } from '../utils/realtimeDataParser'
 
 export interface Fish {
   id: number
@@ -48,14 +49,11 @@ export const useFishControlStore = defineStore('fishControl', () => {
 
   async function disconnect(): Promise<void> {
     if (!currentFish.value) return
-    const { satcomIp, satcomPort1, satcomPort2 } = currentFish.value
-    
+    const { satcomIp, satcomPort1 } = currentFish.value
+
     if (satcomIp) {
       if (satcomPort1) {
         await (window.api as any).tcp.disconnect(satcomIp, satcomPort1)
-      }
-      if (satcomPort2) {
-        await (window.api as any).tcp.disconnect(satcomIp, satcomPort2)
       }
     }
     connectionStatus.value = 'disconnected'
@@ -66,7 +64,7 @@ export const useFishControlStore = defineStore('fishControl', () => {
   }
 
   async function connect(): Promise<void> {
-    if (!currentFish.value?.satcomIp || (!currentFish.value?.satcomPort1 && !currentFish.value?.satcomPort2)) {
+    if (!currentFish.value?.satcomIp || !currentFish.value?.satcomPort1) {
       ElMessage.warning('当前机器鱼未配置声通IP或端口')
       return
     }
@@ -74,10 +72,9 @@ export const useFishControlStore = defineStore('fishControl', () => {
     if (connectionStatus.value === 'connected') return
 
     connectionStatus.value = 'connecting'
-    const { satcomIp, satcomPort1, satcomPort2 } = currentFish.value
+    const { satcomIp, satcomPort1 } = currentFish.value
 
     let connected1 = false
-    let connected2 = false
 
     // Connect Port 1
     if (satcomPort1) {
@@ -86,20 +83,9 @@ export const useFishControlStore = defineStore('fishControl', () => {
       if (res) connected1 = true
     }
 
-    // Connect Port 2
-    if (satcomPort2) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (window.api as any).tcp.connect(satcomIp, satcomPort2)
-      if (res) connected2 = true
-    }
-
-    if (!connected1 && !connected2) {
+    if (!connected1) {
       connectionStatus.value = 'error'
       ElMessage.error('连接失败')
-    } else if (connected1 && !connected2 && satcomPort2) {
-      ElMessage.warning('端口1连接成功，端口2连接失败')
-    } else if (!connected1 && connected2 && satcomPort1) {
-      ElMessage.warning('端口1连接失败，端口2连接成功')
     }
   }
 
@@ -109,7 +95,6 @@ export const useFishControlStore = defineStore('fishControl', () => {
        ElMessage.warning('未选择机器鱼')
        return
      }
- console.log('connectionStatus',connectionStatus.value)
      // Auto-connect if needed
      if (connectionStatus.value !== 'connected') {
         await connect()
@@ -134,7 +119,6 @@ export const useFishControlStore = defineStore('fishControl', () => {
         case 'descend': payload = currentFish.value.descendCommand; break;
         case 'wifi': payload = currentFish.value.wifiCommand; break;
      }
-console.log('payload',payload)
      if (!payload) {
         ElMessage.warning(`未配置 ${cmdType} 指令`)
         return
@@ -174,14 +158,20 @@ console.log('payload',payload)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const onData = (window.api as any).tcp.onData(({ ip, port, data }) => {
-         if (currentFish.value?.satcomIp === ip) {
-             if (currentFish.value?.satcomPort1 === port || currentFish.value?.satcomPort2 === port) {
-                console.log('监听到的内容:', data)
-                // Identify source for clarity
-                const source = port === currentFish.value.satcomPort1 ? 'Port1' : 'Port2'
-                logs.value.push(`[${new Date().toLocaleTimeString()}] RECV(${source}): ${data}`)
-                // ElMessage.success(`收到数据: ${data}`)
-             }
+         const fish = currentFish.value
+         if (fish && fish.satcomIp === ip && fish.satcomPort1 === port) {
+                const now = new Date()
+                const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`
+                console.log(`[${timeStr}] 监听到的内容:`, data)
+
+                // 使用新的解析器处理数据
+                realtimeDataParser.process(data, {
+                  fish,
+                  ip,
+                  port
+                })
+
+                logs.value.push(`[${new Date().toLocaleTimeString()}] RECV: ${data}`)
          }
     })
 
@@ -190,11 +180,8 @@ console.log('payload',payload)
          if (currentFish.value?.satcomIp === ip) {
             if (currentFish.value?.satcomPort1 === port) {
                 connectionStatus.value = 'error'
-                logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR(Port1): ${error}`)
-                ElMessage.error(`连接错误(Port1): ${error}`)
-            } else if (currentFish.value?.satcomPort2 === port) {
-                logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR(Port2): ${error}`)
-                ElMessage.error(`连接错误(Port2): ${error}`)
+                logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${error}`)
+                ElMessage.error(`连接错误: ${error}`)
             }
          }
     })

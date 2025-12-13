@@ -56,12 +56,16 @@ declare global {
         create(data: {
           time: string
           content?: string
+          rawLine?: string | null
           lon?: number | null
           lat?: number | null
           depth?: number | null
           height?: number | null
           battery?: number | null
           signalStrength?: number | null
+          rollDeg?: number | null
+          pitchDeg?: number | null
+          yawDeg?: number | null
         }): Promise<any>
         importXlsx(filePath: string): Promise<any>
       }
