@@ -12,6 +12,10 @@ function contentTypeByExt(p: string): string {
   if (ext === '.mkv') return 'video/x-matroska'
   if (ext === '.avi') return 'video/x-msvideo'
   if (ext === '.mov') return 'video/quicktime'
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg'
+  if (ext === '.png') return 'image/png'
+  if (ext === '.webp') return 'image/webp'
+  if (ext === '.bmp') return 'image/bmp'
   return 'application/octet-stream'
 }
 
@@ -44,9 +48,29 @@ function handleVideo(req: IncomingMessage, res: ServerResponse): void {
     res.statusCode = 200
     res.setHeader('Content-Length', String(fileSize))
     res.setHeader('Content-Type', type)
+    res.setHeader('Cache-Control', 'no-store')
     const stream = createReadStream(p)
     stream.pipe(res)
   }
+}
+
+function handleFile(req: IncomingMessage, res: ServerResponse): void {
+  const url = new URL(req.url || '', `http://localhost:${currentPort}`)
+  const p = url.searchParams.get('path')
+  if (!p || !existsSync(p)) {
+    res.statusCode = 404
+    res.end('Not found')
+    return
+  }
+  const stat = statSync(p)
+  const fileSize = stat.size
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.statusCode = 200
+  res.setHeader('Content-Length', String(fileSize))
+  res.setHeader('Content-Type', contentTypeByExt(p))
+  res.setHeader('Cache-Control', 'no-store')
+  const stream = createReadStream(p)
+  stream.pipe(res)
 }
 
 export function startFileServer(port = 18081): number {
@@ -56,6 +80,10 @@ export function startFileServer(port = 18081): number {
     try {
       if (req.url && req.url.startsWith('/video')) {
         handleVideo(req, res)
+        return
+      }
+      if (req.url && req.url.startsWith('/file')) {
+        handleFile(req, res)
         return
       }
       res.statusCode = 404
@@ -76,4 +104,3 @@ export function startFileServer(port = 18081): number {
 export function getFileServerPort(): number {
   return currentPort
 }
-

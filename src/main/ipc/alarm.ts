@@ -4,8 +4,26 @@ import { join } from 'path'
 import logger from '../logger'
 import { alertService } from '../database'
 
+function parseTimeFromFilename(name: string): string | null {
+  const base = name.split(/[\\/]/).pop() || name
+  const m1 = /(\d{8})_(\d{6})/.exec(base)
+  const m2 = /(\d{8})-(\d{6})/.exec(base)
+  const m = m1 || m2
+  if (!m) return null
+  const y = m[1].slice(0, 4)
+  const mo = m[1].slice(4, 6)
+  const d = m[1].slice(6, 8)
+  const h = m[2].slice(0, 2)
+  const mi = m[2].slice(2, 4)
+  const s = m[2].slice(4, 6)
+  return `${y}-${mo}-${d} ${h}:${mi}:${s}`
+}
+
 // 解析报警文件内容
-function parseAlarmFile(content: string, fileName: string): Array<{
+function parseAlarmFile(
+  content: string,
+  fileName: string
+): Array<{
   time: string
   id: string
   c: string
@@ -19,32 +37,32 @@ function parseAlarmFile(content: string, fileName: string): Array<{
     img: string
     pos: { lat: number; lon: number }
   }> = []
-  
+
   const lines = content.split('\n')
   for (const line of lines) {
     const trimmedLine = line.trim()
     if (!trimmedLine) continue
-    
+
     // 解析时间部分
     const timeMatch = trimmedLine.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+/)
     if (!timeMatch) continue
-    
+
     const time = timeMatch[1]
     const rest = trimmedLine.slice(timeMatch[0].length)
-    
+
     // 解析参数部分
     const params: Record<string, string> = {}
     const paramMatches = rest.matchAll(/(\w+)=(.+?)(?:;|$)/g)
     for (const match of paramMatches) {
       params[match[1]] = match[2]
     }
-    
+
     if (!params.ID || !params.C || !params.IMG || !params.POS) continue
-    
+
     // 解析位置
-    const posParts = params.POS.split(',').map(p => parseFloat(p.trim()))
+    const posParts = params.POS.split(',').map((p) => parseFloat(p.trim()))
     if (posParts.length !== 2 || isNaN(posParts[0]) || isNaN(posParts[1])) continue
-    
+
     alarms.push({
       time,
       id: params.ID,
@@ -53,7 +71,7 @@ function parseAlarmFile(content: string, fileName: string): Array<{
       pos: { lat: posParts[0], lon: posParts[1] }
     })
   }
-  
+
   return alarms
 }
 
@@ -63,39 +81,42 @@ function checkImageExists(folderPath: string, imgName: string): boolean {
 }
 
 // 查找或创建报警记录
-async function findOrCreateAlert(
-  alarmData: {
-    time: string
-    id: string
-    c: string
-    img: string
-    pos: { lat: number; lon: number }
-    fileName: string
-    folderPath: string
-  }
-): Promise<{ ok: boolean; updated: boolean }> {
+async function findOrCreateAlert(alarmData: {
+  time: string
+  id: string
+  c: string
+  img: string
+  pos: { lat: number; lon: number }
+  fileName: string
+  folderPath: string
+}): Promise<{ ok: boolean; updated: boolean }> {
   try {
     // 这里需要根据时间和报警文件作为判断条件，检查是否已存在相同的报警记录
     // 由于目前没有 findByTimeAndFile 方法，我们先获取所有记录并手动过滤
     const allAlerts = await alertService.findAll()
-    const existingAlert = allAlerts.find(alert => {
+    const existingAlert = allAlerts.find((alert) => {
       // 简化判断：根据时间和图片文件名查找
-      return alert.message?.includes(alarmData.img) && 
-             alert.createdAt?.toISOString().includes(alarmData.time.split(' ')[0])
+      return (
+        alert.message?.includes(alarmData.img) &&
+        alert.createdAt?.toISOString().includes(alarmData.time.split(' ')[0])
+      )
     })
-    
+
+    const titleFromImg = parseTimeFromFilename(alarmData.img)
     const alertPayload = {
-      title: `报警记录 - ${alarmData.id}`,
+      title: titleFromImg || `报警记录 - ${alarmData.id}`,
       message: `ID=${alarmData.id};C=${alarmData.c};IMG=${alarmData.img};POS=${alarmData.pos.lat},${alarmData.pos.lon}`,
       level: 'critical',
       type: 'alarm',
       source: join(alarmData.folderPath, alarmData.fileName), // 存储完整的文件路径
       status: 'active',
-      imgFile: checkImageExists(alarmData.folderPath, alarmData.img) ? join(alarmData.folderPath, alarmData.img) : null, // 存储完整的图片文件路径
+      imgFile: checkImageExists(alarmData.folderPath, alarmData.img)
+        ? join(alarmData.folderPath, alarmData.img)
+        : null, // 存储完整的图片文件路径
       lat: alarmData.pos.lat,
       lon: alarmData.pos.lon
     }
-    
+
     if (existingAlert) {
       // 更新现有记录
       await alertService.update(existingAlert.id, alertPayload)
@@ -117,8 +138,8 @@ export function registerAlarmIpc(): void {
     try {
       const files = readdirSync(folderPath)
       const alarmFiles = files
-        .filter(file => file.startsWith('alerts_') && file.endsWith('.txt'))
-        .map(file => ({
+        .filter((file) => file.startsWith('alerts_') && file.endsWith('.txt'))
+        .map((file) => ({
           name: file
         }))
       return alarmFiles
@@ -127,29 +148,31 @@ export function registerAlarmIpc(): void {
       return []
     }
   })
-  
+
   // 导入文件夹中的报警数据
   ipcMain.handle('alarm:importFolder', async (_, folderPath: string) => {
     try {
       let ok = 0
       let fail = 0
       let updated = 0
-      
+
       const files = readdirSync(folderPath)
-      const alarmTxtFiles = files.filter(file => file.startsWith('alerts_') && file.endsWith('.txt'))
-      
+      const alarmTxtFiles = files.filter(
+        (file) => file.startsWith('alerts') && file.endsWith('.txt')
+      )
+
       for (const fileName of alarmTxtFiles) {
         const filePath = join(folderPath, fileName)
         const content = readFileSync(filePath, 'utf8')
         const alarms = parseAlarmFile(content, fileName)
-        
+
         for (const alarm of alarms) {
           const result = await findOrCreateAlert({
             ...alarm,
             fileName,
             folderPath
           })
-          
+
           if (result.ok) {
             ok++
             if (result.updated) {
@@ -160,7 +183,7 @@ export function registerAlarmIpc(): void {
           }
         }
       }
-      
+
       return { ok, fail, updated }
     } catch (error) {
       logger.error('Failed to import alarm folder:', error)

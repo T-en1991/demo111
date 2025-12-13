@@ -1,124 +1,92 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Picture, Calendar, Location, InfoFilled } from '@element-plus/icons-vue'
 
-interface AlertItem {
-  id: number
-  lon?: number
-  lat?: number
-  depth?: number
-  height?: number
-  battery?: number
-  signalStrength?: number
-  type: '报警'
-  time: string
-  content?: string
-  imgFile?: string
-  camMonoUrl?: string
-  camStereoUrl?: string
-}
+type DateRange = [Date, Date] | []
 
-
-
-const allAlerts = ref<AlertItem[]>([
-  {
-    id: 1,
-    time: '2025-10-02 10:12',
-    lon: 121.4737,
-    lat: 31.2304,
-    depth: 12.3,
-    height: 4.5,
-    battery: 15,
-    signalStrength: -68,
-    type: '报警',
-    content: '电池电量降至 15%，请尽快充电',
-    camStereoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
-  },
-  {
-    id: 2,
-    time: '2025-10-03 08:40',
-    lon: 114.0579,
-    lat: 22.5431,
-    depth: 8.1,
-    height: 3.9,
-    battery: 82,
-    signalStrength: -55,
-    type: '报警',
-    content: '检测到滚转角超过阈值'
-  },
-  {
-    id: 4,
-    time: '2025-10-04 09:33',
-    lon: 116.4074,
-    lat: 39.9042,
-    depth: 5.6,
-    height: 2.2,
-    battery: 70,
-    signalStrength: -75,
-    type: '报警',
-    content: '短时通信丢失约 30s'
-  },
-  {
-    id: 5,
-    time: '2025-10-05 15:21',
-    lon: 120.19,
-    lat: 30.26,
-    depth: 9.7,
-    height: 3.1,
-    battery: 40,
-    signalStrength: -80,
-    type: '报警',
-    content: '设备温度达到 75℃，超过告警阈值',
-    imgFile: 'https://picsum.photos/800/450',
-    camMonoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
-  }
-])
-
-
-
-// 默认时间范围：昨天零点 到 今天此时此刻
 const now = new Date()
 const defaultStart = new Date(now)
 defaultStart.setDate(now.getDate() - 1)
 defaultStart.setHours(0, 0, 0, 0)
-type DateRange = [Date, Date] | []
+
 const query = reactive({
   range: [defaultStart, now] as DateRange
 })
-// 仅在点击“查询”后应用筛选的有效范围（默认采用昨天零点到现在）
-const activeRange = ref<DateRange>([defaultStart, now] as DateRange)
+
+const items = ref<any[]>([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(12)
+
+function toFileUrl(p?: string | null): string | '' {
+  if (!p) return ''
+  const norm = p.replace(/\\/g, '/')
+  return `http://localhost:18081/file?path=${encodeURIComponent(norm)}`
+}
+
+function toVideoUrl(p: string): string {
+  const norm = p.replace(/\\/g, '/')
+  return `http://localhost:18081/video?path=${encodeURIComponent(norm)}`
+}
+
+function formatTime(t: string | Date | null | undefined): string {
+  if (!t) return ''
+  const d = typeof t === 'string' ? new Date(t) : t
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${y}-${m}-${day} ${h}:${min}:${s}`
+}
+
+async function fetchAlerts(): Promise<void> {
+  // @ts-ignore
+  const params: any = { page: page.value, pageSize: pageSize.value }
+  if (Array.isArray(query.range) && query.range.length === 2) {
+    params.startTime = query.range[0].toISOString()
+    params.endTime = query.range[1].toISOString()
+  }
+  // @ts-ignore
+  const res = await window.api.alert.list(params)
+  items.value = Array.isArray(res?.items) ? res.items : []
+  total.value = Number(res?.total) || 0
+}
 
 function resetQuery(): void {
   query.range = []
-  activeRange.value = []
 }
-function applyQuery(): void {
-  activeRange.value =
-    Array.isArray(query.range) && query.range.length === 2 ? [query.range[0], query.range[1]] : []
+async function applyQuery(): Promise<void> {
+  await fetchAlerts()
 }
 
-const filtered = computed((): AlertItem[] => {
-  return allAlerts.value
-    .filter((a) => {
-      const byRange =
-        Array.isArray(activeRange.value) && activeRange.value.length === 2
-          ? (() => {
-              const t = new Date(a.time.replace(' ', 'T'))
-              return t >= activeRange.value[0] && t <= activeRange.value[1]
-            })()
-          : true
-      return byRange
-    })
-    .sort((a, b) => {
-      // 按时间倒序排序
-      const timeA = new Date(a.time.replace(' ', 'T')).getTime()
-      const timeB = new Date(b.time.replace(' ', 'T')).getTime()
-      return timeB - timeA
-    })
+onMounted(async () => {
+  await fetchAlerts()
 })
 
+const videoDialogVisible = ref(false)
+const activeTab = ref<'mono' | 'stereo'>('mono')
+const monoUrl = ref<string>('')
+const stereoUrl = ref<string>('')
+const videoError = ref<string>('')
 
+async function openVideo(item: any): Promise<void> {
+  const moment = item?.createdAt ? String(item.createdAt) : ''
+  if (!moment) return
+  // @ts-ignore
+  const res = await window.api.video.findByMoment(moment)
+  monoUrl.value = res?.mono?.path ? toVideoUrl(String(res.mono.path)) : ''
+  stereoUrl.value = res?.stereo?.path ? toVideoUrl(String(res.stereo.path)) : ''
+  activeTab.value = monoUrl.value ? 'mono' : (stereoUrl.value ? 'stereo' : 'mono')
+  videoError.value = ''
+  videoDialogVisible.value = true
+}
 
-
+function onVideoError(e: Event): void {
+  const el = e.target as HTMLVideoElement
+  videoError.value = `无法播放：${el?.src || ''}`
+}
 </script>
 
 <template>
@@ -131,14 +99,8 @@ const filtered = computed((): AlertItem[] => {
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="88px">
         <el-form-item label="时间范围">
-          <el-date-picker
-            v-model="query.range"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            unlink-panels
-          />
+          <el-date-picker v-model="query.range" type="daterange" range-separator="至" start-placeholder="开始日期"
+            end-placeholder="结束日期" unlink-panels />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="applyQuery">查询</el-button>
@@ -150,61 +112,81 @@ const filtered = computed((): AlertItem[] => {
     <!-- 图库展示 -->
     <el-card class="gallery-card" shadow="never">
       <div class="gallery-container">
-        <div 
-          v-for="item in filtered" 
-          :key="item.id"
-          class="gallery-item"
-        >
+        <div v-for="item in items" :key="item.id" class="gallery-item">
           <!-- 图片展示 -->
           <div class="image-wrapper">
-            <el-image
-              v-if="item.imgFile"
-              :src="item.imgFile"
-              fit="cover"
-              class="gallery-image"
-            >
+            <el-image v-if="item.imgFile" :src="toFileUrl(item.imgFile)" fit="cover" class="gallery-image">
               <template #error>
                 <div class="image-fallback">
-                  <el-icon><Picture /></el-icon>
+                  <el-icon>
+                    <Picture />
+                  </el-icon>
                   <span>暂无图片</span>
                 </div>
               </template>
             </el-image>
             <!-- 视频展示 -->
-            <video 
-              v-else-if="item.camMonoUrl || item.camStereoUrl"
-              :src="item.camMonoUrl || item.camStereoUrl"
-              controls
-              class="gallery-video"
-            ></video>
+            <video v-else-if="false" src="" controls class="gallery-video"></video>
             <!-- 无媒体时的占位符 -->
             <div v-else class="image-fallback">
-              <el-icon><Picture /></el-icon>
+              <el-icon>
+                <Picture />
+              </el-icon>
               <span>暂无媒体</span>
             </div>
           </div>
-          
+
           <!-- 信息展示 -->
           <div class="info-panel">
             <div class="info-item">
-              <el-icon class="info-icon"><Calendar /></el-icon>
+              <el-icon class="info-icon">
+                <Calendar />
+              </el-icon>
               <span class="info-label">时间：</span>
-              <span class="info-value">{{ item.time }}</span>
+              <span class="info-value">{{ formatTime(item.createdAt) }}</span>
             </div>
             <div class="info-item">
-              <el-icon class="info-icon"><Location /></el-icon>
+              <el-icon class="info-icon">
+                <Location />
+              </el-icon>
               <span class="info-label">经纬度：</span>
               <span class="info-value">{{ item.lat?.toFixed(4) }}, {{ item.lon?.toFixed(4) }}</span>
             </div>
-            <div class="info-item" v-if="item.content">
-              <el-icon class="info-icon"><InfoFilled /></el-icon>
-              <span class="info-label">内容：</span>
-              <span class="info-value">{{ item.content }}</span>
+            <!-- <div class="info-item" v-if="item.message">
+              <el-icon class="info-icon">
+                <InfoFilled />
+              </el-icon>
+          <span class="info-label">内容：</span>
+              <span class="info-value">{{ item.message }}</span>
+            </div> -->
+            <div style="margin-top:8px;">
+              <el-button type="primary" size="small" @click="openVideo(item)">查看视频</el-button>
             </div>
           </div>
         </div>
       </div>
     </el-card>
+    <el-dialog v-model="videoDialogVisible" title="查看视频" width="60%" append-to-body destroy-on-close>
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="单目" name="mono">
+          <template v-if="monoUrl">
+            <video :src="monoUrl" controls muted autoplay playsinline preload="metadata"
+              style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
+              v-if="activeTab === 'mono'" />
+          </template>
+          <el-empty v-else description="未找到单目视频" />
+        </el-tab-pane>
+        <el-tab-pane label="双目" name="stereo">
+          <template v-if="stereoUrl">
+            <video :src="stereoUrl" controls muted autoplay playsinline preload="metadata"
+              style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
+              v-if="activeTab === 'stereo'" />
+          </template>
+          <el-empty v-else description="未找到双目视频" />
+        </el-tab-pane>
+      </el-tabs>
+      <div v-if="videoError" style="margin-top:8px;color:#f56c6c;">{{ videoError }}</div>
+    </el-dialog>
   </section>
 </template>
 

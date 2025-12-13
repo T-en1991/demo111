@@ -51,7 +51,7 @@ async function selectAlarmFolder(): Promise<void> {
     // @ts-ignore
     const folderPath = await window.api.dialog.openDirectory()
     if (!folderPath) return
-    
+
     selectedAlarmFolder.value = folderPath
     // List alarm files in the folder
     // @ts-ignore
@@ -69,11 +69,11 @@ async function importAlarmData(): Promise<void> {
     ElMessage.warning('请先选择文件夹')
     return
   }
-  
+
   try {
     // @ts-ignore
     const result = await window.api.alarm.importFolder(selectedAlarmFolder.value)
-    
+
     if (result.ok > 0) {
       ElMessage.success(`成功导入 ${result.ok} 条报警记录`)
     }
@@ -83,7 +83,7 @@ async function importAlarmData(): Promise<void> {
     if (result.updated > 0) {
       ElMessage.info(`更新了 ${result.updated} 条报警记录`)
     }
-    
+
     // Clear selection after import
     clearAlarm()
   } catch (e) {
@@ -346,7 +346,7 @@ async function openWifi(): Promise<void> {
         <el-tab-pane label="视频上传" name="video">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">通过系统对话框选择本地视频文件（支持多选）</div>
+              <div class="el-upload__text">选择.mkv视频文件（支持多选）</div>
               <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
                 <el-button type="primary" @click="selectVideosAndSave">选择文件</el-button>
 
@@ -373,7 +373,7 @@ async function openWifi(): Promise<void> {
         <el-tab-pane label="数据上传" name="data">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">通过系统对话框选择本地 Excel 文件（支持多选）</div>
+              <div class="el-upload__text">选择csv文件（支持多选,通常tx开头文件）</div>
               <div style="margin-top:12px; display:flex; gap:8px;">
                 <el-button type="primary" @click="chooseFiles">选择文件</el-button>
                 <el-button type="primary" @click="importSelectedFiles">导入</el-button>
@@ -393,7 +393,6 @@ async function openWifi(): Promise<void> {
             </div>
           </div>
         </el-tab-pane>
-
         <el-tab-pane label="报警数据上传" name="alarm">
           <div class="upload-inline">
             <div class="upload-box">
