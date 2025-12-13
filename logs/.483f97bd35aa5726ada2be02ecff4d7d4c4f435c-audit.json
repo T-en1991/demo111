@@ -29,6 +29,21 @@
             "date": 1765262139100,
             "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-09.log",
             "hash": "ddaa2cd89c47787e36fbe749429917cb327f76cd6407d35e34bfd44a6d3506b3"
+        },
+        {
+            "date": 1765358653560,
+            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-10.log",
+            "hash": "04d5135677ef78ea332123700059e460a29958f800baa39d8a17b63ad487581e"
+        },
+        {
+            "date": 1765430928085,
+            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-11.log",
+            "hash": "019d36e40fa659de02f6c6e838b5166155acb010dd5b20b5755c4e9d982859b3"
+        },
+        {
+            "date": 1765604258596,
+            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-13.log",
+            "hash": "698c0af7864c9c30543fe6c1004797dd6aeafc20375140f8f4a3b4f1cdd328d7"
         }
     ],
     "hashType": "sha256"
