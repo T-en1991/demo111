@@ -16,7 +16,8 @@ const query = reactive({
 const items = ref<any[]>([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(12)
+const pageSize = ref(10)
+const loading = ref(false)
 
 function toFileUrl(p?: string | null): string | '' {
   if (!p) return ''
@@ -42,6 +43,7 @@ function formatTime(t: string | Date | null | undefined): string {
 }
 
 async function fetchAlerts(): Promise<void> {
+  loading.value = true
   // @ts-ignore
   const params: any = { page: page.value, pageSize: pageSize.value }
   if (Array.isArray(query.range) && query.range.length === 2) {
@@ -52,13 +54,25 @@ async function fetchAlerts(): Promise<void> {
   const res = await window.api.alert.list(params)
   items.value = Array.isArray(res?.items) ? res.items : []
   total.value = Number(res?.total) || 0
+  loading.value = false
 }
 
 function resetQuery(): void {
   query.range = []
 }
 async function applyQuery(): Promise<void> {
+  page.value = 1
   await fetchAlerts()
+}
+
+function onSizeChange(size: number): void {
+  pageSize.value = size
+  page.value = 1
+  fetchAlerts()
+}
+function onPageChange(p: number): void {
+  page.value = p
+  fetchAlerts()
 }
 
 onMounted(async () => {
@@ -72,7 +86,7 @@ const stereoUrl = ref<string>('')
 const videoError = ref<string>('')
 
 async function openVideo(item: any): Promise<void> {
-  const moment = item?.createdAt ? String(item.createdAt) : ''
+  const moment = item?.title || '';
   if (!moment) return
   // @ts-ignore
   const res = await window.api.video.findByMoment(moment)
@@ -84,8 +98,8 @@ async function openVideo(item: any): Promise<void> {
 }
 
 function onVideoError(e: Event): void {
-  const el = e.target as HTMLVideoElement
-  videoError.value = `无法播放：${el?.src || ''}`
+  // const el = e.target as HTMLVideoElement
+  // videoError.value = `无法播放：${el?.src || ''}`
 }
 </script>
 
@@ -111,7 +125,7 @@ function onVideoError(e: Event): void {
 
     <!-- 图库展示 -->
     <el-card class="gallery-card" shadow="never">
-      <div class="gallery-container">
+      <div class="gallery-container" v-loading="loading">
         <div v-for="item in items" :key="item.id" class="gallery-item">
           <!-- 图片展示 -->
           <div class="image-wrapper">
@@ -143,7 +157,7 @@ function onVideoError(e: Event): void {
                 <Calendar />
               </el-icon>
               <span class="info-label">时间：</span>
-              <span class="info-value">{{ formatTime(item.createdAt) }}</span>
+              <span class="info-value">{{ item.title }}</span>
             </div>
             <div class="info-item">
               <el-icon class="info-icon">
@@ -164,6 +178,10 @@ function onVideoError(e: Event): void {
             </div>
           </div>
         </div>
+      </div>
+      <div class="pagination" style="display: flex; justify-content: flex-end; padding-top: 12px">
+        <el-pagination background layout="total, sizes, prev, pager, next, jumper" :total="total" :page-size="pageSize"
+          :current-page="page" :page-sizes="[10, 20, 50]" @size-change="onSizeChange" @current-change="onPageChange" />
       </div>
     </el-card>
     <el-dialog v-model="videoDialogVisible" title="查看视频" width="60%" append-to-body destroy-on-close>

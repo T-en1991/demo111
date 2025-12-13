@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
-import { readdirSync, readFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { readdirSync, readFileSync, existsSync, statSync } from 'fs'
+import { join, dirname } from 'path'
 import logger from '../logger'
 import { alertService } from '../database'
 
@@ -76,8 +76,8 @@ function parseAlarmFile(
 }
 
 // 检查图片文件是否存在
-function checkImageExists(folderPath: string, imgName: string): boolean {
-  return existsSync(join(folderPath, imgName))
+function checkImageExists(baseDir: string, imgName: string): boolean {
+  return existsSync(join(baseDir, imgName))
 }
 
 // 查找或创建报警记录
@@ -88,31 +88,33 @@ async function findOrCreateAlert(alarmData: {
   img: string
   pos: { lat: number; lon: number }
   fileName: string
-  folderPath: string
+  filePath: string
 }): Promise<{ ok: boolean; updated: boolean }> {
   try {
     // 这里需要根据时间和报警文件作为判断条件，检查是否已存在相同的报警记录
     // 由于目前没有 findByTimeAndFile 方法，我们先获取所有记录并手动过滤
     const allAlerts = await alertService.findAll()
+    const baseDir = dirname(alarmData.filePath)
+    var filePath = checkImageExists(baseDir, alarmData.img) ? join(baseDir, alarmData.img) : null // 存储完整的图片文件路径
     const existingAlert = allAlerts.find((alert) => {
       // 简化判断：根据时间和图片文件名查找
       return (
-        alert.message?.includes(alarmData.img) &&
-        alert.createdAt?.toISOString().includes(alarmData.time.split(' ')[0])
+        alert.imgFile == filePath
+        // alert.message?.includes(alarmData.img) &&
+        // alert.createdAt?.toISOString().includes(alarmData.time.split(' ')[0])
       )
     })
 
     const titleFromImg = parseTimeFromFilename(alarmData.img)
+
     const alertPayload = {
       title: titleFromImg || `报警记录 - ${alarmData.id}`,
       message: `ID=${alarmData.id};C=${alarmData.c};IMG=${alarmData.img};POS=${alarmData.pos.lat},${alarmData.pos.lon}`,
       level: 'critical',
       type: 'alarm',
-      source: join(alarmData.folderPath, alarmData.fileName), // 存储完整的文件路径
+      source: alarmData.filePath,
       status: 'active',
-      imgFile: checkImageExists(alarmData.folderPath, alarmData.img)
-        ? join(alarmData.folderPath, alarmData.img)
-        : null, // 存储完整的图片文件路径
+      imgFile: filePath,
       lat: alarmData.pos.lat,
       lon: alarmData.pos.lon
     }
@@ -136,13 +138,22 @@ export function registerAlarmIpc(): void {
   // 列出文件夹中的报警文件
   ipcMain.handle('alarm:listFiles', async (_, folderPath: string) => {
     try {
-      const files = readdirSync(folderPath)
-      const alarmFiles = files
-        .filter((file) => file.startsWith('alerts_') && file.endsWith('.txt'))
-        .map((file) => ({
-          name: file
-        }))
-      return alarmFiles
+      const result: Array<{ name: string }> = []
+      const stack: string[] = [folderPath]
+      while (stack.length) {
+        const dir = stack.pop() as string
+        const entries = readdirSync(dir)
+        for (const name of entries) {
+          const p = join(dir, name)
+          const st = statSync(p)
+          if (st.isDirectory()) {
+            stack.push(p)
+          } else if (st.isFile() && name.toLowerCase().endsWith('.txt')) {
+            result.push({ name: p })
+          }
+        }
+      }
+      return result
     } catch (error) {
       logger.error('Failed to list alarm files:', error)
       return []
@@ -156,13 +167,24 @@ export function registerAlarmIpc(): void {
       let fail = 0
       let updated = 0
 
-      const files = readdirSync(folderPath)
-      const alarmTxtFiles = files.filter(
-        (file) => file.startsWith('alerts') && file.endsWith('.txt')
-      )
+      const alarmTxtFiles: string[] = []
+      const stack: string[] = [folderPath]
+      while (stack.length) {
+        const dir = stack.pop() as string
+        const entries = readdirSync(dir)
+        for (const name of entries) {
+          const p = join(dir, name)
+          const st = statSync(p)
+          if (st.isDirectory()) {
+            stack.push(p)
+          } else if (st.isFile() && name.toLowerCase().endsWith('.txt')) {
+            alarmTxtFiles.push(p)
+          }
+        }
+      }
 
-      for (const fileName of alarmTxtFiles) {
-        const filePath = join(folderPath, fileName)
+      for (const filePath of alarmTxtFiles) {
+        const fileName = filePath.split(/[\\/]/).pop() as string
         const content = readFileSync(filePath, 'utf8')
         const alarms = parseAlarmFile(content, fileName)
 
@@ -170,7 +192,7 @@ export function registerAlarmIpc(): void {
           const result = await findOrCreateAlert({
             ...alarm,
             fileName,
-            folderPath
+            filePath
           })
 
           if (result.ok) {

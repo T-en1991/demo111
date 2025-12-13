@@ -37,11 +37,14 @@ export const importService = {
     const wb = XLSX.readFile(filePath, { cellDates: true })
     const sheetName = wb.SheetNames[0]
     const ws = wb.Sheets[sheetName]
-    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { raw: false })
+    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, {
+      raw: true,
+      defval: null
+    })
     const norm = (s: string): string => s.trim().toLowerCase()
     const mapKey = (k: string): string => {
       const s = norm(k)
-      if (['utc_time', '时间'].includes(s)) return 'time'
+      if (['utc_time', 'uct_time', 'utc time', '时间'].includes(s)) return 'time'
       if (['lon_deg', '经度'].includes(s)) return 'lon'
       if (['lat_deg', '纬度'].includes(s)) return 'lat'
       if (['depth_m', '深度'].includes(s)) return 'depth'
@@ -70,7 +73,42 @@ export const importService = {
         obj[mapKey(k)] = row[k]
       })
       const t = obj.time
-      const time = t instanceof Date ? t : typeof t === 'string' ? new Date(t) : null
+      let time: Date | null = null
+      const makeCnDate = (
+        y: number,
+        mo: number,
+        d: number,
+        h: number,
+        mi: number,
+        s: number
+      ): Date => new Date(Date.UTC(y, mo - 1, d, h - 8, mi, s))
+      if (t instanceof Date) {
+        const y = t.getFullYear()
+        const mo = t.getMonth() + 1
+        const d = t.getDate()
+        const h = t.getHours()
+        const mi = t.getMinutes()
+        const s = t.getSeconds()
+        time = makeCnDate(y, mo, d, h, mi, s)
+      } else if (typeof t === 'string') {
+        const s = t.trim()
+        const m =
+          /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s) ||
+          /^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s)
+        if (m) {
+          const y = Number(m[1])
+          const mo = Number(m[2])
+          const d = Number(m[3])
+          const h = Number(m[4])
+          const mi = Number(m[5])
+          const sec = m[6] ? Number(m[6]) : 0
+          time = makeCnDate(y, mo, d, h, mi, sec)
+        } else {
+          time = null
+        }
+      } else {
+        time = null
+      }
       if (!time || isNaN(time.getTime())) return null
       const num = (v: unknown): number | null => (v == null || v === '' ? null : Number(v))
       return {
@@ -194,6 +232,10 @@ export const historyService = {
       azMs2: data.azMs2 ?? null
     }
 
+    const existing = await prisma.history.findFirst({ where: { time: timeValue } })
+    if (existing) {
+      return { inserted: 0, updated: 0, skipped: 1, record: existing }
+    }
     const rec = await prisma.history.create({ data: payload })
     return { inserted: 1, updated: 0, record: rec }
   },
@@ -653,11 +695,11 @@ export const videoService = {
             : data.recordedAt,
       endedAt:
         data.endedAt == null
-          ? (data.recordedAt == null
-              ? null
-              : typeof data.recordedAt === 'string'
-                ? new Date(new Date(data.recordedAt).getTime() + 30 * 60 * 1000)
-                : new Date((data.recordedAt as Date).getTime() + 30 * 60 * 1000))
+          ? data.recordedAt == null
+            ? null
+            : typeof data.recordedAt === 'string'
+              ? new Date(new Date(data.recordedAt).getTime() + 30 * 60 * 1000)
+              : new Date((data.recordedAt as Date).getTime() + 30 * 60 * 1000)
           : typeof data.endedAt === 'string'
             ? new Date(data.endedAt)
             : data.endedAt

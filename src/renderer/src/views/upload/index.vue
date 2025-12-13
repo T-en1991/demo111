@@ -396,7 +396,7 @@ async function openWifi(): Promise<void> {
         <el-tab-pane label="报警数据上传" name="alarm">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">通过系统对话框选择包含报警数据的文件夹</div>
+              <div class="el-upload__text">选择包含报警数据的文件夹(logs\anomaly_alerts)</div>
               <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
                 <el-button type="primary" @click="selectAlarmFolder">选择文件夹</el-button>
                 <el-button type="primary" @click="importAlarmData" :disabled="!selectedAlarmFolder">导入</el-button>

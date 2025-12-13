@@ -36,9 +36,16 @@ const loading = ref(false)
 // 历史记录列表
 const allItems = ref<AlertItem[]>([])
 
-// 格式化日期为字符串（YYYY-MM-DD HH:mm:ss）
-function formatDate(date: Date): string {
-  return date.toISOString().replace('T', ' ').slice(0, 19)
+// 本地时区格式化（YYYY-MM-DD HH:mm:ss）
+function formatDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${y}-${m}-${day} ${h}:${min}:${s}`
 }
 
 // 从数据库获取历史记录
