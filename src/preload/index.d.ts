@@ -18,12 +18,16 @@ declare global {
         create(data: {
           time: string
           content?: string
+          rawLine?: string | null
           lon?: number | null
           lat?: number | null
           depth?: number | null
           height?: number | null
           battery?: number | null
           signalStrength?: number | null
+          yawDeg?: number | null
+          pitchDeg?: number | null
+          rollDeg?: number | null
         }): Promise<any>
       }
       fish: {

@@ -34,6 +34,9 @@ model Fish {
   satcomPort2    Int?
   microwaveIp    String?
   microwavePort  Int?
+  // 声通定位基准
+  acousticLon    Float?
+  acousticLat    Float?
   alerts    Alert[]
   status    FishStatus @default(running)
   // 控制命令（可选）

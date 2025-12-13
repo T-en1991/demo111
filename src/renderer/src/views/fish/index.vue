@@ -32,6 +32,9 @@ interface Fish {
   satcomIp?: string
   satcomPort1?: number
   satcomPort2?: number
+  // 声通定位基准
+  acousticLon?: number
+  acousticLat?: number
 }
 
 // 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
@@ -65,6 +68,9 @@ type FishFromBackend = {
   satcomIp?: string | null
   satcomPort1?: number | null
   satcomPort2?: number | null
+  // 声通定位基准
+  acousticLon?: number | null
+  acousticLat?: number | null
   track?: unknown
 }
 
@@ -88,6 +94,8 @@ interface FishForm {
   satcomIp: string
   satcomPort1: number
   satcomPort2: number
+  acousticLon: number
+  acousticLat: number
   cmdUp: string
   cmdDown: string
   cmdSurf: string
@@ -204,7 +212,9 @@ async function loadFish(): Promise<void> {
         // 额外通信参数：优先使用后端字段，其次兼容旧的 description JSON
         satcomIp: f.satcomIp ?? extra.satcomIp,
         satcomPort1: f.satcomPort1 ?? extra.satcomPort1,
-        satcomPort2: f.satcomPort2 ?? extra.satcomPort2
+        satcomPort2: f.satcomPort2 ?? extra.satcomPort2,
+        acousticLon: f.acousticLon ?? undefined,
+        acousticLat: f.acousticLat ?? undefined
       }
     })
     allFish.value = normalized
@@ -236,6 +246,8 @@ const form = reactive<FishForm>({
   satcomIp: '192.178.1.212',
   satcomPort1: 9200,
   satcomPort2: 9201,
+  acousticLon: 0,
+  acousticLat: 0,
   cmdUp: '',
   cmdDown: '',
   cmdSurf: '',
@@ -264,6 +276,8 @@ function openCreate(): void {
     satcomIp: '192.178.1.212',
     satcomPort1: 9200,
     satcomPort2: 9201,
+    acousticLon: 0,
+    acousticLat: 0,
     cmdUp: '+++AT*SENDIM,2,2,ack,UP',
     cmdDown: '+++AT*SENDIM,4,2,ack,DOWN',
     cmdSurf: '+++AT*SENDIM,4,2,ack,SURF',
@@ -294,6 +308,8 @@ function openEdit(row: Fish): void {
     satcomIp: row.satcomIp ?? '',
     satcomPort1: row.satcomPort1 ?? 0,
     satcomPort2: row.satcomPort2 ?? 0,
+    acousticLon: row.acousticLon ?? 0,
+    acousticLat: row.acousticLat ?? 0,
     // 从后端读取的命令与描述
     cmdUp: row.upCommand ?? '',
     cmdDown: row.downCommand ?? '',
@@ -381,6 +397,8 @@ async function save(): Promise<void> {
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
+        acousticLon: form.acousticLon || null,
+        acousticLat: form.acousticLat || null,
         upCommand: form.cmdUp || null,
         downCommand: form.cmdDown || null,
         surfCommand: form.cmdSurf || null,
@@ -417,6 +435,8 @@ async function save(): Promise<void> {
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
+        acousticLon: form.acousticLon || null,
+        acousticLat: form.acousticLat || null,
         upCommand: form.cmdUp || null,
         downCommand: form.cmdDown || null,
         surfCommand: form.cmdSurf || null,
@@ -580,6 +600,31 @@ function formatDate(input?: string | Date | null): string {
                 :min="0"
                 :max="65535"
                 controls-position="right"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <!-- 第三行：声通定位基准 -->
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="声通基准经度">
+              <el-input-number
+                v-model="form.acousticLon"
+                :precision="6"
+                :step="0.000001"
+                controls-position="right"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="声通基准纬度">
+              <el-input-number
+                v-model="form.acousticLat"
+                :precision="6"
+                :step="0.000001"
+                controls-position="right"
+                style="width: 100%"
               />
             </el-form-item>
           </el-col>

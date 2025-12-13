@@ -466,6 +466,8 @@ export const fishService = {
     satcomPort2?: number | null
     microwaveIp?: string | null
     microwavePort?: number | null
+    acousticLon?: number | null
+    acousticLat?: number | null
     type?: string
     status?: 'running' | 'stopped'
     ascendCommand?: string | null
@@ -498,6 +500,8 @@ export const fishService = {
       satcomPort2: data.satcomPort2 ?? null,
       microwaveIp: data.microwaveIp ?? null,
       microwavePort: data.microwavePort ?? null,
+      acousticLon: data.acousticLon ?? null,
+      acousticLat: data.acousticLat ?? null,
       ascendCommand: data.ascendCommand ?? null,
       descendCommand: data.descendCommand ?? null,
       forwardCommand: data.forwardCommand ?? null,
@@ -603,6 +607,8 @@ export const fishService = {
       satcomPort2?: number | null
       microwaveIp?: string | null
       microwavePort?: number | null
+      acousticLon?: number | null
+      acousticLat?: number | null
       type?: string
       status?: 'running' | 'stopped'
       ascendCommand?: string | null

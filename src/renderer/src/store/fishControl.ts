@@ -26,6 +26,8 @@ export interface Fish {
   lightOnCommand?: string | null
   lightOffCommand?: string | null
   wifiCommand?: string | null
+  acousticLon?: number | null
+  acousticLat?: number | null
 }
 
 export const useFishControlStore = defineStore('fishControl', () => {

@@ -60,6 +60,8 @@ export function registerDatabaseIpc(): void {
         satcomPort2?: number | null
         microwaveIp?: string | null
         microwavePort?: number | null
+        acousticLon?: number | null
+        acousticLat?: number | null
         type?: string
         status?: 'running' | 'stopped'
         ascendCommand?: string | null
@@ -101,6 +103,8 @@ export function registerDatabaseIpc(): void {
         satcomPort2?: number | null
         microwaveIp?: string | null
         microwavePort?: number | null
+        acousticLon?: number | null
+        acousticLat?: number | null
         type?: string
         status?: 'running' | 'stopped'
         ascendCommand?: string | null

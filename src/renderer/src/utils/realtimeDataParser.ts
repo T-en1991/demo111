@@ -1,5 +1,16 @@
 import { Fish } from '../store/fishControl'
 
+// Shared state for USBL data merging
+let lastUsblData: {
+  east: number
+  north: number
+  rawLine: string
+  time: number
+} | null = null
+
+// Shared state for throttling (fishId -> timestamp)
+const lastProcessedTime = new Map<number, number>()
+
 export interface ParserContext {
   fish: Fish
   ip: string
@@ -50,7 +61,7 @@ class RealtimeDataParser {
     for (const strategy of this.strategies) {
       if (strategy.match(data)) {
         try {
-          console.debug(`[RealtimeDataParser] Strategy '${strategy.name}' matched.`)
+          // console.debug(`[RealtimeDataParser] Strategy '${strategy.name}' matched.`)
           await strategy.handle(data, context)
           handled = true
           // 如果只需要第一个匹配的策略处理，可以在这里 break
@@ -133,6 +144,48 @@ export class GpsDataStrategy implements DataParseStrategy {
   }
 }
 
+/**
+ * USBL数据解析策略
+ * 解析 USBLLONG 数据并缓存，供 STAT 数据合并使用
+ */
+export class UsblDataStrategy implements DataParseStrategy {
+  name = 'UsblParser'
+  priority = 25 // 比 STAT 优先级高，或者独立匹配
+
+  match(data: string): boolean {
+    return data.includes('USBLLONG')
+  }
+
+  async handle(data: string, _context: ParserContext): Promise<void> {
+    void _context // 避免未使用的变量报错
+    try {
+      // 1. 过滤重复数据：如果在短时间内（如1秒）已经收到过 USBL 数据，则忽略后续的（取第一条）
+      if (lastUsblData && (Date.now() - lastUsblData.time < 2000)) {
+        return
+      }
+
+      // 示例: +++AT:132:USBLLONG,1325384364.662679,1325384364.401149,2,0.0234,0.3407,-0.1417,-0.3286,0.0800,-0.1494,-0.0178,0.1164,1.3498,247,-16,388,0.0116
+      // 索引 7 为运动补偿后的东向坐标 (East)，索引 8 为运动补偿后的北向坐标 (North)
+      const parts = data.split(',')
+      if (parts.length >= 9) {
+        const east = parseFloat(parts[7])
+        const north = parseFloat(parts[8])
+        if (!isNaN(east) && !isNaN(north)) {
+          lastUsblData = {
+            east,
+            north,
+            rawLine: data,
+            time: Date.now()
+          }
+          console.log('[UsblParser] Cached USBL data:', { east, north })
+        }
+      }
+    } catch (e) {
+      console.error('[UsblParser] Failed to parse USBL data:', e)
+    }
+  }
+}
+
 export class StatDataStrategy implements DataParseStrategy {
   name = 'StatParser'
   priority = 20
@@ -143,6 +196,19 @@ export class StatDataStrategy implements DataParseStrategy {
 
   async handle(data: string, context: ParserContext): Promise<void> {
     try {
+      const { fish } = context
+
+      // 时间过滤：检查距离上次处理是否超过 3000ms
+      const now = Date.now()
+      const lastTime = lastProcessedTime.get(fish.id) || 0
+      if (now - lastTime < 3000) {
+        return // 忽略频繁数据
+      }
+      lastProcessedTime.set(fish.id, now)
+
+      // 2. 等待 2000ms，以确保如果 USBL 数据稍晚到达也能被捕获（整合数据）
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
       // 格式: STAT,yaw,pitch,roll,lon,lat,depth,height,signalStrength,battery,time
       // 示例: STAT,0.00,0.00,0.00,0.000000,0.000000,0.00,0.00,323,-1,2025-12-13 14:55:32
       const parts = data.split(',')
@@ -150,19 +216,38 @@ export class StatDataStrategy implements DataParseStrategy {
         const yawDeg = parseFloat(parts[1])
         const pitchDeg = parseFloat(parts[2])
         const rollDeg = parseFloat(parts[3])
-        const lon = parseFloat(parts[4])
-        const lat = parseFloat(parts[5])
+        let lon = parseFloat(parts[4])
+        let lat = parseFloat(parts[5])
         const depth = parseFloat(parts[6])
         const height = parseFloat(parts[7])
         const signalStrength = parseFloat(parts[8])
         const battery = parseFloat(parts[9])
         const timeStr = parts[10]
 
+        let usblRawLine: string | null = null
+
+        // 如果有缓存的 USBL 数据且足够新鲜（例如 5秒内），则计算真实经纬度
+        // 并将 USBL 原始数据存入 content 字段
+        if (lastUsblData && (now - lastUsblData.time < 5000)) {
+          // 确保鱼配置中有声通基准坐标
+          console.log(fish.acousticLon , fish.acousticLat,11111)
+          if (fish.acousticLon && fish.acousticLat) {
+             const R_EARTH = 6378137
+             const dLat = lastUsblData.north / R_EARTH
+             const dLon = lastUsblData.east / (R_EARTH * Math.cos(fish.acousticLat * Math.PI / 180))
+
+             lat = fish.acousticLat + (dLat * 180 / Math.PI)
+             lon = fish.acousticLon + (dLon * 180 / Math.PI)
+
+             usblRawLine = lastUsblData.rawLine
+          }
+        }
+
         // 入库
         await window.api.history.create({
           time: timeStr,
-          content: data, // 原始内容作为元数据
-          rawLine: data,
+          content: usblRawLine ?? undefined, // 存入 USBL 原始数据
+          rawLine: data,        // 存入 STAT 原始数据
           lon,
           lat,
           depth,
@@ -188,3 +273,4 @@ export const realtimeDataParser = new RealtimeDataParser()
 // 注册示例策略（实际使用时可以按需注册）
 realtimeDataParser.registerStrategy(new GpsDataStrategy())
 realtimeDataParser.registerStrategy(new StatDataStrategy())
+realtimeDataParser.registerStrategy(new UsblDataStrategy())
