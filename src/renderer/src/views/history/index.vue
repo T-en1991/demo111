@@ -12,6 +12,7 @@ interface AlertItem {
   signalStrength?: number
   time: string
   content?: string
+  rawLine?: string
 }
 
 // 默认时间范围：昨天零点 到 今天此时此刻
@@ -65,7 +66,8 @@ async function fetchData(): Promise<void> {
       battery: item.battery,
       signalStrength: item.signalStrength,
       time: formatDate(new Date(item.time)),
-      content: item.content
+      content: item.content,
+      rawLine: item.rawLine
     }))
 
     // 按时间倒序排序
@@ -116,11 +118,31 @@ function onPageChange(p: number): void {
 const detailVisible = ref(false)
 const detailItem = ref<AlertItem | null>(null)
 const activeTab = ref('mono')
+const monoUrl = ref('')
+const stereoUrl = ref('')
+
+function toVideoUrl(p: string): string {
+  const norm = p.replace(/\\/g, '/')
+  return `http://localhost:18081/video?path=${encodeURIComponent(norm)}`
+}
 
 function openDetail(row: AlertItem): void {
+  console.debug('openDetail', row)
   detailItem.value = row
   detailVisible.value = true
   activeTab.value = 'mono'
+  monoUrl.value = ''
+  stereoUrl.value = ''
+  window.api.video
+    .findByMoment(row.time)
+    .then((res) => {
+      if (res?.mono?.path) monoUrl.value = toVideoUrl(res.mono.path)
+      if (res?.stereo?.path) stereoUrl.value = toVideoUrl(res.stereo.path)
+      if (!monoUrl.value && stereoUrl.value) activeTab.value = 'stereo'
+    })
+    .catch((e) => {
+      console.error('findByMoment failed', e)
+    })
 }
 
 function closeDetail(): void {
@@ -176,14 +198,8 @@ onMounted(() => {
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="88px">
         <el-form-item label="时间范围">
-          <el-date-picker
-            v-model="query.range"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            unlink-panels
-          />
+          <el-date-picker v-model="query.range" type="daterange" range-separator="至" start-placeholder="开始日期"
+            end-placeholder="结束日期" unlink-panels />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="applyQuery">查询</el-button>
@@ -193,14 +209,8 @@ onMounted(() => {
     </el-card>
 
     <el-card class="table-card" shadow="never">
-      <el-table
-        :data="currentPageData"
-        border
-        stripe
-        style="width: 100%"
-        v-loading="loading"
-        height="560"
-      >
+      <el-table :data="currentPageData" border stripe style="width: 100%" v-loading="loading" height="560">
+
         <el-table-column prop="id" label="ID" />
         <el-table-column prop="lon" label="经度" />
         <el-table-column prop="lat" label="纬度" />
@@ -209,6 +219,8 @@ onMounted(() => {
         <el-table-column prop="rollAngle" label="横滚角" />
         <el-table-column prop="pitchAngle" label="俯仰角" />
         <el-table-column prop="yawAngle" label="偏航角" />
+        <el-table-column prop="battery" label="电量" />
+        <el-table-column prop="signalStrength" label="信号强度" />
         <!-- <el-table-column prop="content" label="内容" min-width="240" /> -->
         <el-table-column prop="time" label="时间" />
         <el-table-column label="操作" width="120" fixed="right">
@@ -218,20 +230,12 @@ onMounted(() => {
         </el-table-column>
       </el-table>
       <div class="pagination">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          :page-size="pageSize"
-          :current-page="page"
-          :page-sizes="[10, 20, 50]"
-          @size-change="onSizeChange"
-          @current-change="onPageChange"
-        />
+        <el-pagination background layout="total, sizes, prev, pager, next, jumper" :total="total" :page-size="pageSize"
+          :current-page="page" :page-sizes="[10, 20, 50]" @size-change="onSizeChange" @current-change="onPageChange" />
       </div>
     </el-card>
 
-    <el-dialog v-model="detailVisible" width="80vw" class="history-dialog">
+    <el-dialog v-model="detailVisible" width="80vw" class="history-dialog" append-to-body destroy-on-close>
       <template #header>
         <div class="detail-header">
           <div class="line1">
@@ -251,39 +255,45 @@ onMounted(() => {
             <span class="sep">•</span>
             <span class="meta-item">高度: {{ detailItem?.height ?? '-' }}</span>
             <span class="sep">•</span>
-            <span class="meta-item"
-              >电量:
-              <span :class="batteryClass(detailItem?.battery)"
-                >{{ detailItem?.battery ?? '-' }}%</span
-              ></span
-            >
+            <span class="meta-item">电量:
+              <span :class="batteryClass(detailItem?.battery)">{{ detailItem?.battery ?? '-' }}%</span></span>
             <span class="sep">•</span>
-            <span class="meta-item"
-              >信号:
-              <span :class="signalClass(detailItem?.signalStrength)"
-                >{{ detailItem?.signalStrength ?? '-' }} dBm</span
-              ></span
-            >
+            <span class="meta-item">信号:
+              <span :class="signalClass(detailItem?.signalStrength)">{{ detailItem?.signalStrength ?? '-' }}
+                dBm</span></span>
           </div>
         </div>
       </template>
 
-      <div class="map-pane" style="margin-top: 8px">
+      <div class="video-pane" style="margin-top: 8px">
+        <el-tabs v-model="activeTab">
+          <el-tab-pane label="单目" name="mono">
+            <template v-if="monoUrl">
+              <video :src="monoUrl" controls autoplay style="width: 100%; max-height: 52vh; background: #000" />
+            </template>
+            <el-empty v-else description="未找到单目视频" />
+          </el-tab-pane>
+          <el-tab-pane label="双目" name="stereo">
+            <template v-if="stereoUrl">
+              <video :src="stereoUrl" controls autoplay style="width: 100%; max-height: 52vh; background: #000" />
+            </template>
+            <el-empty v-else description="未找到双目视频" />
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+
+      <!-- <div class="map-pane" style="margin-top: 8px">
         <div v-if="detailItem?.lat != null && detailItem?.lon != null">
-          <iframe
-            :src="
-              baiduMarkerUrl(
-                detailItem!.lat!,
-                detailItem!.lon!,
-                detailItem!.content,
-                detailItem!.time
-              )
-            "
-            style="width: 100%; height: 420px; border: 0; border-radius: 8px"
-          />
+          <iframe :src="baiduMarkerUrl(
+            detailItem!.lat!,
+            detailItem!.lon!,
+            detailItem!.content,
+            detailItem!.time
+          )
+            " style="width: 100%; height: 420px; border: 0; border-radius: 8px" />
         </div>
         <el-empty v-else description="暂无坐标信息，无法在地图上标注" />
-      </div>
+      </div> -->
       <template #footer>
         <el-button @click="closeDetail">关闭</el-button>
       </template>

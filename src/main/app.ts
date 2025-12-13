@@ -7,6 +7,7 @@ import { prisma } from './database/index'
 
 import { stopAllListeners } from './network/tcpManager'
 import { startRtspRelay, stopRtspRelay } from './rtspRelay'
+import { startFileServer } from './fileServer'
 
 export async function setupApp(): Promise<void> {
   // Check for single instance lock
@@ -70,6 +71,13 @@ export async function setupApp(): Promise<void> {
     }
   } catch (error) {
     console.error('启动RTSP流时出错:', error)
+  }
+
+  // 启动本地文件视频服务，用于在渲染进程播放本地视频文件
+  try {
+    startFileServer(18081)
+  } catch (e) {
+    logger.error('Failed to start file server:', e)
   }
 
   app.on('before-quit', async () => {

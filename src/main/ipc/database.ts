@@ -162,6 +162,7 @@ export function registerDatabaseIpc(): void {
       data: {
         time: string
         content?: string
+        rawLine?: string | null
         lon?: number | null
         lat?: number | null
         depth?: number | null
@@ -190,6 +191,7 @@ export function registerDatabaseIpc(): void {
         size?: number | null
         camera?: 'mono' | 'stereo' | 'unknown'
         recordedAt?: string | Date | null
+        endedAt?: string | Date | null
       }
     ) => {
       try {
@@ -200,6 +202,15 @@ export function registerDatabaseIpc(): void {
       }
     }
   )
+
+  ipcMain.handle('video:findByMoment', async (_, moment: string) => {
+    try {
+      return await videoService.findByMoment(moment)
+    } catch (error) {
+      console.error('Error finding video by moment:', error)
+      throw error
+    }
+  })
 
   ipcMain.handle(
     'video:list',

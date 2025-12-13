@@ -34,6 +34,7 @@ const api = {
     create(data: {
       time: string
       content?: string
+      rawLine?: string | null
       lon?: number | null
       lat?: number | null
       depth?: number | null
@@ -73,11 +74,15 @@ const api = {
       size?: number | null
       camera?: 'mono' | 'stereo' | 'unknown'
       recordedAt?: string | Date | null
+      endedAt?: string | Date | null
     }): Promise<any> {
       return ipcRenderer.invoke('video:create', data)
     },
     list(params: { page?: number; pageSize?: number; keyword?: string } = {}): Promise<any> {
       return ipcRenderer.invoke('video:list', params)
+    },
+    findByMoment(moment: string): Promise<{ mono: any | null; stereo: any | null }> {
+      return ipcRenderer.invoke('video:findByMoment', moment)
     },
     get(id: number): Promise<any> {
       return ipcRenderer.invoke('video:get', id)

@@ -31,7 +31,7 @@ export const importService = {
       throw new Error(`File not found: ${filePath}`)
     }
     const ext = extname(filePath).toLowerCase()
-    if (ext !== '.xlsx' && ext !== '.xls') {
+    if (ext !== '.xlsx' && ext !== '.xls' && ext !== '.csv') {
       throw new Error('Unsupported file extension: ' + ext)
     }
     const wb = XLSX.readFile(filePath, { cellDates: true })
@@ -41,20 +41,21 @@ export const importService = {
     const norm = (s: string): string => s.trim().toLowerCase()
     const mapKey = (k: string): string => {
       const s = norm(k)
-      if (['time_wall', '时间'].includes(s)) return 'time'
-      if (['fused_lon', '经度'].includes(s)) return 'lon'
-      if (['fused_lat', '纬度'].includes(s)) return 'lat'
-      if (['depth[m]', '深度'].includes(s)) return 'depth'
-      if (['dvl_alt[m]', '高度', 'alt', 'dvl_alt[m]'].includes(s)) return 'height'
-      if (['battery', '电量'].includes(s)) return 'battery'
-      if (['signalstrength', '信号强度', 'signal'].includes(s)) return 'signalStrength'
+      if (['utc_time', '时间'].includes(s)) return 'time'
+      if (['lon_deg', '经度'].includes(s)) return 'lon'
+      if (['lat_deg', '纬度'].includes(s)) return 'lat'
+      if (['depth_m', '深度'].includes(s)) return 'depth'
+      if (['alt_m', '高度', 'alt', 'dvl_alt[m]'].includes(s)) return 'height'
+      if (['battery_percent', '电量'].includes(s)) return 'battery'
+      if (['si', '信号强度', 'signal'].includes(s)) return 'signalStrength'
       if (['content', '内容'].includes(s)) return 'content'
-      if (['roll[deg]', '横滚角', 'roll'].includes(s)) return 'rollDeg'
-      if (['pitch[deg]', '俯仰角', 'pitch'].includes(s)) return 'pitchDeg'
-      if (['yaw[deg]', '偏航角', 'yaw'].includes(s)) return 'yawDeg'
-      if (['ax[m/s^2]', '角速度x', 'ax'].includes(s)) return 'axMs2'
-      if (['ay[m/s^2]', '角速度y', 'ay'].includes(s)) return 'ayMs2'
-      if (['az[m/s^2]', '角速度z', 'az'].includes(s)) return 'azMs2'
+      if (['roll_deg', '横滚角', 'roll'].includes(s)) return 'rollDeg'
+      if (['pitch_deg', '俯仰角', 'pitch'].includes(s)) return 'pitchDeg'
+      if (['yaw_deg', '偏航角', 'yaw'].includes(s)) return 'yawDeg'
+      if (['raw_line', '元数据', 'raw', '原始行'].includes(s)) return 'rawLine'
+      // if (['ax[m/s^2]', '角速度x', 'ax'].includes(s)) return 'axMs2'
+      // if (['ay[m/s^2]', '角速度y', 'ay'].includes(s)) return 'ayMs2'
+      // if (['az[m/s^2]', '角速度z', 'az'].includes(s)) return 'azMs2'
       return k
     }
 
@@ -75,6 +76,7 @@ export const importService = {
       return {
         time,
         content: obj.content ?? null,
+        rawLine: obj.rawLine ?? null,
         lon: num(obj.lon),
         lat: num(obj.lat),
         depth: num(obj.depth),
@@ -97,23 +99,8 @@ export const importService = {
     const chunk = 500
     for (let i = 0; i < payloads.length; i += chunk) {
       const part = payloads.slice(i, i + chunk)
-      // @ts-ignore: History uses time as unique key
-      const ops = part.map((p) => prisma.history.findUnique({ where: { time: p.time } }))
-      const exists = await prisma.$transaction(ops)
-      // Use the existence check results to perform update by id or create.
-      const ops2 = part.map((p, idx) => {
-        const e = exists[idx]
-        if (e && e.id) {
-          // update by id to avoid relying on time unique where clause in generated client
-          return prisma.history.update({ where: { id: e.id }, data: p })
-        }
-        return prisma.history.create({ data: p })
-      })
-      await prisma.$transaction(ops2)
-      exists.forEach((e) => {
-        if (e) updated++
-        else inserted++
-      })
+      const res = await prisma.history.createMany({ data: part as any })
+      inserted += res.count
     }
 
     failed = rows.length - (inserted + updated)
@@ -170,10 +157,11 @@ export const userService = {
 
 // History CRUD 操作
 export const historyService = {
-  // 创建历史记录（如果存在则更新，否则创建）
+  // 创建历史记录（允许相同 time 多条记录）
   async create(data: {
     time: Date | string
     content?: string | null
+    rawLine?: string | null
     lon?: number | null
     lat?: number | null
     depth?: number | null
@@ -191,6 +179,7 @@ export const historyService = {
     const payload = {
       time: timeValue,
       content: data.content ?? null,
+      rawLine: data.rawLine ?? null,
       lon: data.lon ?? null,
       lat: data.lat ?? null,
       depth: data.depth ?? null,
@@ -205,26 +194,19 @@ export const historyService = {
       azMs2: data.azMs2 ?? null
     }
 
-    // First check existence by unique time key
-    // @ts-ignore - Prisma History model typing
-    const existing = await prisma.history.findUnique({ where: { time: timeValue } })
-    if (existing) {
-      // update
-      const rec = await prisma.history.update({ where: { time: timeValue }, data: payload })
-      return { inserted: 0, updated: 1, record: rec }
-    }
-    // create
     const rec = await prisma.history.create({ data: payload })
     return { inserted: 1, updated: 0, record: rec }
   },
 
   // 获取历史记录列表（支持分页和时间范围）
-  async list(params: {
-    page?: number
-    pageSize?: number
-    startTime?: string
-    endTime?: string
-  } = {}): Promise<{
+  async list(
+    params: {
+      page?: number
+      pageSize?: number
+      startTime?: string
+      endTime?: string
+    } = {}
+  ): Promise<{
     items: any[]
     total: number
     page: number
@@ -297,12 +279,14 @@ export const alertService = {
   },
 
   // 获取告警列表（支持分页和时间范围）
-  async list(params: {
-    page?: number
-    pageSize?: number
-    startTime?: string
-    endTime?: string
-  } = {}): Promise<{
+  async list(
+    params: {
+      page?: number
+      pageSize?: number
+      startTime?: string
+      endTime?: string
+    } = {}
+  ): Promise<{
     items: any[]
     total: number
     page: number
@@ -653,6 +637,7 @@ export const videoService = {
     size?: number | null
     camera?: 'mono' | 'stereo' | 'unknown'
     recordedAt?: Date | string | null
+    endedAt?: Date | string | null
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }): Promise<any> {
     const payload = {
@@ -665,13 +650,26 @@ export const videoService = {
           ? null
           : typeof data.recordedAt === 'string'
             ? new Date(data.recordedAt)
-            : data.recordedAt
+            : data.recordedAt,
+      endedAt:
+        data.endedAt == null
+          ? (data.recordedAt == null
+              ? null
+              : typeof data.recordedAt === 'string'
+                ? new Date(new Date(data.recordedAt).getTime() + 30 * 60 * 1000)
+                : new Date((data.recordedAt as Date).getTime() + 30 * 60 * 1000))
+          : typeof data.endedAt === 'string'
+            ? new Date(data.endedAt)
+            : data.endedAt
     }
     // Try to find existing record by path. Use findFirst to avoid requiring a unique index on `path`.
     // If found, update the existing record; otherwise create a new one.
     const existing = await prisma.video.findFirst({ where: { path: data.path } as any })
     if (existing && (existing as any).id) {
-      const rec = await prisma.video.update({ where: { id: (existing as any).id }, data: payload as any })
+      const rec = await prisma.video.update({
+        where: { id: (existing as any).id },
+        data: payload as any
+      })
       return { inserted: 0, updated: 1, record: rec }
     }
 
@@ -679,6 +677,28 @@ export const videoService = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec = await prisma.video.create({ data: payload as any })
     return { inserted: 1, updated: 0, record: rec }
+  },
+  async findByMoment(moment: Date | string): Promise<{ mono: any | null; stereo: any | null }> {
+    const t = typeof moment === 'string' ? new Date(moment) : moment
+    const whereBase: any = {
+      recordedAt: { lte: t }
+    }
+    const intervalFilter: any = {
+      OR: [{ endedAt: null }, { endedAt: { gte: t } }]
+    }
+    const [mono, stereo] = await Promise.all([
+      // @ts-ignore: Video model not recognized by client yet
+      prisma.video.findFirst({
+        where: { ...whereBase, ...intervalFilter, camera: 'mono' } as any,
+        orderBy: { recordedAt: 'desc' } as any
+      }),
+      // @ts-ignore: Video model not recognized by client yet
+      prisma.video.findFirst({
+        where: { ...whereBase, ...intervalFilter, camera: 'stereo' } as any,
+        orderBy: { recordedAt: 'desc' } as any
+      })
+    ])
+    return { mono, stereo }
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async list(params: { page?: number; pageSize?: number; keyword?: string }): Promise<any> {
@@ -722,13 +742,15 @@ export const systemLogService = {
     })
   },
 
-  async list(params: {
-    page?: number
-    pageSize?: number
-    startTime?: string
-    endTime?: string
-    type?: string
-  } = {}) {
+  async list(
+    params: {
+      page?: number
+      pageSize?: number
+      startTime?: string
+      endTime?: string
+      type?: string
+    } = {}
+  ) {
     const { page = 1, pageSize = 20, startTime, endTime, type } = params
     const skip = (page - 1) * pageSize
     const where: Prisma.SystemLogWhereInput = {}
@@ -765,4 +787,3 @@ export const systemLogService = {
     return prisma.systemLog.deleteMany()
   }
 }
-

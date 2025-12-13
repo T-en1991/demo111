@@ -31,6 +31,7 @@ declare global {
           size?: number | null
           camera?: 'mono' | 'stereo' | 'unknown'
           recordedAt?: string | Date | null
+          endedAt?: string | Date | null
         }): Promise<any>
         list(params?: { page?: number; pageSize?: number; keyword?: string }): Promise<{
           items: Array<{
@@ -40,12 +41,14 @@ declare global {
             size: number | null
             camera: 'mono' | 'stereo' | 'unknown'
             recordedAt: Date | null
+            endedAt?: Date | null
             createdAt: Date
           }>
           total: number
           page: number
           pageSize: number
         }>
+        findByMoment(moment: string): Promise<{ mono: any | null; stereo: any | null }>
         get(id: number): Promise<any>
         delete(id: number): Promise<any>
       }
