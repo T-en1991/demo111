@@ -3,6 +3,7 @@ import { app, BrowserWindow } from 'electron'
 import { setupApp } from './app'
 import { createMainWindow } from './windows/mainWindow'
 import { registerIpc } from './ipc'
+import { startSerialAutoListener } from './ipc/serial'
 import { startListenersForAllFish } from './network/tcpManager'
 import logger from './logger'
 async function bootstrap(): Promise<void> {
@@ -13,6 +14,8 @@ async function bootstrap(): Promise<void> {
   // Create main window and register IPC handlers
   createMainWindow()
   registerIpc()
+  // 根据持久化配置自动开始串口监听 SURF
+  startSerialAutoListener().catch((err) => logger.error('Failed to start serial auto listener:', err))
   // Start TCP listeners for fish that have ip/port configured
   startListenersForAllFish().catch((err) => logger.error('Failed to start fish listeners:', err))
 

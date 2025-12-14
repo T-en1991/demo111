@@ -35,6 +35,8 @@ interface Fish {
   // 声通定位基准
   acousticLon?: number
   acousticLat?: number
+  // 持久化的串口选择（用于 SURF 自动监听）
+  microwaveIp?: string
 }
 
 // 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
@@ -72,6 +74,8 @@ type FishFromBackend = {
   acousticLon?: number | null
   acousticLat?: number | null
   track?: unknown
+  // 后端持久化的串口字段
+  microwaveIp?: string | null
 }
 
 // 轨迹点类型（仅前端使用，不持久化）
@@ -115,6 +119,9 @@ interface FishForm {
 // 响应式数据
 const allFish = ref<Fish[]>([])
 const loading = ref(false)
+// 串口下拉（仅一个字段，无刷新/连接/断开）
+const comPorts = ref<Array<{ path: string; manufacturer?: string; serialNumber?: string }>>([])
+const selectedCom = ref<string>('')
 
 // 取消查询与分页：不再需要 query 与重置逻辑
 
@@ -214,7 +221,9 @@ async function loadFish(): Promise<void> {
         satcomPort1: f.satcomPort1 ?? extra.satcomPort1,
         satcomPort2: f.satcomPort2 ?? extra.satcomPort2,
         acousticLon: f.acousticLon ?? undefined,
-        acousticLat: f.acousticLat ?? undefined
+        acousticLat: f.acousticLat ?? undefined,
+        // 持久化串口
+        microwaveIp: f.microwaveIp ?? undefined
       }
     })
     allFish.value = normalized
@@ -223,6 +232,15 @@ async function loadFish(): Promise<void> {
     ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载串口列表（用于编辑对话框中的下拉）
+async function loadSerialPorts(): Promise<void> {
+  try {
+    comPorts.value = await window.api.serial.list()
+  } catch (e) {
+    console.error('枚举串口失败', e)
   }
 }
 
@@ -293,6 +311,9 @@ function openCreate(): void {
     description: '',
     track: []
   })
+  // 串口：默认清空或选择列表第一个
+  selectedCom.value = ''
+  loadSerialPorts()
   dialogVisible.value = true
 }
 
@@ -326,6 +347,9 @@ function openEdit(row: Fish): void {
     description: row.description ?? '',
     track: (row.track ?? []).map((p) => ({ ...p }))
   })
+  // 串口：使用后端持久化字段 microwaveIp 作为默认选择
+  selectedCom.value = row.microwaveIp ?? ''
+  loadSerialPorts()
   dialogVisible.value = true
 }
 
@@ -399,7 +423,9 @@ async function save(): Promise<void> {
         satcomPort2: form.satcomPort2 || null,
         acousticLon: form.acousticLon || null,
         acousticLat: form.acousticLat || null,
+        microwaveIp: selectedCom.value || null,
         upCommand: form.cmdUp || null,
+
         downCommand: form.cmdDown || null,
         surfCommand: form.cmdSurf || null,
         forwardCommand: form.cmdForward || null,
@@ -415,11 +441,11 @@ async function save(): Promise<void> {
         description: form.description || null,
         track: form.track.length
           ? form.track.map((p) => ({
-              lon: round6(p.lon),
-              lat: round6(p.lat),
-              alt: p.alt,
-              depth: p.depth
-            }))
+            lon: round6(p.lon),
+            lat: round6(p.lat),
+            alt: p.alt,
+            depth: p.depth
+          }))
           : []
       })
       ElMessage.success('已更新机器鱼')
@@ -437,6 +463,7 @@ async function save(): Promise<void> {
         satcomPort2: form.satcomPort2 || null,
         acousticLon: form.acousticLon || null,
         acousticLat: form.acousticLat || null,
+        microwaveIp: selectedCom.value || null,
         upCommand: form.cmdUp || null,
         downCommand: form.cmdDown || null,
         surfCommand: form.cmdSurf || null,
@@ -453,11 +480,11 @@ async function save(): Promise<void> {
         description: form.description || null,
         track: form.track.length
           ? form.track.map((p) => ({
-              lon: round6(p.lon),
-              lat: round6(p.lat),
-              alt: p.alt,
-              depth: p.depth
-            }))
+            lon: round6(p.lon),
+            lat: round6(p.lat),
+            alt: p.alt,
+            depth: p.depth
+          }))
           : []
       })
       if (res && (res as any).error) {
@@ -540,7 +567,7 @@ function formatDate(input?: string | Date | null): string {
       </el-form>
     </el-card>
 
-    <UsbComConsole />
+
 
     <el-card v-loading="loading" class="table-card" shadow="never">
       <el-table :data="allFish" border stripe style="width: 100%" height="560">
@@ -561,12 +588,7 @@ function formatDate(input?: string | Date | null): string {
       </el-table>
     </el-card>
 
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEdit ? '编辑机器鱼' : '新增机器鱼'"
-      width="60%"
-      class="fish-dialog"
-    >
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑机器鱼' : '新增机器鱼'" width="60%" class="fish-dialog">
       <el-form label-width="120px">
         <!-- 第一行：名称 -->
         <el-row :gutter="12">
@@ -585,47 +607,31 @@ function formatDate(input?: string | Date | null): string {
           </el-col>
           <el-col :span="8">
             <el-form-item label="声通端口1">
-              <el-input-number
-                v-model="form.satcomPort1"
-                :min="0"
-                :max="65535"
-                controls-position="right"
-              />
+              <el-input-number v-model="form.satcomPort1" :min="0" :max="65535" controls-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="声通端口2">
-              <el-input-number
-                v-model="form.satcomPort2"
-                :min="0"
-                :max="65535"
-                controls-position="right"
-              />
+              <el-input-number v-model="form.satcomPort2" :min="0" :max="65535" controls-position="right" />
             </el-form-item>
           </el-col>
         </el-row>
-        <!-- 第三行：声通定位基准 -->
+        <el-form-item label="串口">
+          <el-select v-model="selectedCom" placeholder="选择串口">
+            <el-option v-for="p in comPorts" :key="p.path" :label="p.path" :value="p.path" />
+          </el-select>
+        </el-form-item>
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="声通基准经度">
-              <el-input-number
-                v-model="form.acousticLon"
-                :precision="6"
-                :step="0.000001"
-                controls-position="right"
-                style="width: 100%"
-              />
+              <el-input-number v-model="form.acousticLon" :precision="6" :step="0.000001" controls-position="right"
+                style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="声通基准纬度">
-              <el-input-number
-                v-model="form.acousticLat"
-                :precision="6"
-                :step="0.000001"
-                controls-position="right"
-                style="width: 100%"
-              />
+              <el-input-number v-model="form.acousticLat" :precision="6" :step="0.000001" controls-position="right"
+                style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -673,64 +679,35 @@ function formatDate(input?: string | Date | null): string {
             <el-table :data="form.track" border stripe style="width: 100%" size="small">
               <el-table-column label="经度">
                 <template #default="{ $index }">
-                  <el-input-number
-                    v-model="form.track[$index].lon"
-                    :min="-180"
-                    :max="180"
-                    :step="0.000001"
-                    :precision="6"
-                    controls-position="right"
-                  />
+                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.000001"
+                    :precision="6" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="纬度">
                 <template #default="{ $index }">
-                  <el-input-number
-                    v-model="form.track[$index].lat"
-                    :min="-90"
-                    :max="90"
-                    :step="0.000001"
-                    :precision="6"
-                    controls-position="right"
-                  />
+                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.000001" :precision="6"
+                    controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="高度">
                 <template #default="{ $index }">
-                  <el-input-number
-                    v-model="form.track[$index].alt"
-                    :min="0"
-                    :step="0.1"
-                    controls-position="right"
-                  />
+                  <el-input-number v-model="form.track[$index].alt" :min="0" :step="0.1" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="深度">
                 <template #default="{ $index }">
-                  <el-input-number
-                    v-model="form.track[$index].depth"
-                    :min="0"
-                    :step="0.1"
-                    controls-position="right"
-                  />
+                  <el-input-number v-model="form.track[$index].depth" :min="0" :step="0.1" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="120" fixed="right">
                 <template #default="{ $index }">
-                  <el-button size="small" type="danger" plain @click="removeTrackPoint($index)"
-                    >删除</el-button
-                  >
+                  <el-button size="small" type="danger" plain @click="removeTrackPoint($index)">删除</el-button>
                 </template>
               </el-table-column>
             </el-table>
             <div v-if="trackErrors.length" style="margin-top: 8px">
-              <el-alert
-                type="error"
-                show-icon
-                :closable="false"
-                :title="'轨迹校验失败：高度与深度必须二选一'"
-                :description="trackErrorDesc"
-              />
+              <el-alert type="error" show-icon :closable="false" :title="'轨迹校验失败：高度与深度必须二选一'"
+                :description="trackErrorDesc" />
             </div>
           </div>
         </el-form-item>

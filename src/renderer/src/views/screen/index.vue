@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, reactive, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { loadBMapGL } from '../../utils/baiduMap'
@@ -71,6 +71,26 @@ robots.forEach((r): void => {
 onMounted(async (): Promise<void> => {
   void init()
 })
+
+// 监听串口 SURF 事件并弹框提示
+let removeSurfListener: (() => void) | null = null
+onMounted(() => {
+  // 使用 window.electron.ipcRenderer 并做空值保护
+  const ipc = (window as any)?.electron?.ipcRenderer
+  if (!ipc || typeof ipc.on !== 'function' || typeof ipc.removeListener !== 'function') return
+  const handler = (_evt: unknown, payload: { time?: string; csq?: number; raw?: string; port?: string }) => {
+    try {
+      const t = payload?.time ?? ''
+      const csq = payload?.csq ?? ''
+      const dt = t ? t.replace('_', ' ') : ''
+      ElMessageBox.alert(`上浮成功\n时间：${dt}\nCSQ：${csq}`, '提示', { type: 'success' })
+    } catch { /* ignore */ }
+  }
+  ipc.on('serial:surf', handler)
+  removeSurfListener = () => ipc.removeListener('serial:surf', handler)
+})
+
+onBeforeUnmount(() => { removeSurfListener?.() })
 
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
 function controlUp(): void {

@@ -17,6 +17,7 @@
     "postinstall": "node scripts/postinstall-rebuild.js",
     "seed:alerts": "node scripts/seed-alerts.js",
     "seed:history": "node scripts/seed-history.js",
+    "send:surf": "node scripts/send-surf.js",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",

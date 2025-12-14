@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "F:\\jiaming\\gitrepo\\demo111\\logs\\.7ecf898c1be691edecf2e118cb2b0066617189e9-audit.json",
+    "files": [
+        {
+            "date": 1765725057654,
+            "name": "F:\\jiaming\\gitrepo\\demo111\\logs\\app-2025-12-14.log",
+            "hash": "81410f7fa93db23f18e762852aa5265d036fa9873ba71ae00370520d442672c6"
+        }
+    ],
+    "hashType": "sha256"
+}
