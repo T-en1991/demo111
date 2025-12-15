@@ -1,4 +1,5 @@
 <script setup lang="ts">
+/* eslint-disable linebreak-style */
 import { onMounted, onUnmounted, reactive, ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
@@ -179,7 +180,7 @@ function returnHome(): void {
   //   target.lat = home.lat
   //   ElMessage.success('已返航至初始位置')
   // }
-    ElMessage.success('返航指令已发送')
+  ElMessage.success('返航指令已发送')
 
   void fishControlStore.sendCommand('return')
 }
@@ -193,6 +194,7 @@ interface AlertItem {
   lat: number
   level: AlertLevel
   imageUrl?: string
+  imageBase64?: string
 }
 
 const alerts = reactive<AlertItem[]>([
@@ -304,19 +306,75 @@ function formatTime(iso: string): string {
   }
 }
 
+function mapLevel(level: unknown): AlertLevel {
+  const s = String(level || '').toLowerCase()
+  if (s === 'critical' || s === 'error') return '高'
+  if (s === 'warning') return '中'
+  return '低'
+}
+
+async function fetchAlertsAndUpdate(): Promise<void> {
+  try {
+    const res = await (window as any).api?.alert?.list?.({
+      page: 1,
+      pageSize: 10,
+      fromSocket: true
+    })
+    const items = Array.isArray(res?.items) ? res.items : []
+    items.sort(
+      (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    const top10 = items.slice(0, 10)
+    const mapped: AlertItem[] = top10.map((it: any) => ({
+      id: String(it.id),
+      time:
+        typeof it.createdAt === 'string'
+          ? it.createdAt
+          : new Date(it.createdAt).toISOString(),
+      lng: Number(it.lon ?? 0),
+      lat: Number(it.lat ?? 0),
+      level: mapLevel(it.level),
+      imageUrl: it.imgFile || undefined,
+      imageBase64: it.imageBase64 || undefined
+    }))
+    alerts.splice(0, alerts.length, ...mapped)
+  } catch (e) {
+    console.error('fetchAlertsAndUpdate failed:', e)
+  }
+}
+
 const router = useRouter()
 const alertImageDialogVisible = ref(false)
 const currentAlertImageUrl = ref<string>('')
 
-function focusAlert(a: AlertItem): void {
-  // 有图片则直接弹窗展示；无图片则弹出提示
-  if (a.imageUrl) {
+async function focusAlert(a: AlertItem): Promise<void> {
+  // 有base64数据则直接弹窗展示
+  if (a.imageBase64) {
+    currentAlertImageUrl.value = a.imageBase64
+    alertImageDialogVisible.value = true
+  }
+  // 如果没有base64但有imageUrl，也尝试显示
+  else if (a.imageUrl) {
     currentAlertImageUrl.value = a.imageUrl
     alertImageDialogVisible.value = true
-  } else {
-    void ElMessageBox.alert('如需查看详细信息，请先让设备浮出水面后再操作', '提示', {
-      type: 'warning'
-    })
+  }
+  // 无图片数据时发送PICSTART命令
+  else {
+    // 提取图片文件名，从imageUrl或生成默认文件名
+    const imageName = a.imageUrl ? a.imageUrl.split('/').pop() || `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg` : `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg`
+    try {
+      // 从COM口发送PICSTART命令
+      const command = `PICSTART ${imageName}`
+      const ok = await (window as any).api?.serial?.write?.(command)
+      if (ok) {
+        ElMessage.success(`已发送PICSTART命令: ${command}`)
+      } else {
+        ElMessage.error('发送PICSTART命令失败')
+      }
+    } catch (e) {
+      console.error('发送PICSTART命令出错:', e)
+      ElMessage.error('发送PICSTART命令出错')
+    }
   }
 }
 
@@ -329,6 +387,7 @@ function goHistory(): void {
 let routeOverlay: unknown | null = null
 let currentMarker: unknown | null = null
 let pollTimer: number | null = null
+let alertPollTimer: number | null = null
 // 持续按压动作的定时器集合（键：动作名；值：setInterval 返回的标识）
 const holdTimers: Record<string, number> = {}
 
@@ -406,7 +465,7 @@ function setCurrentMarker(lng: number, lat: number, size = 56): void {
   mapInstance.addOverlay(currentMarker)
   // 点击鱼标注，打开视频弹窗（默认单目）
   try {
-    ;(
+    ; (
       currentMarker as { addEventListener?: (type: string, handler: () => void) => void }
     ).addEventListener?.('click', (): void => {
       openVideo('mono')
@@ -536,8 +595,7 @@ async function loadSelectedFishData(recenter = false): Promise<void> {
   routePoints.value = res.route
   drawRoute(routePoints.value)
 
-  // 更新报警列表
-  alerts.splice(0, alerts.length, ...res.alarm)
+
 
   if (recenter) {
     const point = new BMap.Point(res.info.lng, res.info.lat)
@@ -597,6 +655,12 @@ async function init(): Promise<void> {
       pollTimer = window.setInterval((): void => {
         void loadSelectedFishData(false)
       }, 3000)
+
+      // 拉取报警并启动轮询（每分钟）
+      await fetchAlertsAndUpdate()
+      alertPollTimer = window.setInterval(() => {
+        void fetchAlertsAndUpdate()
+      }, 60000)
     } else {
       console.error('Baidu Map API not available after load')
     }
@@ -610,6 +674,10 @@ onUnmounted((): void => {
   if (pollTimer) {
     clearInterval(pollTimer)
     pollTimer = null
+  }
+  if (alertPollTimer) {
+    clearInterval(alertPollTimer)
+    alertPollTimer = null
   }
   // 清理持续按压的所有定时器
   Object.values(holdTimers).forEach((t): void => {
@@ -672,16 +740,14 @@ watch(selectedId, (): void => {
             </div>
             <div class="stat-card signal">
               <div class="stat-value">
-                <span
-                  :class="[
-                    'sig',
-                    currentAcoustic === 'strong'
-                      ? 's-strong'
-                      : currentAcoustic === 'medium'
-                        ? 's-medium'
-                        : 's-weak'
-                  ]"
-                >
+                <span :class="[
+                  'sig',
+                  currentAcoustic === 'strong'
+                    ? 's-strong'
+                    : currentAcoustic === 'medium'
+                      ? 's-medium'
+                      : 's-weak'
+                ]">
                   {{
                     currentAcoustic === 'strong' ? '强' : currentAcoustic === 'medium' ? '中' : '弱'
                   }}
@@ -700,12 +766,15 @@ watch(selectedId, (): void => {
             </button>
           </div>
           <div class="alerts-list">
-            <div v-for="(a, i) in alerts" :key="a.id" class="alert-card" @click="focusAlert(a)">
+            <div v-for="(a, i) in alerts" :key="a.id" class="alert-card" @dblclick="focusAlert(a)">
               <div class="alert-index">
                 <span>{{ i + 1 }}</span>
               </div>
               <div class="alert-main">
-                <div class="alert-title">{{ formatTime(a.time) }}</div>
+                <div class="alert-title">
+                  {{ formatTime(a.time) }}
+                  <span v-if="a.imageBase64 || a.imageUrl" class="alert-image-icon">📷</span>
+                </div>
                 <div class="alert-sub">
                   经度 {{ Number(a.lng).toFixed(6) }} · 纬度 {{ Number(a.lat).toFixed(6) }}
                 </div>
@@ -763,38 +832,19 @@ watch(selectedId, (): void => {
       </div>
     </div>
     <!-- 视频查看弹窗：单目/双目切换 -->
-    <el-dialog
-      v-model="videoDialogVisible"
-      :title="currentVideoTitle"
-      width="60%"
-      class="video-dialog"
-      @close="onVideoDialogClose"
-    >
+    <el-dialog v-model="videoDialogVisible" :title="currentVideoTitle" width="60%" class="video-dialog"
+      @close="onVideoDialogClose">
       <div class="video-toolbar">
         <el-button-group>
-          <el-button
-            type="primary"
-            :plain="videoMode !== 'mono'"
-            :loading="videoLoading"
-            @click="videoMode = 'mono'"
-            >单目视频</el-button
-          >
-          <el-button
-            type="primary"
-            :plain="videoMode !== 'stereo'"
-            :loading="videoLoading"
-            @click="videoMode = 'stereo'"
-            >双目视频</el-button
-          >
+          <el-button type="primary" :plain="videoMode !== 'mono'" :loading="videoLoading"
+            @click="videoMode = 'mono'">单目视频</el-button>
+          <el-button type="primary" :plain="videoMode !== 'stereo'" :loading="videoLoading"
+            @click="videoMode = 'stereo'">双目视频</el-button>
         </el-button-group>
       </div>
       <div class="video-body">
         <div :class="['video-container', { 'video-loading': videoLoading }]">
-          <el-loading
-            v-loading="videoLoading"
-            text="正在切换视频流..."
-            background="rgba(0, 0, 0, 0.8)"
-          >
+          <el-loading v-loading="videoLoading" text="正在切换视频流..." background="rgba(0, 0, 0, 0.8)">
             <template v-if="showVideoPlayer && videoMode === 'mono'">
               <VideoPlayerJSMpeg url="ws://localhost:8085/" />
             </template>
@@ -812,27 +862,23 @@ watch(selectedId, (): void => {
     </el-dialog>
     <!-- 报警图片弹窗：有图则直接展示 -->
     <el-dialog v-model="alertImageDialogVisible" title="报警图片" width="50%" class="image-dialog">
-      <div
-        style="
+      <div style="
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 12px;
           padding: 10px;
           background: linear-gradient(135deg, #1f2230, #25293a);
-        "
-      >
+        ">
         <template v-if="currentAlertImageUrl">
           <img :src="currentAlertImageUrl" alt="报警图片" style="width: 100%; border-radius: 8px" />
         </template>
         <template v-else>
-          <div
-            style="
+          <div style="
               height: 320px;
               display: flex;
               align-items: center;
               justify-content: center;
               color: #9fb2ff;
-            "
-          >
+            ">
             暂无图片信息
           </div>
         </template>

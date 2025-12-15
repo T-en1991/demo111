@@ -98,7 +98,34 @@ export const useFishControlStore = defineStore('fishControl', () => {
       ElMessage.warning('未选择机器鱼')
       return
     }
-    // Auto-connect if needed
+    // Special-case: 'down' uses COM port to send 'done' command
+    if (cmdType === 'down') {
+      const comPath = currentFish.value.microwaveIp || ''
+      if (!comPath) {
+        ElMessage.warning('未配置串口（microwaveIp），无法下潜')
+        return
+      }
+      try {
+        // Try opening the serial port; if already open, main will handle gracefully
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        //await (window.api as any).serial.open(comPath, { baudRate: 115200 })
+      } catch (e) {
+        // Ignore open errors here; write will report if not open
+        console.warn('串口打开失败或已打开:', e)
+      }
+      // Send literal 'done' (main will append CRLF if missing)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ok = await (window.api as any).serial.write('done')
+      if (ok) {
+        logs.value.push(`[${new Date().toLocaleTimeString()}] COM SEND(${comPath}): done`)
+        ElMessage.success('已通过串口发送下潜指令')
+      } else {
+        ElMessage.error('串口发送失败：请检查串口是否占用或未打开')
+      }
+      return
+    }
+
+    // Other commands: ensure TCP connection and send via satcom
     if (connectionStatus.value !== 'connected') {
       await connect()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,7 +138,6 @@ export const useFishControlStore = defineStore('fishControl', () => {
       case 'left': payload = currentFish.value.leftCommand; break;
       case 'right': payload = currentFish.value.rightCommand; break;
       case 'up': payload = currentFish.value.upCommand; break;
-      case 'down': payload = currentFish.value.downCommand; break;
       case 'surf': payload = currentFish.value.surfCommand; break;
       case 'manual': payload = currentFish.value.manualCommand; break;
       case 'return': payload = currentFish.value.returnCommand; break;
@@ -134,7 +160,6 @@ export const useFishControlStore = defineStore('fishControl', () => {
     const success = await (window.api as any).tcp.sendClient(satcomIp, satcomPort1, payload)
     if (success) {
       console.log('发送的控制台命令:', payload)
-      // ElMessage.success(`发送指令成功`)
       logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${payload}`)
     } else {
       ElMessage.error(`发送指令失败`)

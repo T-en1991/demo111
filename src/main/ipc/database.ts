@@ -274,12 +274,13 @@ export function registerDatabaseIpc(): void {
     }
   })
 
-  // 获取报警记录列表（支持分页和时间范围）
+  // 获取报警记录列表（支持分页、时间范围和fromSocket过滤）
   ipcMain.handle('alert:list', async (_, params: {
     page?: number
     pageSize?: number
     startTime?: string
     endTime?: string
+    fromSocket?: boolean
   } = {}) => {
     try {
       return await alertService.list(params)

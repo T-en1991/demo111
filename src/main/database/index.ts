@@ -307,8 +307,25 @@ export const alertService = {
     imgFile?: string | null
     lat?: number | null
     lon?: number | null
+    fromSocket?: boolean | null
+    imageBase64?: string | null
   }): Promise<Alert> {
-    return prisma.alert.create({ data })
+    return prisma.alert.create({
+      data: {
+        title: data.title,
+        message: data.message,
+        level: data.level,
+        type: data.type,
+        source: data.source,
+        status: data.status,
+        fishId: data.fishId ?? null,
+        imgFile: data.imgFile ?? null,
+        lat: data.lat ?? null,
+        lon: data.lon ?? null,
+        fromSocket: data.fromSocket ?? true,
+        imageBase64: data.imageBase64 ?? null
+      }
+    })
   },
 
   // 获取所有告警
@@ -320,13 +337,14 @@ export const alertService = {
     })
   },
 
-  // 获取告警列表（支持分页和时间范围）
+  // 获取告警列表（支持分页、时间范围和fromSocket过滤）
   async list(
     params: {
       page?: number
       pageSize?: number
       startTime?: string
       endTime?: string
+      fromSocket?: boolean
     } = {}
   ): Promise<{
     items: any[]
@@ -350,6 +368,9 @@ export const alertService = {
         ...where.createdAt,
         lte: new Date(params.endTime)
       }
+    }
+    if (params.fromSocket !== undefined) {
+      where.fromSocket = params.fromSocket
     }
 
     const [items, total] = await Promise.all([
@@ -448,6 +469,26 @@ export const alertService = {
   async deleteResolved(): Promise<Prisma.BatchPayload> {
     return prisma.alert.deleteMany({
       where: { status: 'resolved' }
+    })
+  },
+
+  // 更新告警
+  async update(id: number, data: {
+    title?: string
+    message?: string | null
+    level?: 'info' | 'warning' | 'error' | 'critical'
+    type?: string | null
+    source?: string | null
+    imgFile?: string | null
+    lat?: number | null
+    lon?: number | null
+    fishId?: number | null
+    status?: 'active' | 'resolved' | 'acknowledged'
+    imageBase64?: string | null
+  }): Promise<Alert> {
+    return prisma.alert.update({
+      where: { id },
+      data
     })
   }
 }

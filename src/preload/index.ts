@@ -229,7 +229,7 @@ const api = {
       return () => ipcRenderer.removeListener('serial:data', fn)
     }
   }
-}
+} 
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

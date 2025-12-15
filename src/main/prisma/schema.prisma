@@ -77,6 +77,10 @@ model Alert {
   fish        Fish?     @relation(fields: [fishId], references: [id], onDelete: SetNull)
   status      AlertStatus @default(active)
   createdAt   DateTime   @default(now())
+  // 新增：是否来自于 socket 客户端数据
+  fromSocket  Boolean    @default(true)
+  // 新增：图片的 base64 内容（后续保存）
+  imageBase64 String?
 
 
   @@map("alerts")
