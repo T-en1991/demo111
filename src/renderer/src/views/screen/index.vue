@@ -185,6 +185,7 @@ function returnHome(): void {
   void fishControlStore.sendCommand('return')
 }
 
+
 // 报警信息数据结构与示例
 type AlertLevel = '高' | '中' | '低'
 interface AlertItem {
@@ -197,94 +198,45 @@ interface AlertItem {
   imageBase64?: string
 }
 
-const alerts = reactive<AlertItem[]>([
-  {
-    id: 'al-1',
-    time: new Date().toISOString(),
-    lng: robots[0].lng + 0.0012,
-    lat: robots[0].lat + 0.0012,
-    level: '高',
-    imageUrl: fishIconUrl
-  },
-  {
-    id: 'al-2',
-    time: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0008,
-    lat: robots[0].lat - 0.0006,
-    level: '中'
-  },
-  {
-    id: 'al-3',
-    time: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng + 0.0024,
-    lat: robots[0].lat - 0.0014,
-    level: '低',
-    imageUrl: fishIconUrl
-  },
-  {
-    id: 'al-4',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-5',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-6',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-7',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-8',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-9',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-10',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-11',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
-  },
-  {
-    id: 'al-12',
-    time: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    lng: robots[0].lng - 0.0032,
-    lat: robots[0].lat + 0.0022,
-    level: '中'
+// 图片接收进度状态 Key: filename, Value: { current, total }
+const imageProgress = reactive<Record<string, { current: number; total: number }>>({})
+
+// 监听图片传输进度
+let removeImageProgressListener: (() => void) | null = null
+let removeImageCompleteListener: (() => void) | null = null
+
+onMounted(() => {
+  const ipc = (window as any)?.electron?.ipcRenderer
+  if (!ipc || typeof ipc.on !== 'function') return
+
+  const progressHandler = (_evt: unknown, payload: { imageId: string; current: number; total: number; filename: string }) => {
+    if (payload.filename) {
+      imageProgress[payload.filename] = { current: payload.current, total: payload.total }
+    }
   }
-])
+
+  const completeHandler = (_evt: unknown, payload: { imageId: string; filename: string }) => {
+    if (payload.filename) {
+      delete imageProgress[payload.filename]
+      // 图片接收完成，刷新列表显示图片
+      void fetchAlertsAndUpdate()
+      ElMessage.success(`图片 ${payload.filename} 接收完成`)
+    }
+  }
+
+  ipc.on('serial:image-progress', progressHandler)
+  ipc.on('serial:image-complete', completeHandler)
+
+  removeImageProgressListener = () => ipc.removeListener('serial:image-progress', progressHandler)
+  removeImageCompleteListener = () => ipc.removeListener('serial:image-complete', completeHandler)
+})
+
+onBeforeUnmount(() => {
+  removeImageProgressListener?.()
+  removeImageCompleteListener?.()
+})
+
+const alerts = reactive<AlertItem[]>([])
 
 function levelClass(level: AlertLevel): string {
   return level === '高' ? 'lv-high' : level === '中' ? 'lv-mid' : 'lv-low'
@@ -348,6 +300,13 @@ const alertImageDialogVisible = ref(false)
 const currentAlertImageUrl = ref<string>('')
 
 async function focusAlert(a: AlertItem): Promise<void> {
+  // 如果图片正在接收中，提示进度
+  if (a.imageUrl && imageProgress[a.imageUrl]) {
+    const p = imageProgress[a.imageUrl]
+    ElMessage.warning(`图片接收中... ${p.current}/${p.total}`)
+    return
+  }
+
   // 有base64数据则直接弹窗展示
   if (a.imageBase64) {
     currentAlertImageUrl.value = a.imageBase64
@@ -773,7 +732,11 @@ watch(selectedId, (): void => {
               <div class="alert-main">
                 <div class="alert-title">
                   {{ formatTime(a.time) }}
-                  <span v-if="a.imageBase64 || a.imageUrl" class="alert-image-icon">📷</span>
+                  <span v-if="a.imageBase64" class="alert-image-icon">📷</span>
+                  <span v-else-if="a.imageUrl && imageProgress[a.imageUrl]" class="alert-image-icon" style="font-size: 0.8em; color: #e6a23c;">
+                    ⏳ {{ imageProgress[a.imageUrl].current }}/{{ imageProgress[a.imageUrl].total }}
+                  </span>
+                  <span v-else-if="a.imageUrl" class="alert-image-icon">📷</span>
                 </div>
                 <div class="alert-sub">
                   经度 {{ Number(a.lng).toFixed(6) }} · 纬度 {{ Number(a.lat).toFixed(6) }}

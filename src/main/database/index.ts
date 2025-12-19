@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
-import type { User, Alert, Fish } from '@prisma/client'
+import type { User, Alert, Fish, ImageFrame } from '@prisma/client'
 import logger from '../logger'
 import * as XLSX from 'xlsx'
 import { existsSync } from 'fs'
@@ -420,23 +420,7 @@ export const alertService = {
     })
   },
 
-  // 更新告警
-  async update(
-    id: number,
-    data: {
-      title?: string
-      message?: string
-      level?: 'info' | 'warning' | 'error' | 'critical'
-      type?: string
-      source?: string
-      status?: 'active' | 'resolved' | 'acknowledged'
-    }
-  ): Promise<Alert> {
-    return prisma.alert.update({
-      where: { id },
-      data
-    })
-  },
+
 
   // 解决告警
   async resolve(id: number): Promise<Alert> {
@@ -819,6 +803,83 @@ export const videoService = {
     return prisma.video.delete({ where: { id } })
   }
 }
+
+export const imageFrameService = {
+  // Save a new frame
+  async create(data: {
+    imageId: string
+    current: number
+    total: number
+    data: string
+    crc?: string
+    filename?: string
+  }): Promise<ImageFrame> {
+    // Check if frame exists
+    const existing = await prisma.imageFrame.findFirst({
+      where: {
+        imageId: data.imageId,
+        current: data.current
+      }
+    })
+
+    if (existing) {
+      // Update existing
+      return prisma.imageFrame.update({
+        where: { id: existing.id },
+        data: {
+          total: data.total,
+          data: data.data,
+          crc: data.crc ?? null,
+          filename: data.filename ?? null
+        }
+      })
+    }
+
+    // Create new
+    return prisma.imageFrame.create({
+      data: {
+        imageId: data.imageId,
+        current: data.current,
+        total: data.total,
+        data: data.data,
+        crc: data.crc ?? null,
+        filename: data.filename ?? null
+      }
+    })
+  },
+
+  // Count frames collected for a specific imageId
+  async countFrames(imageId: string): Promise<number> {
+    // Current is distinct frame index. We count how many unique 'current' indices we have.
+    // However, logic implies 1 record per frame.
+    // To refer to unique frames, we can use distinct or just count if we trust logic doesn't duplicate much.
+    // Ideally we should use findMany distinct.
+    const frames = await prisma.imageFrame.findMany({
+      where: { imageId },
+      select: { current: true },
+      distinct: ['current']
+    })
+    return frames.length
+  },
+
+  // Get all frames for an imageId, ordered by index
+  async getFrames(imageId: string): Promise<ImageFrame[]> {
+    return prisma.imageFrame.findMany({
+      where: { imageId },
+      orderBy: { current: 'asc' }
+    })
+  },
+
+  // Get progress info (current unique count / total)
+  // Logic: query one record to get 'total' (since total is consistent for same imageId), then count unique frames.
+  async getProgress(imageId: string): Promise<{ collected: number; total: number; filename: string | null }> {
+    const sample = await prisma.imageFrame.findFirst({ where: { imageId } })
+    if (!sample) return { collected: 0, total: 0, filename: null }
+    const collected = await this.countFrames(imageId)
+    return { collected, total: sample.total, filename: sample.filename }
+  }
+}
+
 
 export const systemLogService = {
   async create(data: { content: string; type: string; time?: Date | string }) {

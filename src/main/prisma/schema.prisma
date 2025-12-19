@@ -153,3 +153,16 @@ enum AlertStatus {
   resolved
   acknowledged
 }
+
+model ImageFrame {
+  id        Int      @id @default(autoincrement())
+  imageId   String
+  current   Int
+  total     Int
+  data      String   // Base64 chunk
+  crc       String?
+  filename  String?
+  createdAt DateTime @default(now())
+
+  @@map("image_frames")
+}

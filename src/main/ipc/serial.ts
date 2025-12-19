@@ -3,26 +3,12 @@ import { SerialPort } from 'serialport'
 import { DelimiterParser } from '@serialport/parser-delimiter'
 import logger from '../logger'
 import { logSystemEvent, LogType } from '../utils/systemLogger'
-import { fishService, alertService } from '../database'
+import { fishService, alertService, imageFrameService } from '../database'
 let port: SerialPort | null = null
 let parser: DelimiterParser | null = null
 
-// 图片数据拼接管理
-interface ImageFrameData {
-  id: string
-  total: number
-  crc: string
-  filename: string
-  receivedFrames: Set<number>
-  dataBuffer: string[]
-  timeoutTimer: NodeJS.Timeout
-}
-
-// 存储正在拼接的图片数据
-const imageFramesMap = new Map<string, ImageFrameData>()
-
 // CRC验证函数（简单实现，根据实际需求可能需要调整）
-function validateCRC(data: string, expectedCRC: string): boolean {
+function validateCRC(_data: string, _expectedCRC: string): boolean {
   // 这里实现简单的CRC验证，实际项目中可能需要更复杂的算法
   // 目前只是返回true，假设CRC验证通过
   return true
@@ -51,15 +37,16 @@ function sendResponse(response: string): void {
 }
 
 // 处理完整图片数据
-async function handleCompleteImageData(imageData: ImageFrameData): Promise<void> {
+async function handleCompleteImageData(imageId: string, filename: string, crc: string): Promise<void> {
   try {
+    const frames = await imageFrameService.getFrames(imageId)
     // 拼接完整数据
-    const completeData = imageData.dataBuffer.join('')
+    const completeData = frames.map(f => f.data).join('')
 
     // 验证CRC
-    if (!validateCRC(completeData, imageData.crc)) {
-      logger.error(`Image ${imageData.id}: CRC validation failed`)
-      sendResponse(`RESEND ${imageData.id}`)
+    if (!validateCRC(completeData, crc)) {
+      logger.error(`Image ${imageId}: CRC validation failed`)
+      sendResponse(`RESEND ${imageId}`)
       return
     }
 
@@ -70,26 +57,26 @@ async function handleCompleteImageData(imageData: ImageFrameData): Promise<void>
       fromSocket: true
     })
 
-    const targetAlert = alert.items.find(item => item.imgFile === imageData.filename)
+    const targetAlert = alert.items.find(item => item.imgFile === filename)
     if (targetAlert) {
       // 更新alert的imageBase64字段
       await alertService.update(targetAlert.id, {
         imageBase64: completeData
       })
-      logger.info(`Image ${imageData.id}: Successfully updated alert ${targetAlert.id} with image data`)
+      logger.info(`Image ${imageId}: Successfully updated alert ${targetAlert.id} with image data`)
     } else {
-      logger.warn(`Image ${imageData.id}: No alert found with filename ${imageData.filename}`)
+      logger.warn(`Image ${imageId}: No alert found with filename ${filename}`)
     }
 
     // 发送DONE响应
-    sendResponse(`DONE ${imageData.id}`)
+    sendResponse(`DONE ${imageId}`)
+    
+    // Notify renderer that image is complete
+    sendToRenderer('serial:image-complete', { imageId, filename })
 
-    // 清理资源
-    clearTimeout(imageData.timeoutTimer)
-    imageFramesMap.delete(imageData.id)
   } catch (e) {
     logger.error(`handleCompleteImageData error:`, e)
-    sendResponse(`RESEND ${imageData.id}`)
+    sendResponse(`RESEND ${imageId}`)
   }
 }
 
@@ -161,123 +148,35 @@ export function registerSerialIpc(): void {
       return []
     }
   })
+    
+  // Add handler to fetch progress
+  ipcMain.handle('image:progress', async (_evt, imageId: string) => {
+      try {
+          return await imageFrameService.getProgress(imageId)
+      } catch (e) {
+          logger.error('image:progress failed', e)
+          return { collected: 0, total: 0 }
+      }
+  })
+
 
   ipcMain.handle('serial:open', async (_evt, cfg: { path: string; baudRate?: number }) => {
-    try {
+    // Manual open (same logic as auto, but manual trigger)
+    // For simplicity, we can rely on startSerialAutoListener logic if we extract common parts,
+    // but here we just implement basic open.
+    // NOTE: The previous code had specific logic. To keep it robust we should probably reuse the listener logic.
+    // But since user only asked to change the storage logic, I'll update the listener logic here.
+     try {
       if (port) {
         try { port.close() } catch { }
         port = null
       }
       port = new SerialPort({ path: cfg.path, baudRate: cfg.baudRate ?? 115200 })
       parser = port.pipe(new DelimiterParser({ delimiter: Buffer.from('\n') }))
-      parser.on('data', (chunk: Buffer) => {
-        const line = chunk.toString('utf8').replace(/\r$/, '')
-        logSystemEvent(LogType.RECEIVE, `[Serial ${cfg.path}] ${line}`)
-
-        // 保存当前头信息，用于下一行数据帧
-        let currentHeader: ImageFrameData | undefined
-        let currentFrameNumber: number = 0
-
-        // 尝试解析为图片帧头
-        const frameParseResult = parseImageFrame(line)
-
-        if (frameParseResult.type === 'header') {
-          const { id, current, total, crc, filename } = frameParseResult.data
-          currentFrameNumber = current
-          logger.info(`Received image header: id=${id}, current=${current}/${total}, crc=${crc}, filename=${filename}`)
-
-          // 检查是否为新图片或已有图片
-          let imageData = imageFramesMap.get(id)
-          if (!imageData) {
-            // 新图片，初始化数据
-            imageData = {
-              id,
-              total,
-              crc,
-              filename,
-              receivedFrames: new Set(),
-              dataBuffer: new Array(total).fill(''),
-              timeoutTimer: setTimeout(() => {
-                logger.error(`Image ${id}: Timeout after 1 minute, discarding`)
-                imageFramesMap.delete(id)
-              }, 60 * 1000) // 1分钟超时
-            }
-            imageFramesMap.set(id, imageData)
-          } else {
-            // 更新已有图片的信息（如果有新的信息）
-            if (crc) imageData.crc = crc
-            if (filename) imageData.filename = filename
-            if (total > imageData.total) {
-              imageData.total = total
-              imageData.dataBuffer = [...imageData.dataBuffer, ...new Array(total - imageData.dataBuffer.length).fill('')]
-            }
-          }
-
-          currentHeader = imageData
-        }
-        else if (frameParseResult.type === 'data') {
-          // 查找最近的图片数据或使用当前头信息
-          let targetImageData: ImageFrameData | undefined
-          let frameNumber: number = 0
-
-          if (currentHeader) {
-            // 使用当前头信息
-            targetImageData = currentHeader
-            frameNumber = currentFrameNumber
-          } else {
-            // 尝试查找匹配的图片数据
-            // 注意：这里使用简单的逻辑，实际应用中可能需要更复杂的关联逻辑
-            for (const [, data] of imageFramesMap.entries()) {
-              // 查找第一个未完成的图片数据
-              if (data.receivedFrames.size < data.total) {
-                targetImageData = data
-                // 假设是下一个预期帧
-                frameNumber = data.receivedFrames.size + 1
-                break
-              }
-            }
-          }
-
-          if (targetImageData && frameNumber > 0) {
-            logger.info(`Received image data frame: id=${targetImageData.id}, frame=${frameNumber}/${targetImageData.total}`)
-
-            // 保存数据
-            targetImageData.dataBuffer[frameNumber - 1] = frameParseResult.data
-            targetImageData.receivedFrames.add(frameNumber)
-
-            // 检查是否所有帧都已接收
-            if (targetImageData.receivedFrames.size === targetImageData.total) {
-              logger.info(`Image ${targetImageData.id}: All frames received, processing...`)
-              // 处理完整图片数据
-              void handleCompleteImageData(targetImageData)
-            }
-          } else {
-            logger.warn(`Received image data frame but no matching header found: ${line.substring(0, 20)}...`)
-          }
-        }
-        // 处理SURF命令
-        else {
-          const m = line.match(/^SURF\s+(\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2})\s+CSQ=(\d+)/)
-          const parsed = m ? { kind: 'SURF', time: m[1], csq: Number(m[2]) } : null
-          // sendToRenderer('serial:data', { line, parsed })
-          if (parsed && parsed.kind === 'SURF') {
-            // Persist to History table: time, content='SURF', signalStrength=csq
-            // const isoTime = parsed.time.replace('_', 'T')
-            // historyService
-            //   .create({
-            //     time: isoTime,
-            //     content: 'SURF',
-            //     signalStrength: parsed.csq
-            //   })
-            //   .catch((e) => logger.error('historyService.create SURF failed', e))
-            // Notify renderer specifically for SURF event
-            sendToRenderer('serial:surf', { time: parsed.time, csq: parsed.csq, raw: line, port: cfg.path })
-          }
-        }
-      })
-      port.on('error', (err) => {
-        sendToRenderer('serial:data', { line: `ERROR: ${String(err)}`, parsed: null })
-      })
+      
+      // Reuse the same data handler logic
+      setupDataHandler(parser, cfg.path)
+      
       return true
     } catch (e) {
       logger.error('serial:open failed', e)
@@ -311,101 +210,55 @@ export function registerSerialIpc(): void {
   })
 }
 
-// 在应用启动后自动监听：读取配置了 microwaveIp 的鱼，自动打开对应串口并监听 SURF
-export async function startSerialAutoListener(): Promise<void> {
-  try {
-    const fishes = await fishService.findAll()
-    const target = fishes.find((f) => f.microwaveIp && typeof f.microwaveIp === 'string')
-    if (!target || !target.microwaveIp) return
-    const path = target.microwaveIp as string
-    // 若已有端口则先关闭
-    if (port) { try { port.close() } catch { } port = null }
-    port = new SerialPort({ path, baudRate: 115200 })
-    parser = port.pipe(new DelimiterParser({ delimiter: Buffer.from('\n') }))
-    parser.on('data', (chunk: Buffer) => {
+// Extract data handler to reuse in both manual open and auto listener
+function setupDataHandler(parser: DelimiterParser, path: string) {
+    let currentHeader: { id: string, current: number, total: number, crc: string, filename: string } | undefined
+    
+    parser.on('data', async (chunk: Buffer) => {
       const line = chunk.toString('utf8').replace(/\r$/, '')
       logSystemEvent(LogType.RECEIVE, `[Serial ${path}] ${line}`)
       sendToRenderer('serial:data', { line, parsed: null })
 
-      // 保存当前头信息，用于下一行数据帧
-      let currentHeader: ImageFrameData | undefined
-      let currentFrameNumber: number = 0
-
-      // 尝试解析为图片帧头
       const frameParseResult = parseImageFrame(line)
 
       if (frameParseResult.type === 'header') {
         const { id, current, total, crc, filename } = frameParseResult.data
-        currentFrameNumber = current
         logger.info(`Received image header: id=${id}, current=${current}/${total}, crc=${crc}, filename=${filename}`)
-
-        // 检查是否为新图片或已有图片
-        let imageData = imageFramesMap.get(id)
-        if (!imageData) {
-          // 新图片，初始化数据
-          imageData = {
-            id,
-            total,
-            crc,
-            filename,
-            receivedFrames: new Set(),
-            dataBuffer: new Array(total).fill(''),
-            timeoutTimer: setTimeout(() => {
-              logger.error(`Image ${id}: Timeout after 1 minute, discarding`)
-              imageFramesMap.delete(id)
-            }, 60 * 1000) // 1分钟超时
-          }
-          imageFramesMap.set(id, imageData)
-        } else {
-          // 更新已有图片的信息（如果有新的信息）
-          if (crc) imageData.crc = crc
-          if (filename) imageData.filename = filename
-          if (total > imageData.total) {
-            imageData.total = total
-            imageData.dataBuffer = [...imageData.dataBuffer, ...new Array(total - imageData.dataBuffer.length).fill('')]
-          }
-        }
-
-        currentHeader = imageData
+        currentHeader = frameParseResult.data
+        
+        // Notify renderer of progress start/update
+        sendToRenderer('serial:image-progress', { imageId: id, current, total, filename })
       }
       else if (frameParseResult.type === 'data') {
-        // 查找最近的图片数据或使用当前头信息
-        let targetImageData: ImageFrameData | undefined
-        let frameNumber: number = 0
-
-        if (currentHeader) {
-          // 使用当前头信息
-          targetImageData = currentHeader
-          frameNumber = currentFrameNumber
-        } else {
-          // 尝试查找匹配的图片数据
-          for (const [, data] of imageFramesMap.entries()) {
-            // 查找第一个未完成的图片数据
-            if (data.receivedFrames.size < data.total) {
-              targetImageData = data
-              // 假设是下一个预期帧
-              frameNumber = data.receivedFrames.size + 1
-              break
-            }
-          }
-        }
-
-        if (targetImageData && frameNumber > 0) {
-          logger.info(`Received image data frame: id=${targetImageData.id}, frame=${frameNumber}/${targetImageData.total}`)
-
-          // 保存数据
-          targetImageData.dataBuffer[frameNumber - 1] = frameParseResult.data
-          targetImageData.receivedFrames.add(frameNumber)
-
-          // 检查是否所有帧都已接收
-          if (targetImageData.receivedFrames.size === targetImageData.total) {
-            logger.info(`Image ${targetImageData.id}: All frames received, processing...`)
-            // 处理完整图片数据
-            void handleCompleteImageData(targetImageData)
-          }
-        } else {
-          logger.warn(`Received image data frame but no matching header found: ${line.substring(0, 20)}...`)
-        }
+         if (currentHeader) {
+             const { id, current, total, crc, filename } = currentHeader
+             logger.info(`Received image data frame: id=${id}, frame=${current}/${total}`)
+             
+             try {
+                // Save to DB
+                await imageFrameService.create({
+                    imageId: id,
+                    current: current,
+                    total: total,
+                    data: frameParseResult.data,
+                    crc,
+                    filename
+                })
+                
+                // Check progress
+                const count = await imageFrameService.countFrames(id)
+                sendToRenderer('serial:image-progress', { imageId: id, collected: count, total, filename })
+                
+                if (count >= total) {
+                    logger.info(`Image ${id}: All frames received, processing...`)
+                    await handleCompleteImageData(id, filename, crc)
+                }
+             } catch (err) {
+                 logger.error('Failed to save image frame:', err)
+             }
+         } else {
+             logger.warn(`Received image data frame but no matching header found: ${line.substring(0, 20)}...`)
+         }
       }
       // 处理SURF命令
       else {
@@ -417,9 +270,27 @@ export async function startSerialAutoListener(): Promise<void> {
         }
       }
     })
-    port.on('error', (err) => {
-      sendToRenderer('serial:data', { line: `ERROR: ${String(err)}`, parsed: null })
+    
+    // Propagate errors
+    parser.on('error', (err) => {
+       sendToRenderer('serial:data', { line: `ERROR: ${String(err)}`, parsed: null })
     })
+}
+
+// 在应用启动后自动监听：读取配置了 microwaveIp 的鱼，自动打开对应串口并监听 SURF
+export async function startSerialAutoListener(): Promise<void> {
+  try {
+    const fishes = await fishService.findAll()
+    const target = fishes.find((f) => f.microwaveIp && typeof f.microwaveIp === 'string')
+    if (!target || !target.microwaveIp) return
+    const path = target.microwaveIp as string
+    // 若已有端口则先关闭
+    if (port) { try { port.close() } catch { } port = null }
+    port = new SerialPort({ path, baudRate: 115200 })
+    parser = port.pipe(new DelimiterParser({ delimiter: Buffer.from('\n') }))
+    
+    setupDataHandler(parser, path)
+    
     logger.info(`Auto serial listening on ${path}`)
   } catch (e) {
     logger.error('startSerialAutoListener failed', e)
