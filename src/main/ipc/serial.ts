@@ -70,7 +70,7 @@ async function handleCompleteImageData(imageId: string, filename: string, crc: s
 
     // 发送DONE响应
     sendResponse(`DONE ${imageId}`)
-    
+
     // Notify renderer that image is complete
     sendToRenderer('serial:image-complete', { imageId, filename })
 
@@ -148,7 +148,7 @@ export function registerSerialIpc(): void {
       return []
     }
   })
-    
+
   // Add handler to fetch progress
   ipcMain.handle('image:progress', async (_evt, imageId: string) => {
       try {
@@ -166,17 +166,18 @@ export function registerSerialIpc(): void {
     // but here we just implement basic open.
     // NOTE: The previous code had specific logic. To keep it robust we should probably reuse the listener logic.
     // But since user only asked to change the storage logic, I'll update the listener logic here.
+
      try {
       if (port) {
         try { port.close() } catch { }
         port = null
       }
-      port = new SerialPort({ path: cfg.path, baudRate: cfg.baudRate ?? 115200 })
+      port = new SerialPort({ path: cfg.path, baudRate: cfg.baudRate ?? 9600 })
       parser = port.pipe(new DelimiterParser({ delimiter: Buffer.from('\n') }))
-      
+
       // Reuse the same data handler logic
       setupDataHandler(parser, cfg.path)
-      
+
       return true
     } catch (e) {
       logger.error('serial:open failed', e)
@@ -213,9 +214,11 @@ export function registerSerialIpc(): void {
 // Extract data handler to reuse in both manual open and auto listener
 function setupDataHandler(parser: DelimiterParser, path: string) {
     let currentHeader: { id: string, current: number, total: number, crc: string, filename: string } | undefined
-    
+
     parser.on('data', async (chunk: Buffer) => {
       const line = chunk.toString('utf8').replace(/\r$/, '')
+      console.log('Received line:', line , new Date().toLocaleString())
+      if (line.startsWith('CSQ_')) return;
       logSystemEvent(LogType.RECEIVE, `[Serial ${path}] ${line}`)
       sendToRenderer('serial:data', { line, parsed: null })
 
@@ -225,7 +228,7 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
         const { id, current, total, crc, filename } = frameParseResult.data
         logger.info(`Received image header: id=${id}, current=${current}/${total}, crc=${crc}, filename=${filename}`)
         currentHeader = frameParseResult.data
-        
+
         // Notify renderer of progress start/update
         sendToRenderer('serial:image-progress', { imageId: id, current, total, filename })
       }
@@ -233,7 +236,7 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
          if (currentHeader) {
              const { id, current, total, crc, filename } = currentHeader
              logger.info(`Received image data frame: id=${id}, frame=${current}/${total}`)
-             
+
              try {
                 // Save to DB
                 await imageFrameService.create({
@@ -244,11 +247,11 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
                     crc,
                     filename
                 })
-                
+
                 // Check progress
                 const count = await imageFrameService.countFrames(id)
                 sendToRenderer('serial:image-progress', { imageId: id, collected: count, total, filename })
-                
+
                 if (count >= total) {
                     logger.info(`Image ${id}: All frames received, processing...`)
                     await handleCompleteImageData(id, filename, crc)
@@ -270,7 +273,7 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
         }
       }
     })
-    
+
     // Propagate errors
     parser.on('error', (err) => {
        sendToRenderer('serial:data', { line: `ERROR: ${String(err)}`, parsed: null })
@@ -286,11 +289,11 @@ export async function startSerialAutoListener(): Promise<void> {
     const path = target.microwaveIp as string
     // 若已有端口则先关闭
     if (port) { try { port.close() } catch { } port = null }
-    port = new SerialPort({ path, baudRate: 115200 })
+    port = new SerialPort({ path, baudRate: 9600 })
     parser = port.pipe(new DelimiterParser({ delimiter: Buffer.from('\n') }))
-    
+
     setupDataHandler(parser, path)
-    
+
     logger.info(`Auto serial listening on ${path}`)
   } catch (e) {
     logger.error('startSerialAutoListener failed', e)
