@@ -4,7 +4,7 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     counter: 0,
     isAuthenticated: false,
-    selectedRobotId: 'A1'
+    selectedRobotId: null as number | null
   }),
   actions: {
     increment() {
@@ -16,7 +16,7 @@ export const useAppStore = defineStore('app', {
     logout() {
       this.isAuthenticated = false
     },
-    setSelectedRobotId(id: string) {
+    setSelectedRobotId(id: number) {
       this.selectedRobotId = id
     }
   },

@@ -52,6 +52,8 @@ declare global {
           satcomPort2?: number | null
           microwaveIp?: string | null
           microwavePort?: number | null
+          acousticLon?: number | null
+          acousticLat?: number | null
           // 控制命令与描述
           ascendCommand?: string | null
           descendCommand?: string | null
@@ -68,7 +70,7 @@ declare global {
           lightOffCommand?: string | null
           wifiCommand?: string | null
           description?: string | null
-          track?: Prisma.JsonValue | null
+          track?: Prisma.InputJsonValue | null
         }): Promise<Fish>
         update(
           id: number,
@@ -86,6 +88,8 @@ declare global {
             satcomPort2?: number | null
             microwaveIp?: string | null
             microwavePort?: number | null
+            acousticLon?: number | null
+            acousticLat?: number | null
             // 控制命令与描述
             ascendCommand?: string | null
             descendCommand?: string | null
@@ -102,7 +106,7 @@ declare global {
             lightOffCommand?: string | null
             wifiCommand?: string | null
             description?: string | null
-            track?: Prisma.JsonValue | null
+            track?: Prisma.InputJsonValue | null
           }
         ): Promise<Fish>
         delete(id: number): Promise<Fish>

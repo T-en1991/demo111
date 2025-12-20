@@ -7,8 +7,16 @@ import { loadBMapGL } from '../../utils/baiduMap'
 import { loadOfflineBMap } from '../../utils/offlineBMap'
 import VideoPlayerJSMpeg from '../../components/VideoPlayerJSMpeg.vue'
 import { useAppStore } from '../../store/app'
-import { INITIAL_ROBOTS, type RobotStatus, type SignalLevel } from '../../constants/robots'
+import { type RobotStatus, type SignalLevel } from '../../constants/robots'
 import { useFishControlStore } from '../../store/fishControl'
+
+// 轨迹点类型（仅前端使用，不持久化）
+interface TrackPoint {
+  lon: number
+  lat: number
+  alt: number | null
+  depth: number | null
+}
 
 const appStore = useAppStore()
 const fishControlStore = useFishControlStore()
@@ -41,35 +49,66 @@ interface BMap2DApi {
   Polyline: new (points: unknown[], opts?: unknown) => unknown
 }
 
-const robots = reactive<RobotStatus[]>(JSON.parse(JSON.stringify(INITIAL_ROBOTS)))
-const selectedId = computed(() => appStore.selectedRobotId || INITIAL_ROBOTS[0].id)
+const robots = reactive<RobotStatus[]>([])
+const selectedId = computed(() => appStore.selectedRobotId || (robots.length > 0 ? robots[0].id : 0))
 const current = computed<RobotStatus | undefined>(() =>
   robots.find((r) => r.id === selectedId.value)
 )
-// 为模板提供已解包的派生值，避免在模板中直接访问 ComputedRef 成员导致类型提示报错
-const currentLng = computed<number>(() => current.value?.lng ?? 0)
-const currentLat = computed<number>(() => current.value?.lat ?? 0)
-const currentDepth = computed<number>(() => current.value?.depth ?? 0)
-const currentAltitude = computed<number>(() => current.value?.altitude ?? 0)
-const currentBattery = computed<number>(() => current.value?.battery ?? 0)
-const currentYaw = computed<number>(() => current.value?.yaw ?? 0)
-const currentPitch = computed<number>(() => current.value?.pitch ?? 0)
-const currentRoll = computed<number>(() => current.value?.roll ?? 0)
-const currentAcoustic = computed<SignalLevel>(() => current.value?.acoustic ?? 'weak')
+// 为模板提供已解包的派生值，优先使用实时状态
+const currentLng = computed<number>(() => fishControlStore.currentStatus?.lng ?? current.value?.lng ?? 0)
+const currentLat = computed<number>(() => fishControlStore.currentStatus?.lat ?? current.value?.lat ?? 0)
+const currentDepth = computed<number>(() => fishControlStore.currentStatus?.depth ?? current.value?.depth ?? 0)
+const currentAltitude = computed<number>(() => fishControlStore.currentStatus?.altitude ?? current.value?.altitude ?? 0)
+const currentBattery = computed<number>(() => fishControlStore.currentStatus?.battery ?? current.value?.battery ?? 0)
+const currentYaw = computed<number>(() => fishControlStore.currentStatus?.yaw ?? current.value?.yaw ?? 0)
+const currentPitch = computed<number>(() => fishControlStore.currentStatus?.pitch ?? current.value?.pitch ?? 0)
+const currentRoll = computed<number>(() => fishControlStore.currentStatus?.roll ?? current.value?.roll ?? 0)
+const currentAcoustic = computed<SignalLevel>(() => (fishControlStore.currentStatus?.acoustic as SignalLevel) ?? current.value?.acoustic ?? 'weak')
 let mapInstance: BMapLikeMap | null = null
 function getBMap(): BMap2DApi | undefined {
   return (window as { BMap?: unknown }).BMap as BMap2DApi | undefined
 }
 
 // 记录每个设备的初始位置与初始深度，供“返航/初始定高”使用
-const homes: Record<string, { lng: number; lat: number }> = {}
-const initialDepths: Record<string, number> = {}
-robots.forEach((r): void => {
-  homes[r.id] = { lng: r.lng, lat: r.lat }
-  initialDepths[r.id] = r.depth
-})
+const homes: Record<number, { lng: number; lat: number }> = {}
+const initialDepths: Record<number, number> = {}
 
 onMounted(async (): Promise<void> => {
+  // 从后端获取机器鱼列表
+  try {
+    const list = await window.api.fish.findAll()
+    if (list && list.length > 0) {
+      // 转换为 RobotStatus 格式
+      const statusList: RobotStatus[] = list.map(f => ({
+        id: f.id,
+        name: f.name,
+        battery: 100, // 默认电量
+        depth: 0,
+        altitude: 0,
+        yaw: 0,
+        pitch: 0,
+        roll: 0,
+        lng: f.acousticLon || 0, // 使用声通基准或默认0
+        lat: f.acousticLat || 0,
+        acoustic: 'weak'
+      }))
+      robots.splice(0, robots.length, ...statusList)
+
+      // 初始化 homes 和 initialDepths
+      robots.forEach((r): void => {
+        homes[r.id] = { lng: r.lng, lat: r.lat }
+        initialDepths[r.id] = r.depth
+      })
+
+      // 如果没有选中任何机器鱼，默认选中第一个
+      if (!appStore.selectedRobotId) {
+        appStore.setSelectedRobotId(robots[0].id)
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch fish list:', e)
+  }
+
   void init()
 })
 
@@ -157,10 +196,150 @@ function enableManual(): void {
   ElMessage.success('人工模式指令已发送')
   void fishControlStore.sendCommand('manual')
 }
-function enableNavigate(): void {
-  ElMessage.success('导航模式指令已发送')
-  void fishControlStore.sendCommand('navigate')
+
+// 导航弹窗相关状态
+const navigateDialogVisible = ref(false)
+const navigateTrack = ref<TrackPoint[]>([])
+const trackErrors = ref<number[]>([])
+const trackErrorDesc = computed(() =>
+  trackErrors.value.length ? `问题行：${trackErrors.value.map((i) => i + 1).join(', ')}` : ''
+)
+
+function addTrackPoint(): void {
+  navigateTrack.value.push({ lon: 0, lat: 0, alt: null, depth: null })
 }
+
+function removeTrackPoint(index: number): void {
+  if (index >= 0 && index < navigateTrack.value.length) {
+    navigateTrack.value.splice(index, 1)
+  }
+}
+
+function recomputeTrackErrors(): void {
+  const errs: number[] = []
+  navigateTrack.value.forEach((p, idx) => {
+    const hasLon = p.lon !== null && p.lon !== undefined
+    const hasLat = p.lat !== null && p.lat !== undefined
+    const hasAlt = p.alt !== null && p.alt !== undefined
+    const hasDepth = p.depth !== null && p.depth !== undefined
+
+    // 经纬度必填
+    if (!hasLon || !hasLat) {
+      errs.push(idx)
+      return
+    }
+
+    // 高度和深度二选一
+    if (!((hasAlt && !hasDepth) || (!hasAlt && hasDepth))) {
+      errs.push(idx)
+    }
+  })
+  trackErrors.value = errs
+}
+
+watch(
+  navigateTrack,
+  () => recomputeTrackErrors(),
+  { deep: true }
+)
+
+async function enableNavigate(): Promise<void> {
+  const currentFish = fishControlStore.currentFish
+  console.log('enableNavigate', currentFish)
+  if (!currentFish) {
+    ElMessage.warning('请先选择机器鱼')
+    return
+  }
+
+  // 先发送导航指令，确认成功后再打开弹窗
+  const success = await fishControlStore.enterNavigationMode()
+  if (!success) return
+
+  try {
+    const fish = await window.api.fish.findById(currentFish.id)
+    console.log(fish)
+    if (fish) {
+      // 解析后端返回的 track 数据
+      let tracks: TrackPoint[] = []
+      if (Array.isArray(fish.track)) {
+        tracks = (fish.track as unknown[]).map((tp) => {
+          const o = tp as Record<string, unknown>
+          const lon = typeof o.lon === 'number' ? o.lon : Number(o.lon)
+          const lat = typeof o.lat === 'number' ? o.lat : Number(o.lat)
+          const altRaw = o.alt
+          const depthRaw = o.depth
+          const altNum = altRaw === null || altRaw === undefined ? null : Number(altRaw)
+          const depthNum = depthRaw === null || depthRaw === undefined ? null : Number(depthRaw)
+          return {
+            lon: Number.isFinite(lon) ? lon : 0,
+            lat: Number.isFinite(lat) ? lat : 0,
+            alt: altNum !== null && !Number.isFinite(altNum as number) ? null : altNum,
+            depth: depthNum !== null && !Number.isFinite(depthNum as number) ? null : depthNum
+          }
+        })
+      }
+      navigateTrack.value = tracks
+      navigateDialogVisible.value = true
+    } else {
+      ElMessage.error('获取机器鱼数据失败')
+    }
+  } catch (error) {
+    console.error('获取机器鱼数据出错:', error)
+    ElMessage.error('获取机器鱼数据出错')
+  }
+}
+
+async function confirmNavigate(): Promise<void> {
+  const currentFish = fishControlStore.currentFish
+  if (!currentFish) return
+
+  // 校验
+  recomputeTrackErrors()
+  if (trackErrors.value.length) {
+    ElMessage.error('轨迹校验失败：经度、纬度必填，且高度与深度必须二选一')
+    return
+  }
+
+  try {
+    // 1. 更新鱼的轨迹信息
+    // 注意：这里我们只更新 track 字段，但 update 接口可能需要其他字段保持不变或者允许部分更新
+    // 假设 update 接口支持部分更新（Prisma 通常支持）
+    // 但我们的 preload/ipc 封装可能需要传递完整对象或者特定的结构
+    // 查看 preload 定义，update 接收的是可选字段，所以只传 track 是可以的
+
+    // 保留 6 位小数
+    const cleanTrack = navigateTrack.value.map((p) => ({
+      lon: Math.round(p.lon * 1e6) / 1e6,
+      lat: Math.round(p.lat * 1e6) / 1e6,
+      alt: p.alt,
+      depth: p.depth
+    }))
+
+    await window.api.fish.update(currentFish.id, {
+      track: cleanTrack
+    })
+
+    ElMessage.success('轨迹已保存，开始执行导航流程')
+    // Start complex navigation flow (Navigate -> Wait -> Upload Trajectory)
+    // Map UI TrackPoint to Store TrackPoint
+    const storeTrack = cleanTrack.map(p => ({
+      lon: p.lon,
+      lat: p.lat,
+      alt: p.alt,
+      depth: p.depth
+    }))
+
+    // We don't await this because it's a long running process with its own UI feedback
+    // and we want to close the dialog immediately.
+    void fishControlStore.sendTrajectory(storeTrack)
+
+    navigateDialogVisible.value = false
+  } catch (error) {
+    console.error('保存轨迹失败:', error)
+    ElMessage.error('保存轨迹失败')
+  }
+}
+
 function setLight(on: boolean): void {
   lightOn.value = on
   ElMessage.success(`灯光：${on ? '开启' : '关闭'}`)
@@ -330,7 +509,6 @@ const holdTimers: Record<string, number> = {}
 type VideoMode = 'mono' | 'stereo'
 const videoDialogVisible = ref(false)
 const videoMode = ref<VideoMode>('mono')
-const videoUrls = reactive<Record<string, { mono?: string; stereo?: string }>>({})
 const videoLoading = ref(false)
 
 // 监听videoMode变化，切换RTSP流类型
@@ -364,10 +542,6 @@ watch(videoMode, async (newMode) => {
   }
 })
 // 使用本地示例视频，同时作为单目与双目演示源
-const mockVideoUrl = new URL('../../assets/mock.mp4', import.meta.url).href
-videoUrls['A1'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
-videoUrls['B2'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
-videoUrls['C3'] = { mono: mockVideoUrl, stereo: mockVideoUrl }
 const currentVideoTitle = computed((): string => '实时视频')
 const showVideoPlayer = ref(true)
 function openVideo(mode: VideoMode): void {
@@ -457,10 +631,14 @@ function mockAlarmsFor(center: { lng: number; lat: number }): AlertItem[] {
 }
 
 async function fetchFishData(
-  id: string,
+  id: number,
   prevRoute: RoutePoint[]
 ): Promise<{ info: RobotStatus; route: RoutePoint[]; alarm: AlertItem[] }> {
   const base = robots.find((r) => r.id === id) ?? robots[0]
+  if (!base) {
+    // Should not happen if robots is populated
+    throw new Error('No fish found')
+  }
   // 模拟当前位置在基础点附近随机漂移
   const jitter = (): number => (Math.random() - 0.5) * 0.0012
   const nextLng = base.lng + jitter()
@@ -517,6 +695,7 @@ const routePoints = ref<RoutePoint[]>([])
 async function loadSelectedFishData(recenter = false): Promise<void> {
   const BMap = getBMap()
   if (!BMap || !mapInstance) return
+  if (robots.length === 0) return
   const id = selectedId.value
   const res = await fetchFishData(id, routePoints.value)
   // 将 info 映射回当前选中机器人，驱动右侧基本信息展示
@@ -570,8 +749,13 @@ async function init(): Promise<void> {
       const map = new BMap.Map(container)
       mapInstance = map
       const start = current.value || robots[0]
-      const center = new BMap.Point(start.lng, start.lat)
-      map.centerAndZoom(center, 12)
+      if (start) {
+        const center = new BMap.Point(start.lng, start.lat)
+        map.centerAndZoom(center, 12)
+      } else {
+        const center = new BMap.Point(121.4737, 31.2304)
+        map.centerAndZoom(center, 12)
+      }
       map.enableScrollWheelZoom(true)
       map.addControl(new BMap.NavigationControl())
       map.addControl(new BMap.ScaleControl())
@@ -671,7 +855,7 @@ watch(selectedId, (): void => {
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentYaw }}°</div>
-              <div class="stat-label">偏航角</div>
+              <div class="stat-label">航向角</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentPitch }}°</div>
@@ -715,7 +899,10 @@ watch(selectedId, (): void => {
               </div>
               <div class="alert-main">
                 <div class="alert-title">
-                  {{ formatTime(a.createdAt.toString()) }}
+                  <span v-if="a.imgFile" >
+                     {{ a.imgFile.split(/[/\\]/).pop() }}
+                  </span>
+                  &nbsp;  &nbsp;
                   <span v-if="a.imageBase64" class="alert-image-icon">📷</span>
                   <span v-else-if="a.imgFile && imageProgress[a.imgFile]" class="alert-image-icon" style="font-size: 0.8em; color: #e6a23c;">
                     ⏳ {{ imageProgress[a.imgFile].current }}/{{ imageProgress[a.imgFile].total }}
@@ -723,10 +910,9 @@ watch(selectedId, (): void => {
                   <span v-else-if="a.imgFile" class="alert-image-icon">📷</span>
                 </div>
                 <div class="alert-sub">
+                  <span> {{ formatTime(a.createdAt.toString()) }}  &nbsp;  &nbsp;</span>
                   经度 {{ Number(a.lon ?? 0).toFixed(6) }} · 纬度 {{ Number(a.lat ?? 0).toFixed(6) }}
-                  <div v-if="a.imgFile" style="margin-top: 2px; font-size: 0.9em; opacity: 0.8;">
-                    {{ a.imgFile.split(/[/\\]/).pop() }}
-                  </div>
+
                 </div>
               </div>
               <div class="alert-level" :class="levelClass(a.level)">{{ a.level }}</div>
@@ -833,6 +1019,55 @@ watch(selectedId, (): void => {
           </div>
         </template>
       </div>
+    </el-dialog>
+    <!-- 导航弹窗 -->
+    <el-dialog v-model="navigateDialogVisible" title="导航设置" width="800px" class="navigate-dialog">
+      <div class="dialog-content">
+        <div style="margin-bottom: 8px">
+          <el-button type="primary" plain @click="addTrackPoint">添加轨迹点</el-button>
+        </div>
+        <el-table :data="navigateTrack" border stripe style="width: 100%" size="small" max-height="400">
+          <el-table-column label="经度">
+            <template #default="{ $index }">
+              <el-input-number v-model="navigateTrack[$index].lon" :min="-180" :max="180" :step="0.0001" :precision="4"
+                controls-position="right" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="纬度">
+            <template #default="{ $index }">
+              <el-input-number v-model="navigateTrack[$index].lat" :min="-90" :max="90" :step="0.0001" :precision="4"
+                controls-position="right" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="高度">
+            <template #default="{ $index }">
+              <el-input-number v-model="navigateTrack[$index].alt" :min="0" :step="0.01" :precision="2" controls-position="right"
+                style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="深度">
+            <template #default="{ $index }">
+              <el-input-number v-model="navigateTrack[$index].depth" :min="0" :step="0.01" :precision="2" controls-position="right"
+                style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="80" fixed="right">
+            <template #default="{ $index }">
+              <el-button size="small" type="danger" plain @click="removeTrackPoint($index)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div v-if="trackErrors.length" style="margin-top: 8px">
+          <el-alert type="error" show-icon :closable="false" :title="'轨迹校验失败：经度、纬度必填，且高度与深度必须二选一'"
+            :description="trackErrorDesc" />
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="navigateDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmNavigate">保存并开始导航</el-button>
+        </span>
+      </template>
     </el-dialog>
   </section>
 </template>

@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import UsbComConsole from '../home/UsbComConsole.vue'
+
+import { useFishControlStore } from '../../store/fishControl'
+import type { Fish as StoreFish } from '../../store/fishControl'
+
+const fishControlStore = useFishControlStore()
 
 interface Fish {
   id: number
@@ -37,6 +41,7 @@ interface Fish {
   acousticLat?: number
   // 持久化的串口选择（用于 SURF 自动监听）
   microwaveIp?: string
+  microwavePort?: number
 }
 
 // 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
@@ -76,6 +81,7 @@ type FishFromBackend = {
   track?: unknown
   // 后端持久化的串口字段
   microwaveIp?: string | null
+  microwavePort?: number | null
 }
 
 // 轨迹点类型（仅前端使用，不持久化）
@@ -100,6 +106,7 @@ interface FishForm {
   satcomPort2: number
   acousticLon: number
   acousticLat: number
+  microwavePort: number
   cmdUp: string
   cmdDown: string
   cmdSurf: string
@@ -223,7 +230,8 @@ async function loadFish(): Promise<void> {
         acousticLon: f.acousticLon ?? undefined,
         acousticLat: f.acousticLat ?? undefined,
         // 持久化串口
-        microwaveIp: f.microwaveIp ?? undefined
+        microwaveIp: f.microwaveIp ?? undefined,
+        microwavePort: f.microwavePort ?? undefined
       }
     })
     allFish.value = normalized
@@ -266,6 +274,7 @@ const form = reactive<FishForm>({
   satcomPort2: 9201,
   acousticLon: 0,
   acousticLat: 0,
+  microwavePort: 9600,
   cmdUp: '',
   cmdDown: '',
   cmdSurf: '',
@@ -296,6 +305,7 @@ function openCreate(): void {
     satcomPort2: 9201,
     acousticLon: 0,
     acousticLat: 0,
+    microwavePort: 9600,
     cmdUp: '+++AT*SENDIM,2,2,ack,UP',
     cmdDown: '+++AT*SENDIM,4,2,ack,DOWN',
     cmdSurf: '+++AT*SENDIM,4,2,ack,SURF',
@@ -331,6 +341,7 @@ function openEdit(row: Fish): void {
     satcomPort2: row.satcomPort2 ?? 0,
     acousticLon: row.acousticLon ?? 0,
     acousticLat: row.acousticLat ?? 0,
+    microwavePort: row.microwavePort ?? 9600,
     // 从后端读取的命令与描述
     cmdUp: row.upCommand ?? '',
     cmdDown: row.downCommand ?? '',
@@ -368,9 +379,19 @@ const trackErrors = ref<number[]>([])
 function recomputeTrackErrors(): void {
   const errs: number[] = []
   form.track.forEach((p, idx) => {
+    const hasLon = p.lon !== null && p.lon !== undefined
+    const hasLat = p.lat !== null && p.lat !== undefined
     const hasAlt = p.alt !== null && p.alt !== undefined
     const hasDepth = p.depth !== null && p.depth !== undefined
-    if (hasAlt && hasDepth) {
+
+    // 经纬度必填
+    if (!hasLon || !hasLat) {
+      errs.push(idx)
+      return
+    }
+
+    // 高度和深度二选一
+    if (!((hasAlt && !hasDepth) || (!hasAlt && hasDepth))) {
       errs.push(idx)
     }
   })
@@ -398,7 +419,7 @@ async function save(): Promise<void> {
   // 轨迹校验：若存在错误行则阻止保存
   recomputeTrackErrors()
   if (trackErrors.value.length) {
-    ElMessage.error('轨迹校验失败：同一轨迹点不能同时填写高度和深度')
+    ElMessage.error('轨迹校验失败：经度、纬度必填，且高度与深度必须二选一')
     return
   }
 
@@ -424,6 +445,7 @@ async function save(): Promise<void> {
         acousticLon: form.acousticLon || null,
         acousticLat: form.acousticLat || null,
         microwaveIp: selectedCom.value || null,
+        microwavePort: form.microwavePort || 9600,
         upCommand: form.cmdUp || null,
 
         downCommand: form.cmdDown || null,
@@ -447,7 +469,7 @@ async function save(): Promise<void> {
             depth: p.depth
           }))
           : []
-      })
+      } as any)
       ElMessage.success('已更新机器鱼')
     } else {
       // 创建机器鱼
@@ -464,6 +486,7 @@ async function save(): Promise<void> {
         acousticLon: form.acousticLon || null,
         acousticLat: form.acousticLat || null,
         microwaveIp: selectedCom.value || null,
+        microwavePort: form.microwavePort || 9600,
         upCommand: form.cmdUp || null,
         downCommand: form.cmdDown || null,
         surfCommand: form.cmdSurf || null,
@@ -486,15 +509,25 @@ async function save(): Promise<void> {
             depth: p.depth
           }))
           : []
-      })
-      if (res && (res as any).error) {
-        throw new Error((res as any).error)
+      } as any)
+      const resAny = res as unknown as { error?: string }
+      if (resAny && resAny.error) {
+        throw new Error(resAny.error)
       }
       ElMessage.success('已新增机器鱼')
     }
 
     dialogVisible.value = false
     await loadFish() // 重新加载数据
+
+    // 如果编辑的是当前选中的机器鱼，同步更新 store 数据
+    if (isEdit.value && fishControlStore.currentFish?.id === form.id) {
+      const updatedFish = allFish.value.find((f) => f.id === form.id)
+      if (updatedFish) {
+        fishControlStore.setCurrentFish(updatedFish as unknown as StoreFish)
+      }
+    }
+
     if (rtspChanged) {
       ElMessageBox.alert('RTSP流地址已变更，需重启应用才能生效。', '提示', { type: 'warning' })
     }
@@ -621,6 +654,9 @@ function formatDate(input?: string | Date | null): string {
             <el-option v-for="p in comPorts" :key="p.path" :label="p.path" :value="p.path" />
           </el-select>
         </el-form-item>
+        <el-form-item label="波特率">
+          <el-input-number v-model="form.microwavePort" :min="1200" :max="921600" />
+        </el-form-item>
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="声通基准经度">
@@ -679,24 +715,24 @@ function formatDate(input?: string | Date | null): string {
             <el-table :data="form.track" border stripe style="width: 100%" size="small">
               <el-table-column label="经度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.000001"
-                    :precision="6" controls-position="right" />
+                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.0001"
+                    :precision="4" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="纬度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.000001" :precision="6"
+                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.0001" :precision="4"
                     controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="高度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].alt" :min="0" :step="0.1" controls-position="right" />
+                  <el-input-number v-model="form.track[$index].alt" :min="0" :step="0.01" :precision="2" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="深度">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].depth" :min="0" :step="0.1" controls-position="right" />
+                  <el-input-number v-model="form.track[$index].depth" :min="0" :step="0.01" :precision="2" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column label="操作" width="120" fixed="right">
@@ -706,7 +742,7 @@ function formatDate(input?: string | Date | null): string {
               </el-table-column>
             </el-table>
             <div v-if="trackErrors.length" style="margin-top: 8px">
-              <el-alert type="error" show-icon :closable="false" :title="'轨迹校验失败：高度与深度必须二选一'"
+              <el-alert type="error" show-icon :closable="false" :title="'轨迹校验失败：经度、纬度必填，且高度与深度必须二选一'"
                 :description="trackErrorDesc" />
             </div>
           </div>

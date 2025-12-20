@@ -39,6 +39,9 @@ function exitApp(): void {
       <span v-if="fishStore.currentFish" class="current-device">
         当前设备：{{ fishStore.currentFish.name }}
       </span>
+      <span v-if="fishStore.currentStatus?.label" class="current-status">
+        最新状态：{{ fishStore.currentStatus.label }}
+      </span>
       <el-tooltip effect="dark" content="返回主页" placement="bottom">
         <el-button type="primary" circle plain @click="goHome">
           <el-icon><HomeFilled /></el-icon>

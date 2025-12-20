@@ -106,6 +106,8 @@ const api = {
       satcomPort2?: number | null
       microwaveIp?: string | null
       microwavePort?: number | null
+      acousticLon?: number | null
+      acousticLat?: number | null
       type?: string
       status?: 'running' | 'stopped'
       ascendCommand?: string | null
@@ -128,6 +130,8 @@ const api = {
         satcomPort2?: number | null
         microwaveIp?: string | null
         microwavePort?: number | null
+        acousticLon?: number | null
+        acousticLat?: number | null
         type?: string
         status?: 'running' | 'stopped'
         ascendCommand?: string | null
@@ -229,7 +233,7 @@ const api = {
       return () => ipcRenderer.removeListener('serial:data', fn)
     }
   }
-} 
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

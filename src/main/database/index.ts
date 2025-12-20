@@ -54,7 +54,7 @@ export const importService = {
       if (['content', '内容'].includes(s)) return 'content'
       if (['roll_deg', '横滚角', 'roll'].includes(s)) return 'rollDeg'
       if (['pitch_deg', '俯仰角', 'pitch'].includes(s)) return 'pitchDeg'
-      if (['yaw_deg', '偏航角', 'yaw'].includes(s)) return 'yawDeg'
+      if (['yaw_deg', '偏航角', '航向角', 'yaw'].includes(s)) return 'yawDeg'
       if (['raw_line', '元数据', 'raw', '原始行'].includes(s)) return 'rawLine'
       // if (['ax[m/s^2]', '角速度x', 'ax'].includes(s)) return 'axMs2'
       // if (['ay[m/s^2]', '角速度y', 'ay'].includes(s)) return 'ayMs2'

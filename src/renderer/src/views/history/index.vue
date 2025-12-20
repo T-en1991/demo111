@@ -225,7 +225,7 @@ onMounted(() => {
         <el-table-column prop="height" label="高度" />
         <el-table-column prop="rollAngle" label="横滚角" />
         <el-table-column prop="pitchAngle" label="俯仰角" />
-        <el-table-column prop="yawAngle" label="偏航角" />
+        <el-table-column prop="yawAngle" label="航向角" />
         <el-table-column prop="battery" label="电量" />
         <el-table-column prop="signalStrength" label="信号强度" />
         <!-- <el-table-column prop="content" label="内容" min-width="240" /> -->
