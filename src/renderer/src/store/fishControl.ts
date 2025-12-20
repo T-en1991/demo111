@@ -30,17 +30,10 @@ export interface Fish {
   acousticLat?: number | null
 }
 
-export interface TrackPoint {
-  lon: number
-  lat: number
-  alt: number | null
-  depth: number | null
-}
-
 export const useFishControlStore = defineStore('fishControl', () => {
   const currentFish = ref<Fish | null>(null)
   const currentStatus = ref<FishTelemetry | null>(null)
-  const connectionStatus = ref<string>('disconnected')
+  const connectionStatus = ref<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
   const logs = ref<string[]>([])
   const lastSurfAt = ref<string | null>(null)
 
@@ -136,12 +129,10 @@ export const useFishControlStore = defineStore('fishControl', () => {
     }
 
     // Other commands: ensure TCP connection and send via satcom
-    // Allow sending if status is connected OR if it's a known active status (not disconnected/error)
-    const badStates = ['disconnected', 'error', 'connecting']
-    if (badStates.includes(connectionStatus.value)) {
+    if (connectionStatus.value !== 'connected') {
       await connect()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (badStates.includes(connectionStatus.value)) return
+      if ((connectionStatus.value as any) !== 'connected') return
     }
 
     let payload: string | null | undefined = ''
@@ -339,13 +330,8 @@ export const useFishControlStore = defineStore('fishControl', () => {
           fish,
           ip,
           port,
-          updateStatus: (status: Partial<FishTelemetry>) => {
-            // 合并更新 currentStatus
-            if (currentStatus.value) {
-              currentStatus.value = { ...currentStatus.value, ...status }
-            } else {
-              currentStatus.value = status as FishTelemetry
-            }
+          updateStatus: (status: FishTelemetry) => {
+            currentStatus.value = status
           }
         })
 
@@ -364,31 +350,11 @@ export const useFishControlStore = defineStore('fishControl', () => {
       }
     })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ipc = (window as any).electron?.ipcRenderer
-
-    // Listen for serial status updates (keyword matching)
-    if (ipc && typeof ipc.on === 'function') {
-      const statusHandler = (_evt: any, payload: { status: string; label: string }) => {
-        // Update currentStatus label for UI feedback
-        if (currentStatus.value) {
-          currentStatus.value = { ...currentStatus.value, label: payload.label }
-        } else {
-          // If no status yet, initialize with just label
-          currentStatus.value = { label: payload.label } as FishTelemetry
-        }
-        logs.value.push(`[${new Date().toLocaleTimeString()}] STATUS: ${payload.label}`)
-      }
-      ipc.on('serial:status-update', statusHandler)
-      cleanupListeners.push(() => {
-        ipc.removeListener('serial:status-update', statusHandler)
-      })
-    }
-
     cleanupListeners.push(onStatus, onData, onError)
 
     // 监听串口 SURF 上浮事件，更新状态与记录
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ipc = (window as any).electron?.ipcRenderer
     if (ipc && typeof ipc.on === 'function') {
       const handler = (_evt: any, payload: { time: string; csq: number; raw: string; port: string }) => {
         lastSurfAt.value = payload.time.replace('_', ' ')

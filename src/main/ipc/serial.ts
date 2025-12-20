@@ -4,8 +4,6 @@ import { DelimiterParser } from '@serialport/parser-delimiter'
 import logger from '../logger'
 import { logSystemEvent, LogType } from '../utils/systemLogger'
 import { fishService, alertService, imageFrameService } from '../database'
-import { serial_FISH_STATUS_CONFIG } from '../../renderer/src/config'
-
 let port: SerialPort | null = null
 let parser: DelimiterParser | null = null
 
@@ -228,13 +226,6 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
     if (line.startsWith('CSQ_')) return
     logSystemEvent(LogType.RECEIVE, `[Serial ${path}] ${line}`)
     sendToRenderer('serial:data', { line, parsed: null })
-
-    // Match status keywords
-    const upperLine = line.toUpperCase()
-    const match = serial_FISH_STATUS_CONFIG.find(k => upperLine.includes(k.keyword))
-    if (match) {
-      sendToRenderer('serial:status-update', { status: match.status, label: match.label })
-    }
 
     const frameParseResult = parseImageFrame(line)
 

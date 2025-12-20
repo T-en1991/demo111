@@ -1,5 +1,4 @@
 import { Fish } from '../store/fishControl'
-import { FISH_STATUS_CONFIG } from '../config'
 
 // Shared state for USBL data merging
 let lastUsblData: {
@@ -13,24 +12,23 @@ let lastUsblData: {
 const lastProcessedTime = new Map<number, number>()
 
 export interface FishTelemetry {
-  yaw?: number
-  pitch?: number
-  roll?: number
-  depth?: number
-  altitude?: number
-  battery?: number
-  acoustic?: 'strong' | 'medium' | 'weak'
-  lng?: number
-  lat?: number
-  lastUpdated?: number
-  label?: string // 中文状态描述，如 "正在上浮"
+  yaw: number
+  pitch: number
+  roll: number
+  depth: number
+  altitude: number
+  battery: number
+  acoustic: 'strong' | 'medium' | 'weak'
+  lng: number
+  lat: number
+  lastUpdated: number
 }
 
 export interface ParserContext {
   fish: Fish
   ip: string
   port: number
-  updateStatus?: (status: Partial<FishTelemetry>) => void
+  updateStatus?: (status: FishTelemetry) => void
 }
 
 export interface DataParseStrategy {
@@ -202,28 +200,6 @@ export class UsblDataStrategy implements DataParseStrategy {
   }
 }
 
-export class StatusStringStrategy implements DataParseStrategy {
-  name = 'StatusStringParser'
-  priority = 15 // Check before fallback but after specific formats
-
-  match(data: string): boolean {
-    // Only match if it's a known status keyword
-    const upper = data.toUpperCase().trim()
-    return FISH_STATUS_CONFIG.some(cfg => upper.includes(cfg.keyword))
-  }
-
-  async handle(data: string, context: ParserContext): Promise<void> {
-    const upper = data.toUpperCase().trim()
-    const match = FISH_STATUS_CONFIG.find(cfg => upper.includes(cfg.keyword))
-    if (match) {
-      console.log(`[StatusStringParser] Matched status: ${match.status} (${match.label})`)
-      if (context.updateStatus) {
-        context.updateStatus({ label: match.label, lastUpdated: Date.now() })
-      }
-    }
-  }
-}
-
 export class StatDataStrategy implements DataParseStrategy {
   name = 'StatParser'
   priority = 20
@@ -328,4 +304,3 @@ export const realtimeDataParser = new RealtimeDataParser()
 realtimeDataParser.registerStrategy(new GpsDataStrategy())
 realtimeDataParser.registerStrategy(new StatDataStrategy())
 realtimeDataParser.registerStrategy(new UsblDataStrategy())
-realtimeDataParser.registerStrategy(new StatusStringStrategy())
