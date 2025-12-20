@@ -20,30 +20,34 @@ export function registerTcpIpc(): void {
       const port = Number(payload?.port || 0)
       if (!txt) return
 
-      // Pattern 1: +++AT*SENDIM,58,1,ack,ID=01;C=01;IMG=fm_20251027_134455.jpg;POS=31.5678,121.8765
-      const sendim58 = /^\+\+\+AT\*SENDIM,58,\d+,ack,(.+)$/i
-      const m58 = sendim58.exec(txt)
+      //'+++AT:96:RECVIM,55,2,1,ack,757857,-16,296,-0.0378,ID=01;C=01;IMG=fm_20251220_132512.jpg;POS=0.0000,0.0000\r\n+++AT:116:USBLANGLES,1325377475.019626,1325377474.170448,2,-2.2959,-0.4586,-1.7643,-0.4293,0.0307,0.0766,0.5695,-16,296,0.0114'
+
+      const idPattern = /ID=([^;]+)/i
+      const cPattern = /C=([^;]+)/i
+      const imgPattern = /IMG=([^;]+)/i
+      const posPattern = /POS=([^,]+),([^;|\s]+)/i
+
       let parsed: { id?: string; c?: string; img?: string; lat?: number | null; lon?: number | null } | null = null
-      if (m58) {
-        const tail = m58[1]
-        const parts = tail.split(';')
-        const kv: Record<string, string> = {}
-        for (const p of parts) {
-          const [k, v] = p.split('=')
-          if (k && v) kv[k.trim().toUpperCase()] = v.trim()
-        }
-        const pos = kv['POS']
-        let lat: number | null = null
-        let lon: number | null = null
-        if (pos) {
-          const [latStr, lonStr] = pos.split(',')
-          lat = latStr && !isNaN(Number(latStr)) ? Number(latStr) : null
-          lon = lonStr && !isNaN(Number(lonStr)) ? Number(lonStr) : null
-        }
+
+      const idMatch = idPattern.exec(txt)
+      const cMatch = cPattern.exec(txt)
+      const imgMatch = imgPattern.exec(txt)
+      const posMatch = posPattern.exec(txt)
+
+      if (idMatch && cMatch && imgMatch && posMatch) {
+        const id = idMatch[1]
+        const c = cMatch[1]
+        const img = imgMatch[1]
+        const latStr = posMatch[1]
+        const lonStr = posMatch[2]
+
+        const lat = !isNaN(Number(latStr)) ? Number(latStr) : null
+        const lon = !isNaN(Number(lonStr)) ? Number(lonStr) : null
+
         parsed = {
-          id: kv['ID'],
-          c: kv['C'],
-          img: kv['IMG'],
+          id,
+          c,
+          img,
           lat,
           lon
         }
@@ -53,7 +57,8 @@ export function registerTcpIpc(): void {
       if (parsed) {
         void (async () => {
           try {
-            await alertService.create({
+            console.log('Attempting to create alert:', parsed) // Debug log
+            const createdAlert = await alertService.create({
               title: `Alarm from socket ${ip}:${port}`,
               message: `id=${parsed.id ?? ''};c=${parsed.c ?? ''};img=${parsed.img ?? ''};pos=${parsed.lat ?? ''},${parsed.lon ?? ''}`,
               level: 'critical',
@@ -67,6 +72,7 @@ export function registerTcpIpc(): void {
               fromSocket: true,
               imageBase64: null
             })
+            console.log('Alert created successfully:', createdAlert) // Debug log
             logSystemEvent(LogType.RECEIVE, `[TCP ${ip}:${port}] ALARM ${txt}`)
 
             // Send ACK response

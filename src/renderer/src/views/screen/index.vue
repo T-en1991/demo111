@@ -186,17 +186,10 @@ function returnHome(): void {
 }
 
 
-// 报警信息数据结构与示例
-type AlertLevel = '高' | '中' | '低'
-interface AlertItem {
-  id: string
-  time: string
-  lng: number
-  lat: number
-  level: AlertLevel
-  imageUrl?: string
-  imageBase64?: string
-}
+import type { Alert, AlertLevel } from '@prisma/client'
+
+// 报警信息数据结构使用 Prisma 生成的类型
+type AlertItem = Alert
 
 // 图片接收进度状态 Key: filename, Value: { current, total }
 const imageProgress = reactive<Record<string, { current: number; total: number }>>({})
@@ -239,7 +232,7 @@ onBeforeUnmount(() => {
 const alerts = reactive<AlertItem[]>([])
 
 function levelClass(level: AlertLevel): string {
-  return level === '高' ? 'lv-high' : level === '中' ? 'lv-mid' : 'lv-low'
+  return level === 'critical' ? 'lv-high' : level === 'error' ? 'lv-high' : level === 'warning' ? 'lv-mid' : 'lv-low'
 }
 
 function formatTime(iso: string): string {
@@ -258,13 +251,6 @@ function formatTime(iso: string): string {
   }
 }
 
-function mapLevel(level: unknown): AlertLevel {
-  const s = String(level || '').toLowerCase()
-  if (s === 'critical' || s === 'error') return '高'
-  if (s === 'warning') return '中'
-  return '低'
-}
-
 async function fetchAlertsAndUpdate(): Promise<void> {
   try {
     const res = await (window as any).api?.alert?.list?.({
@@ -273,23 +259,12 @@ async function fetchAlertsAndUpdate(): Promise<void> {
       fromSocket: true
     })
     const items = Array.isArray(res?.items) ? res.items : []
+    // 按照 createdAt 倒序排序
     items.sort(
-      (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a: AlertItem, b: AlertItem) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     const top10 = items.slice(0, 10)
-    const mapped: AlertItem[] = top10.map((it: any) => ({
-      id: String(it.id),
-      time:
-        typeof it.createdAt === 'string'
-          ? it.createdAt
-          : new Date(it.createdAt).toISOString(),
-      lng: Number(it.lon ?? 0),
-      lat: Number(it.lat ?? 0),
-      level: mapLevel(it.level),
-      imageUrl: it.imgFile || undefined,
-      imageBase64: it.imageBase64 || undefined
-    }))
-    alerts.splice(0, alerts.length, ...mapped)
+    alerts.splice(0, alerts.length, ...top10)
   } catch (e) {
     console.error('fetchAlertsAndUpdate failed:', e)
   }
@@ -301,8 +276,8 @@ const currentAlertImageUrl = ref<string>('')
 
 async function focusAlert(a: AlertItem): Promise<void> {
   // 如果图片正在接收中，提示进度
-  if (a.imageUrl && imageProgress[a.imageUrl]) {
-    const p = imageProgress[a.imageUrl]
+  if (a.imgFile && imageProgress[a.imgFile]) {
+    const p = imageProgress[a.imgFile]
     ElMessage.warning(`图片接收中... ${p.current}/${p.total}`)
     return
   }
@@ -313,14 +288,15 @@ async function focusAlert(a: AlertItem): Promise<void> {
     alertImageDialogVisible.value = true
   }
   // 如果没有base64但有imageUrl，也尝试显示
-  else if (a.imageUrl) {
-    currentAlertImageUrl.value = a.imageUrl
-    alertImageDialogVisible.value = true
-  }
+  // else if (a.imgFile) {
+  //   currentAlertImageUrl.value = a.imgFile
+  //   alertImageDialogVisible.value = true
+  // }
   // 无图片数据时发送PICSTART命令
   else {
     // 提取图片文件名，从imageUrl或生成默认文件名
-    const imageName = a.imageUrl ? a.imageUrl.split('/').pop() || `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg` : `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg`
+    ElMessage.warning('请上浮')
+    const imageName = a.imgFile ? a.imgFile.split('/').pop() || `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg` : `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg`
     try {
       // 从COM口发送PICSTART命令
       const command = `PICSTART ${imageName}`
@@ -453,7 +429,7 @@ function drawRoute(points: RoutePoint[]): void {
 // 模拟接口：返回 info（基本信息）、route（轨迹）、alarm（报警）
 // 生成围绕当前位置的报警数据（与鱼相关，而不是沿用前一条鱼）
 function mockAlarmsFor(center: { lng: number; lat: number }): AlertItem[] {
-  const levels: AlertLevel[] = ['高', '中', '低']
+  const levels: AlertLevel[] = ['critical', 'error', 'warning']
   const count = 6 + Math.floor(Math.random() * 5)
   const res: AlertItem[] = []
   for (let i = 0; i < count; i++) {
@@ -461,12 +437,20 @@ function mockAlarmsFor(center: { lng: number; lat: number }): AlertItem[] {
     const jitterLat = center.lat + (Math.random() - 0.5) * 0.003
     const hasImage = Math.random() < 0.5
     res.push({
-      id: `al-${Date.now()}-${i}`,
-      time: new Date(Date.now() - i * 15 * 60 * 1000).toISOString(),
-      lng: jitterLng,
-      lat: jitterLat,
+      id: Number(Date.now() + i),
+      title: `报警 ${i}`,
+      message: `模拟报警信息 ${i}`,
       level: levels[Math.floor(Math.random() * levels.length)] as AlertLevel,
-      imageUrl: hasImage ? fishIconUrl : undefined
+      type: 'alarm',
+      source: 'mock',
+      status: 'active',
+      fishId: null,
+      imgFile: hasImage ? fishIconUrl : null,
+      lat: jitterLat,
+      lon: jitterLng,
+      fromSocket: false,
+      imageBase64: null,
+      createdAt: new Date(Date.now() - i * 15 * 60 * 1000)
     })
   }
   return res
@@ -731,15 +715,18 @@ watch(selectedId, (): void => {
               </div>
               <div class="alert-main">
                 <div class="alert-title">
-                  {{ formatTime(a.time) }}
+                  {{ formatTime(a.createdAt.toString()) }}
                   <span v-if="a.imageBase64" class="alert-image-icon">📷</span>
-                  <span v-else-if="a.imageUrl && imageProgress[a.imageUrl]" class="alert-image-icon" style="font-size: 0.8em; color: #e6a23c;">
-                    ⏳ {{ imageProgress[a.imageUrl].current }}/{{ imageProgress[a.imageUrl].total }}
+                  <span v-else-if="a.imgFile && imageProgress[a.imgFile]" class="alert-image-icon" style="font-size: 0.8em; color: #e6a23c;">
+                    ⏳ {{ imageProgress[a.imgFile].current }}/{{ imageProgress[a.imgFile].total }}
                   </span>
-                  <span v-else-if="a.imageUrl" class="alert-image-icon">📷</span>
+                  <span v-else-if="a.imgFile" class="alert-image-icon">📷</span>
                 </div>
                 <div class="alert-sub">
-                  经度 {{ Number(a.lng).toFixed(6) }} · 纬度 {{ Number(a.lat).toFixed(6) }}
+                  经度 {{ Number(a.lon ?? 0).toFixed(6) }} · 纬度 {{ Number(a.lat ?? 0).toFixed(6) }}
+                  <div v-if="a.imgFile" style="margin-top: 2px; font-size: 0.9em; opacity: 0.8;">
+                    {{ a.imgFile.split(/[/\\]/).pop() }}
+                  </div>
                 </div>
               </div>
               <div class="alert-level" :class="levelClass(a.level)">{{ a.level }}</div>
