@@ -412,6 +412,22 @@ export const alertService = {
       }
     })
   },
+  
+  // 根据文件名查找告警
+  async findByFilename(filename: string): Promise<Alert | null> {
+    // 尝试直接匹配 imgFile，或者 imgFile 包含 filename
+    // 优先完整匹配
+    let alert = await prisma.alert.findFirst({
+      where: {
+        OR: [
+          { imgFile: filename },
+          { imgFile: { contains: filename } }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+    return alert
+  },
 
   // 根据ID查找告警
   async findById(id: number): Promise<Alert | null> {
