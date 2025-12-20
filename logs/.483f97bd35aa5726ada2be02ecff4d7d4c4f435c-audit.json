@@ -41,9 +41,15 @@
             "hash": "698c0af7864c9c30543fe6c1004797dd6aeafc20375140f8f4a3b4f1cdd328d7"
         },
         {
+<<<<<<< Updated upstream
             "date": 1766207193116,
             "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-20.log",
             "hash": "09da967cd9c4610a32117a7a7c0891458af454b92e74f07eaa27b41503971906"
+=======
+            "date": 1765983024811,
+            "name": "/Users/ten/Desktop/oceanfish/ocean-fish/logs/app-2025-12-17.log",
+            "hash": "86a86f0f930298263d9ae22e77f314e72b96a49b35eb79522b649498a38cf929"
+>>>>>>> Stashed changes
         }
     ],
     "hashType": "sha256"

@@ -6,7 +6,8 @@ import {
   UploadFilled,
   List,
   WarningFilled,
-  Document
+  Document,
+  Star
 } from '@element-plus/icons-vue'
 const router = useRouter()
 
@@ -72,6 +73,14 @@ function go(name: string): void {
           <h3>日志记录</h3>
           <p>系统运行事件与异常</p>
           <el-button type="info" plain>进入</el-button>
+        </div>
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="8">
+        <div class="menu-item demo" @click="go('demo')">
+          <el-icon class="bg-icon"><Star /></el-icon>
+          <h3>Demo 模块</h3>
+          <p>这是一个空的演示页面</p>
+          <el-button type="default" plain>进入</el-button>
         </div>
       </el-col>
     </el-row>
