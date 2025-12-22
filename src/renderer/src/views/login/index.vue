@@ -53,10 +53,12 @@ function submit(): void {
       const target = fishList.value.find(f => f.id === form.robotId)
       if (target) {
         // 兼容旧逻辑，虽然后续可能不再使用 string ID
-        appStore.setSelectedRobotId(String(target.id))
+        appStore.setSelectedRobotId(target.id)
 
         fishControlStore.setCurrentFish(target)
         fishControlStore.initListeners()
+        // 登录成功后启动后台监听（串口/TCP）
+        void (window.api as any).startMonitoring()
         void fishControlStore.connect()
       }
 

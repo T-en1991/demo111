@@ -21,8 +21,7 @@ function parseTimeFromFilename(name: string): string | null {
 
 // 解析报警文件内容
 function parseAlarmFile(
-  content: string,
-  fileName: string
+  content: string
 ): Array<{
   time: string
   id: string
@@ -110,10 +109,10 @@ async function findOrCreateAlert(alarmData: {
     const alertPayload = {
       title: titleFromImg || `报警记录 - ${alarmData.id}`,
       message: `ID=${alarmData.id};C=${alarmData.c};IMG=${alarmData.img};POS=${alarmData.pos.lat},${alarmData.pos.lon}`,
-      level: 'critical',
+      level: alarmData.c || '',
       type: 'alarm',
       source: alarmData.filePath,
-      status: 'active',
+      status: 'active' as const,
       imgFile: filePath,
       lat: alarmData.pos.lat,
       lon: alarmData.pos.lon
@@ -186,7 +185,7 @@ export function registerAlarmIpc(): void {
       for (const filePath of alarmTxtFiles) {
         const fileName = filePath.split(/[\\/]/).pop() as string
         const content = readFileSync(filePath, 'utf8')
-        const alarms = parseAlarmFile(content, fileName)
+        const alarms = parseAlarmFile(content)
 
         for (const alarm of alarms) {
           const result = await findOrCreateAlert({

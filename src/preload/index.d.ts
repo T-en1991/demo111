@@ -13,7 +13,50 @@ declare global {
     electron: ElectronAPI
     api: {
       quitApp(): void
+      startMonitoring(): Promise<boolean>
       openWinSCP(): Promise<boolean>
+      dialog: {
+        openVideos(): Promise<Array<{ path: string; name: string; size: number }>>
+        openXlsx(): Promise<Array<{ path: string; name: string; size: number }> | null>
+        openDirectory(): Promise<string | null>
+      }
+      alarm: {
+        listFiles(folderPath: string): Promise<Array<{ name: string; size: number }>>
+        importFolder(folderPath: string): Promise<{ ok: number; fail: number; updated: number }>
+      }
+      systemLog: {
+        create(data: { content: string; type: string; time?: string }): Promise<any>
+        list(params: {
+          page?: number
+          pageSize?: number
+          startTime?: string
+          endTime?: string
+          type?: string
+        }): Promise<any>
+        clear(): Promise<any>
+      }
+      alert: {
+        list(params?: {
+          page?: number
+          pageSize?: number
+          startTime?: string
+          endTime?: string
+        }): Promise<any>
+      }
+      video: {
+        create(data: {
+          path: string
+          name: string
+          size?: number | null
+          camera?: 'mono' | 'stereo' | 'unknown'
+          recordedAt?: string | Date | null
+          endedAt?: string | Date | null
+        }): Promise<any>
+        list(params?: { page?: number; pageSize?: number; keyword?: string }): Promise<any>
+        findByMoment(moment: string): Promise<{ mono: any | null; stereo: any | null }>
+        get(id: number): Promise<any>
+        delete(id: number): Promise<any>
+      }
       history: {
         create(data: {
           time: string
@@ -28,6 +71,13 @@ declare global {
           yawDeg?: number | null
           pitchDeg?: number | null
           rollDeg?: number | null
+        }): Promise<any>
+        importXlsx(filePath: string): Promise<any>
+        list(params?: {
+          page?: number
+          pageSize?: number
+          startTime?: string
+          endTime?: string
         }): Promise<any>
       }
       fish: {

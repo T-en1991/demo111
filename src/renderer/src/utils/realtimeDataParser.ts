@@ -22,6 +22,8 @@ export interface FishTelemetry {
   lng: number
   lat: number
   lastUpdated: number
+  statusText?: string // 状态描述，如 "正在向前"
+  runStatus?: string  // 状态标识，如 "forward"
 }
 
 export interface ParserContext {

@@ -42,6 +42,8 @@ interface Fish {
   // 持久化的串口选择（用于 SURF 自动监听）
   microwaveIp?: string
   microwavePort?: number
+  starlinkRtspMono?: string
+  starlinkRtspStereo?: string
 }
 
 // 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
@@ -82,6 +84,8 @@ type FishFromBackend = {
   // 后端持久化的串口字段
   microwaveIp?: string | null
   microwavePort?: number | null
+  starlinkRtspMono?: string | null
+  starlinkRtspStereo?: string | null
 }
 
 // 轨迹点类型（仅前端使用，不持久化）
@@ -100,6 +104,8 @@ interface FishForm {
   port?: number
   rtspUrl: string
   rtsp2: string
+  starlinkRtspMono: string
+  starlinkRtspStereo: string
   // 额外通信参数：声通与微波
   satcomIp: string
   satcomPort1: number
@@ -231,7 +237,9 @@ async function loadFish(): Promise<void> {
         acousticLat: f.acousticLat ?? undefined,
         // 持久化串口
         microwaveIp: f.microwaveIp ?? undefined,
-        microwavePort: f.microwavePort ?? undefined
+        microwavePort: f.microwavePort ?? undefined,
+        starlinkRtspMono: f.starlinkRtspMono ?? undefined,
+        starlinkRtspStereo: f.starlinkRtspStereo ?? undefined
       }
     })
     allFish.value = normalized
@@ -269,6 +277,8 @@ const form = reactive<FishForm>({
   port: 9200,
   rtspUrl: 'rtsp://192.168.1.100:8550/single_cam',
   rtsp2: 'rtsp://192.168.1.100:8550/double_cam',
+  starlinkRtspMono: '',
+  starlinkRtspStereo: '',
   satcomIp: '192.178.1.212',
   satcomPort1: 9200,
   satcomPort2: 9201,
@@ -300,6 +310,8 @@ function openCreate(): void {
     port: 9200,
     rtspUrl: 'rtsp://192.168.1.100:8550/single_cam',
     rtsp2: 'rtsp://192.168.1.100:8550/double_cam',
+    starlinkRtspMono: '',
+    starlinkRtspStereo: '',
     satcomIp: '192.178.1.212',
     satcomPort1: 9200,
     satcomPort2: 9201,
@@ -336,6 +348,8 @@ function openEdit(row: Fish): void {
     port: row.port ?? 9200,
     rtspUrl: row.rtspUrl ?? '',
     rtsp2: row.rtsp2 ?? '',
+    starlinkRtspMono: row.starlinkRtspMono ?? '',
+    starlinkRtspStereo: row.starlinkRtspStereo ?? '',
     satcomIp: row.satcomIp ?? '',
     satcomPort1: row.satcomPort1 ?? 0,
     satcomPort2: row.satcomPort2 ?? 0,
@@ -622,7 +636,7 @@ function formatDate(input?: string | Date | null): string {
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑机器鱼' : '新增机器鱼'" width="60%" class="fish-dialog">
-      <el-form label-width="120px">
+      <el-form label-width="180px">
         <!-- 第一行：名称 -->
         <el-row :gutter="12">
           <el-col :span="24">
@@ -747,11 +761,17 @@ function formatDate(input?: string | Date | null): string {
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="RTSP流地址1">
+        <el-form-item label="微波RTSP单目流地址">
           <el-input v-model="form.rtspUrl" placeholder="rtsp://..." />
         </el-form-item>
-        <el-form-item label="RTSP流地址2">
+        <el-form-item label="微波RTSP双目流地址">
           <el-input v-model="form.rtsp2" placeholder="rtsp://... (第二路, 可选)" />
+        </el-form-item>
+        <el-form-item label="星链RTSP单目流地址">
+          <el-input v-model="form.starlinkRtspMono" placeholder="rtsp://..." />
+        </el-form-item>
+        <el-form-item label="星链RTSP双目流地址">
+          <el-input v-model="form.starlinkRtspStereo" placeholder="rtsp://..." />
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="form.description" type="textarea" placeholder="描述" :rows="3" />

@@ -50,7 +50,7 @@ interface BMap2DApi {
 }
 
 const robots = reactive<RobotStatus[]>([])
-const selectedId = computed(() => appStore.selectedRobotId || (robots.length > 0 ? robots[0].id : 0))
+const selectedId = computed(() => Number(appStore.selectedRobotId) || (robots.length > 0 ? robots[0].id : 0))
 const current = computed<RobotStatus | undefined>(() =>
   robots.find((r) => r.id === selectedId.value)
 )
@@ -135,26 +135,37 @@ onBeforeUnmount(() => { removeSurfListener?.() })
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
 function controlUp(): void {
   console.log('[tap] up')
+  ElMessage.success('向上指令已发送')
   void fishControlStore.sendCommand('up')
 }
 function controlDown(): void {
   console.log('[tap] down')
+  ElMessage.success('向下指令已发送')
   void fishControlStore.sendCommand('down')
+}
+function controlDive(): void {
+  console.log('[tap] dive')
+  // Store handles the serial logic and messages
+  void fishControlStore.sendCommand('dive')
 }
 function controlSurf(): void {
   console.log('[tap] surf')
+  ElMessage.success('上浮指令已发送')
   void fishControlStore.sendCommand('surf')
 }
 function moveForward(): void {
   console.log('[tap] forward')
+  ElMessage.success('向前指令已发送')
   void fishControlStore.sendCommand('forward')
 }
 function moveLeft(): void {
   console.log('[tap] left')
+  ElMessage.success('向左指令已发送')
   void fishControlStore.sendCommand('left')
 }
 function moveRight(): void {
   console.log('[tap] right')
+  ElMessage.success('向右指令已发送')
   void fishControlStore.sendCommand('right')
 }
 
@@ -182,6 +193,7 @@ const moveLeftDebounced = debounce(moveLeft, 300)
 const moveRightDebounced = debounce(moveRight, 300)
 const controlUpDebounced = debounce(controlUp, 300)
 const controlDownDebounced = debounce(controlDown, 300)
+const controlDiveDebounced = debounce(controlDive, 300)
 const controlSurfDebounced = debounce(controlSurf, 300)
 const enableManualDebounced = debounce(enableManual, 300)
 const enableNavigateDebounced = debounce(enableNavigate, 300)
@@ -365,7 +377,7 @@ function returnHome(): void {
 }
 
 
-import type { Alert, AlertLevel } from '@prisma/client'
+import type { Alert } from '@prisma/client'
 
 // 报警信息数据结构使用 Prisma 生成的类型
 type AlertItem = Alert
@@ -410,9 +422,9 @@ onBeforeUnmount(() => {
 
 const alerts = reactive<AlertItem[]>([])
 
-function levelClass(level: AlertLevel): string {
-  return level === 'critical' ? 'lv-high' : level === 'error' ? 'lv-high' : level === 'warning' ? 'lv-mid' : 'lv-low'
-}
+function levelClass(level: string): string {
+  return level === '01'  ? 'lv-high' : 'lv-low'
+} 
 
 function formatTime(iso: string): string {
   try {
@@ -434,16 +446,17 @@ async function fetchAlertsAndUpdate(): Promise<void> {
   try {
     const res = await (window as any).api?.alert?.list?.({
       page: 1,
-      pageSize: 10,
+      pageSize: 100,
       fromSocket: true
     })
     const items = Array.isArray(res?.items) ? res.items : []
+    console.log('items',items)
     // 按照 createdAt 倒序排序
     items.sort(
       (a: AlertItem, b: AlertItem) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
-    const top10 = items.slice(0, 10)
-    alerts.splice(0, alerts.length, ...top10)
+    const top100 = items.slice(0, 100)
+    alerts.splice(0, alerts.length, ...top100)
   } catch (e) {
     console.error('fetchAlertsAndUpdate failed:', e)
   }
@@ -506,9 +519,9 @@ let alertPollTimer: number | null = null
 const holdTimers: Record<string, number> = {}
 
 // 视频弹窗状态
-type VideoMode = 'mono' | 'stereo'
+type VideoMode = 'microwaveMono' | 'microwaveStereo' | 'starlinkMono' | 'starlinkStereo'
 const videoDialogVisible = ref(false)
-const videoMode = ref<VideoMode>('mono')
+const videoMode = ref<VideoMode>('microwaveMono')
 const videoLoading = ref(false)
 
 // 监听videoMode变化，切换RTSP流类型
@@ -525,7 +538,7 @@ watch(videoMode, async (newMode) => {
         newMode
       )
       if (result.success) {
-        console.log(`已切换到${newMode === 'mono' ? '单目' : '双目'}视频流`)
+        console.log(`已切换到${newMode}视频流`)
       } else {
         console.error('切换RTSP流类型失败:', result.message)
         ElMessage.error('切换视频流失败: ' + result.message)
@@ -577,7 +590,7 @@ function setCurrentMarker(lng: number, lat: number, size = 56): void {
     ; (
       currentMarker as { addEventListener?: (type: string, handler: () => void) => void }
     ).addEventListener?.('click', (): void => {
-      openVideo('mono')
+      openVideo('microwaveMono')
     })
   } catch (e) {
     console.warn('Bind marker click failed:', e)
@@ -600,62 +613,47 @@ function drawRoute(points: RoutePoint[]): void {
   mapInstance.addOverlay(polyline)
 }
 
-// 模拟接口：返回 info（基本信息）、route（轨迹）、alarm（报警）
-// 生成围绕当前位置的报警数据（与鱼相关，而不是沿用前一条鱼）
-function mockAlarmsFor(center: { lng: number; lat: number }): AlertItem[] {
-  const levels: AlertLevel[] = ['critical', 'error', 'warning']
-  const count = 6 + Math.floor(Math.random() * 5)
-  const res: AlertItem[] = []
-  for (let i = 0; i < count; i++) {
-    const jitterLng = center.lng + (Math.random() - 0.5) * 0.003
-    const jitterLat = center.lat + (Math.random() - 0.5) * 0.003
-    const hasImage = Math.random() < 0.5
-    res.push({
-      id: Number(Date.now() + i),
-      title: `报警 ${i}`,
-      message: `模拟报警信息 ${i}`,
-      level: levels[Math.floor(Math.random() * levels.length)] as AlertLevel,
-      type: 'alarm',
-      source: 'mock',
-      status: 'active',
-      fishId: null,
-      imgFile: hasImage ? fishIconUrl : null,
-      lat: jitterLat,
-      lon: jitterLng,
-      fromSocket: false,
-      imageBase64: null,
-      createdAt: new Date(Date.now() - i * 15 * 60 * 1000)
-    })
-  }
-  return res
-}
+
 
 async function fetchFishData(
   id: number,
-  prevRoute: RoutePoint[]
+  _prevRoute: RoutePoint[]
 ): Promise<{ info: RobotStatus; route: RoutePoint[]; alarm: AlertItem[] }> {
-  const base = robots.find((r) => r.id === id) ?? robots[0]
-  if (!base) {
-    // Should not happen if robots is populated
-    throw new Error('No fish found')
+  // 获取真实鱼数据
+  const fish = await window.api.fish.findById(Number(id))
+  if (!fish) {
+    throw new Error('Fish not found in database')
   }
-  // 模拟当前位置在基础点附近随机漂移
-  const jitter = (): number => (Math.random() - 0.5) * 0.0012
-  const nextLng = base.lng + jitter()
-  const nextLat = base.lat + jitter()
-  const nextDepth = Math.max(0, base.depth + Math.round((Math.random() - 0.5) * 10))
-  const nextAltitude = Math.max(0, base.altitude + Math.round((Math.random() - 0.5) * 3))
-  const nextYaw = (base.yaw + Math.round((Math.random() - 0.5) * 10) + 360) % 360
-  const nextPitch = Math.max(-90, Math.min(90, base.pitch + Math.round((Math.random() - 0.5) * 4)))
-  const nextRoll = Math.max(-180, Math.min(180, base.roll + Math.round((Math.random() - 0.5) * 6)))
-  const nextBattery = Math.max(0, base.battery - (Math.random() < 0.3 ? 1 : 0))
-  const nextAcoustic: SignalLevel =
-    Math.random() < 0.7
-      ? base.acoustic
-      : (['strong', 'medium', 'weak'][Math.floor(Math.random() * 3)] as SignalLevel)
+  const base = robots.find((r) => r.id === id) ?? robots[0]
+
+  // Update store's current fish if changed, to enable real-time connection context
+  if (fishControlStore.currentFish?.id !== fish.id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fishControlStore.setCurrentFish(fish as any)
+  }
+
+  // 优先使用实时状态（声通数据），否则使用数据库中的声通基准或内存中的最后状态
+  const store = (fishControlStore.currentFish?.id === id) ? fishControlStore.currentStatus : null
+  // 辅助函数：优先取实时值，其次取数据库值，最后取默认值
+  const val = (rt: number | undefined, db: number | null | undefined, def: number): number => {
+    if (rt !== undefined && rt !== null) return rt
+    if (db !== undefined && db !== null) return db
+    return def
+  }
+
+  const nextLng = val(store?.lng, fish.acousticLon, base?.lng || 0)
+  const nextLat = val(store?.lat, fish.acousticLat, base?.lat || 0)
+  const nextDepth = store?.depth ?? base?.depth ?? 0
+  const nextAltitude = store?.altitude ?? base?.altitude ?? 0
+  const nextYaw = store?.yaw ?? base?.yaw ?? 0
+  const nextPitch = store?.pitch ?? base?.pitch ?? 0
+  const nextRoll = store?.roll ?? base?.roll ?? 0
+  const nextBattery = store?.battery ?? base?.battery ?? 100
+  const nextAcoustic: SignalLevel = (store?.acoustic as SignalLevel) ?? base?.acoustic ?? 'weak'
 
   const info: RobotStatus = {
-    ...base,
+    id: fish.id,
+    name: fish.name,
     lng: nextLng,
     lat: nextLat,
     depth: nextDepth,
@@ -667,26 +665,35 @@ async function fetchFishData(
     acoustic: nextAcoustic
   }
 
-  let route: RoutePoint[] = prevRoute.length > 0 ? [...prevRoute] : []
-  if (route.length === 0) {
-    // 初始化一段规划路线（近似直线+轻微扰动）
-    const steps = 24
-    for (let i = 0; i < steps; i++) {
-      const t = i / (steps - 1)
-      const lng = base.lng + t * 0.05 + (Math.random() - 0.5) * 0.001
-      const lat = base.lat + t * 0.05 + (Math.random() - 0.5) * 0.001
-      route.push({
-        lng,
-        lat,
-        altitude: base.altitude + Math.round((Math.random() - 0.5) * 2),
-        depth: base.depth
-      })
-    }
+  // 获取真实轨迹
+  let route: RoutePoint[] = []
+  if (Array.isArray(fish.track)) {
+    route = (fish.track as any[]).map((p) => ({
+      lng: Number(p.lon ?? p.lng ?? 0),
+      lat: Number(p.lat ?? 0),
+      altitude: Number(p.alt ?? p.altitude ?? 0),
+      depth: Number(p.depth ?? 0)
+    }))
   }
-  // 保持原先设置好的轨迹线，不追加最新点
 
-  // 报警：根据该鱼当前位置生成一组新的报警
-  const alarm = mockAlarmsFor({ lng: info.lng, lat: info.lat })
+  // 报警：读取最近2小时的报警
+  const now = new Date()
+  const startTime = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
+  const endTime = now.toISOString()
+
+  let alarm: AlertItem[] = []
+  try {
+    const res = await window.api.alert.list({
+      page: 1,
+      pageSize: 50,
+      startTime,
+      endTime
+    })
+    alarm = res.items
+  } catch (e) {
+    console.error('Fetch alarms failed:', e)
+  }
+
   return { info, route, alarm }
 }
 
@@ -759,19 +766,6 @@ async function init(): Promise<void> {
       map.enableScrollWheelZoom(true)
       map.addControl(new BMap.NavigationControl())
       map.addControl(new BMap.ScaleControl())
-      // 默认使用普通地图，不再强制切换为卫星地图
-      /*
-      try {
-        const sat =
-          (window as { BMAP_SATELLITE_MAP?: unknown }).BMAP_SATELLITE_MAP ??
-          (BMap as unknown as { SATELLITE_MAP?: unknown }).SATELLITE_MAP
-        if (map.setMapType && sat) {
-          map.setMapType(sat as unknown)
-        }
-      } catch (e) {
-        console.warn('Switch to satellite map failed:', e)
-      }
-      */
 
       // 初始化加载选中鱼的数据并绘制
       await loadSelectedFishData(true)
@@ -783,11 +777,15 @@ async function init(): Promise<void> {
         void loadSelectedFishData(false)
       }, 3000)
 
-      // 拉取报警并启动轮询（每分钟）
+      // 拉取报警并启动轮询（30秒）
       await fetchAlertsAndUpdate()
+      if (alertPollTimer) {
+        clearInterval(alertPollTimer)
+        alertPollTimer = null
+      }
       alertPollTimer = window.setInterval(() => {
         void fetchAlertsAndUpdate()
-      }, 60000)
+      }, 30000)
     } else {
       console.error('Baidu Map API not available after load')
     }
@@ -915,7 +913,7 @@ watch(selectedId, (): void => {
 
                 </div>
               </div>
-              <div class="alert-level" :class="levelClass(a.level)">{{ a.level }}</div>
+              <div class="alert-level" :class="levelClass(a.level || '')">{{ a.level==='01'?'高':'低' }}</div>
             </div>
           </div>
         </div>
@@ -940,7 +938,7 @@ watch(selectedId, (): void => {
             <button class="action-btn accent" @click="controlDownDebounced">
               <span class="icon">⤓</span><span class="text">向下</span>
             </button>
-            <button class="action-btn accent" @click="controlDownDebounced">
+            <button class="action-btn accent" @click="controlDiveDebounced">
               <span class="icon">⤓</span><span class="text">下潜</span>
             </button>
             <!-- 模式/返航/上浮 -->
@@ -967,24 +965,28 @@ watch(selectedId, (): void => {
         </div>
       </div>
     </div>
-    <!-- 视频查看弹窗：单目/双目切换 -->
+    <!-- 视频查看弹窗：微波/星链 单目/双目切换 -->
     <el-dialog v-model="videoDialogVisible" :title="currentVideoTitle" width="60%" class="video-dialog"
       @close="onVideoDialogClose">
       <div class="video-toolbar">
         <el-button-group>
-          <el-button type="primary" :plain="videoMode !== 'mono'" :loading="videoLoading"
-            @click="videoMode = 'mono'">单目视频</el-button>
-          <el-button type="primary" :plain="videoMode !== 'stereo'" :loading="videoLoading"
-            @click="videoMode = 'stereo'">双目视频</el-button>
+          <el-button type="primary" :plain="videoMode !== 'microwaveMono'" :loading="videoLoading"
+            @click="videoMode = 'microwaveMono'">微波单目</el-button>
+          <el-button type="primary" :plain="videoMode !== 'microwaveStereo'" :loading="videoLoading"
+            @click="videoMode = 'microwaveStereo'">微波双目</el-button>
+        </el-button-group>
+        <el-divider direction="vertical" />
+        <el-button-group>
+          <el-button type="success" :plain="videoMode !== 'starlinkMono'" :loading="videoLoading"
+            @click="videoMode = 'starlinkMono'">星链单目</el-button>
+          <el-button type="success" :plain="videoMode !== 'starlinkStereo'" :loading="videoLoading"
+            @click="videoMode = 'starlinkStereo'">星链双目</el-button>
         </el-button-group>
       </div>
       <div class="video-body">
         <div :class="['video-container', { 'video-loading': videoLoading }]">
           <el-loading v-loading="videoLoading" text="正在切换视频流..." background="rgba(0, 0, 0, 0.8)">
-            <template v-if="showVideoPlayer && videoMode === 'mono'">
-              <VideoPlayerJSMpeg url="ws://localhost:8085/" />
-            </template>
-            <template v-else-if="showVideoPlayer && videoMode === 'stereo'">
+            <template v-if="showVideoPlayer">
               <VideoPlayerJSMpeg url="ws://localhost:8085/" />
             </template>
             <template v-else>

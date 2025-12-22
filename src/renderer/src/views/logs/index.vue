@@ -175,7 +175,7 @@ onMounted(() => {
 </template>
 
 <style lang="scss" scoped>
-@import './index.scss';
+@use './index.scss';
 
 .pagination-container {
   margin-top: 20px;

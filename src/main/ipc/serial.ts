@@ -7,13 +7,6 @@ import { fishService, alertService, imageFrameService } from '../database'
 let port: SerialPort | null = null
 let parser: DelimiterParser | null = null
 
-// CRC验证函数（简单实现，根据实际需求可能需要调整）
-function validateCRC(_data: string, _expectedCRC: string): boolean {
-  // 这里实现简单的CRC验证，实际项目中可能需要更复杂的算法
-  // 目前只是返回true，假设CRC验证通过
-  return true
-}
-
 // 发送响应
 function sendResponse(response: string): void {
   if (!port) {
@@ -39,8 +32,7 @@ function sendResponse(response: string): void {
 // 处理完整图片数据
 async function handleCompleteImageData(
   imageId: string,
-  filename: string,
-  crc: string
+  filename: string
 ): Promise<void> {
   try {
     const frames = await imageFrameService.getFrames(imageId)
@@ -223,7 +215,7 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
   parser.on('data', async (chunk: Buffer) => {
     const line = chunk.toString('utf8').replace(/\r$/, '')
     console.log('Received line:', line, new Date().toLocaleString())
-    if (line.startsWith('CSQ_')) return
+    // if (line.startsWith('CSQ_')) return
     logSystemEvent(LogType.RECEIVE, `[Serial ${path}] ${line}`)
     sendToRenderer('serial:data', { line, parsed: null })
 
@@ -255,7 +247,7 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
         sendToRenderer('serial:image-progress', { imageId: id, collected: count, total, filename })
         if (count >= total) {
           logger.info(`Image ${id}: All frames received (inline), processing...`)
-          await handleCompleteImageData(id, filename, crc)
+          await handleCompleteImageData(id, filename)
         }
       } catch (err) {
         logger.error('Failed to save inline image frame:', err)
@@ -287,7 +279,7 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
 
           if (count >= total) {
             logger.info(`Image ${id}: All frames received, processing...`)
-            await handleCompleteImageData(id, filename, crc)
+            await handleCompleteImageData(id, filename)
           }
         } catch (err) {
           logger.error('Failed to save image frame:', err)
@@ -327,7 +319,12 @@ export async function startSerialAutoListener(): Promise<void> {
     const path = target.microwaveIp as string
     const baudRate = target.microwavePort ?? 9600
     // 若已有端口则先关闭
-    if (port) { try { port.close() } catch { } port = null }
+    if (port) {
+      try {
+        port.close()
+      } catch {}
+      port = null
+    }
     port = new SerialPort({ path, baudRate })
     parser = port.pipe(new DelimiterParser({ delimiter: Buffer.from('\n') }))
 

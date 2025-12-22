@@ -6,7 +6,10 @@ const api = {
   quitApp(): void {
     ipcRenderer.send('app:quit')
   },
-  // 打开本地 WinSCP（通过主进程）
+  startMonitoring(): Promise<boolean> {
+    return ipcRenderer.invoke('app:startMonitoring')
+  },
+  // 打开本机 WinSCP（通过主进程）
   openWinSCP(): Promise<boolean> {
     return ipcRenderer.invoke('app:openWinSCP')
   },

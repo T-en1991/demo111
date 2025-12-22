@@ -89,8 +89,10 @@
 
 // 弹窗滚动：限制内容区高度并启用纵向滚动
 :deep(.fish-dialog) {
+  padding: 20px;
   .el-dialog__body {
     max-height: 60vh;
     overflow-y: auto;
+    padding: 12px;
   }
 }

@@ -174,7 +174,7 @@ export function startListenerForFish(fishId: number, ip: string, port: number): 
             alertData.type = 'alarm'
             alertData.source = `${socket.remoteAddress}:${socket.remotePort}`
             alertData.message = `device=${deviceId};channel=${channel};img=${filename};pos=${latStr},${lonStr}`
-            alertData.level = 'critical'
+            alertData.level = channel || ''
 
             // send ACK back to sender (keep existing behavior)
             try {
@@ -195,7 +195,7 @@ export function startListenerForFish(fishId: number, ip: string, port: number): 
             alertData.type = 'alarm'
             alertData.source = `${socket.remoteAddress}:${socket.remotePort}`
             alertData.message = `sendim=${filename}`
-            alertData.level = 'critical'
+            alertData.level = ''
             // No further ACK necessary — this message already looks like an ACK/notification
           } else {
             // Fallback: use text if printable, otherwise base64

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { UploadFile, UploadFiles } from 'element-plus'
 import { useFishControlStore } from '@renderer/store/fishControl'
 
 type UploadKind = 'video' | 'data' | 'alarm'
@@ -18,15 +17,6 @@ const dataFiles = ref<UFile[]>([])
 const alarmFiles = ref<UFile[]>([])
 const selectedAlarmFolder = ref<string>('')
 const fishControlStore = useFishControlStore()
-
-function filesToUFiles(fileList: UploadFiles): UFile[] {
-  return (fileList ?? []).map((f: UploadFile) => ({
-    name: f.name,
-    size: typeof f.size === 'number' ? f.size : 0,
-    type: f.raw?.type,
-    path: (f.raw as any)?.path
-  }))
-}
 
 function clearVideo(): void {
   videoFiles.value = []
@@ -94,71 +84,6 @@ async function importAlarmData(): Promise<void> {
 
 function isAbsWinPath(p: string): boolean {
   return /^(?:[A-Za-z]:\\|\\\\)/.test(p)
-}
-
-
-async function saveVideos(): Promise<void> {
-  const files = videoFiles.value
-  if (!files.length) {
-    ElMessage.warning('请先选择视频文件')
-    return
-  }
-
-  let ok = 0
-  let fail = 0
-
-  for (const f of files) {
-    // 解析文件名：bcam_20251119_141452
-    // 格式：类型_日期(8位)_时间(6位)
-    const match = f.name.match(/^(\w+)_(\d{8})_(\d{6})/)
-    if (!match) {
-      console.warn('文件名不符合规范:', f.name)
-      fail++
-      continue
-    }
-
-    const [_, typeStr, dateStr, timeStr] = match
-    const Y = dateStr.slice(0, 4)
-    const M = dateStr.slice(4, 6)
-    const D = dateStr.slice(6, 8)
-    const h = timeStr.slice(0, 2)
-    const m = timeStr.slice(2, 4)
-    const s = timeStr.slice(4, 6)
-    const isoString = `${Y}-${M}-${D}T${h}:${m}:${s}`
-
-    const p = f.path
-    if (!p || !isAbsWinPath(p)) {
-      fail++
-      continue
-    }
-    try {
-      await window.api.video.create({
-        path: p,
-        name: f.name,
-        size: f.size,
-        camera:
-          typeStr.toLowerCase() === 'mcam'
-            ? 'mono'
-            : typeStr.toLowerCase() === 'bcam'
-              ? 'stereo'
-              : 'unknown',
-        recordedAt: isoString
-      })
-      ok++
-    } catch (e) {
-      console.error('Save failed:', e)
-      fail++
-    }
-  }
-
-  if (ok > 0) {
-    ElMessage.success(`成功保存 ${ok} 个视频记录`)
-    // 保存成功后自动清空
-    clearVideo()
-  }
-  if (fail > 0) {
-    ElMessage.warning(`${fail} 个文件保存失败（命名或路径不符合要求）`)
-  }
 }
 
 // Save videos but auto-detect camera type from filename prefix (mcam=mono, bcam=stereo)

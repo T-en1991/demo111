@@ -299,7 +299,7 @@ export const alertService = {
   async create(data: {
     title: string
     message?: string
-    level?: 'info' | 'warning' | 'error' | 'critical'
+    level?: string | null
     type?: string
     source?: string
     status?: 'active' | 'resolved' | 'acknowledged'
@@ -404,7 +404,7 @@ export const alertService = {
   },
 
   // 根据级别获取告警
-  async findByLevel(level: 'info' | 'warning' | 'error' | 'critical'): Promise<Alert[]> {
+  async findByLevel(level: string): Promise<Alert[]> {
     return prisma.alert.findMany({
       where: { level },
       orderBy: {
@@ -476,7 +476,7 @@ export const alertService = {
   async update(id: number, data: {
     title?: string
     message?: string | null
-    level?: 'info' | 'warning' | 'error' | 'critical'
+    level?: string | null
     type?: string | null
     source?: string | null
     imgFile?: string | null
@@ -502,6 +502,8 @@ export const fishService = {
     port?: number | null
     rtspUrl?: string | null
     rtsp2?: string | null
+    starlinkRtspMono?: string | null
+    starlinkRtspStereo?: string | null
     satcomIp?: string | null
     satcomPort1?: number | null
     satcomPort2?: number | null
@@ -536,6 +538,8 @@ export const fishService = {
       port: data.port ?? null,
       rtspUrl: data.rtspUrl ?? null,
       rtsp2: data.rtsp2 ?? null,
+      starlinkRtspMono: data.starlinkRtspMono ?? null,
+      starlinkRtspStereo: data.starlinkRtspStereo ?? null,
       satcomIp: data.satcomIp ?? null,
       satcomPort1: data.satcomPort1 ?? null,
       satcomPort2: data.satcomPort2 ?? null,
@@ -643,6 +647,8 @@ export const fishService = {
       port?: number | null
       rtspUrl?: string | null
       rtsp2?: string | null
+      starlinkRtspMono?: string | null
+      starlinkRtspStereo?: string | null
       satcomIp?: string | null
       satcomPort1?: number | null
       satcomPort2?: number | null

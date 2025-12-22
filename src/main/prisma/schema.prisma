@@ -28,6 +28,8 @@ model Fish {
   port      Int?
   rtspUrl   String?
   rtsp2     String?
+  starlinkRtspMono   String?
+  starlinkRtspStereo String?
   // 通信参数：卫通与微波
   satcomIp       String?
   satcomPort1    Int?
@@ -67,7 +69,7 @@ model Alert {
   id          Int       @id @default(autoincrement())
   title       String
   message     String?
-  level       AlertLevel @default(info)
+  level       String?
   type        String?
   source      String?
   imgFile     String?
@@ -141,12 +143,7 @@ enum FishStatus {
   stopped
 }
 
-enum AlertLevel {
-  info
-  warning
-  error
-  critical
-}
+
 
 enum AlertStatus {
   active

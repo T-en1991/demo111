@@ -61,7 +61,7 @@ export function registerTcpIpc(): void {
             const createdAlert = await alertService.create({
               title: `Alarm from socket ${ip}:${port}`,
               message: `id=${parsed.id ?? ''};c=${parsed.c ?? ''};img=${parsed.img ?? ''};pos=${parsed.lat ?? ''},${parsed.lon ?? ''}`,
-              level: 'critical',
+              level: parsed.c || '',
               type: 'alarm',
               source: `${ip}:${port}`,
               status: 'active',

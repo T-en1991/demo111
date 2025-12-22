@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { Picture, Calendar, Location, InfoFilled } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted } from 'vue'
+import { Picture, Calendar, Location } from '@element-plus/icons-vue'
 
 type DateRange = [Date, Date] | []
 
@@ -28,18 +28,6 @@ function toFileUrl(p?: string | null): string | '' {
 function toVideoUrl(p: string): string {
   const norm = p.replace(/\\/g, '/')
   return `http://localhost:18081/video?path=${encodeURIComponent(norm)}`
-}
-
-function formatTime(t: string | Date | null | undefined): string {
-  if (!t) return ''
-  const d = typeof t === 'string' ? new Date(t) : t
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  const s = String(d.getSeconds()).padStart(2, '0')
-  return `${y}-${m}-${day} ${h}:${min}:${s}`
 }
 
 async function fetchAlerts(): Promise<void> {
@@ -110,7 +98,7 @@ async function openVideo(item: any): Promise<void> {
   videoDialogVisible.value = true
 }
 
-function onVideoError(e: Event): void {
+function onVideoError(_e: Event): void {
   // const el = e.target as HTMLVideoElement
   // videoError.value = `无法播放：${el?.src || ''}`
 }

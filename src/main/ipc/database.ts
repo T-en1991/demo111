@@ -55,6 +55,8 @@ export function registerDatabaseIpc(): void {
         port?: number | null
         rtspUrl?: string | null
         rtsp2?: string | null
+        starlinkRtspMono?: string | null
+        starlinkRtspStereo?: string | null
         satcomIp?: string | null
         satcomPort1?: number | null
         satcomPort2?: number | null
@@ -98,6 +100,8 @@ export function registerDatabaseIpc(): void {
         port?: number | null
         rtspUrl?: string | null
         rtsp2?: string | null
+        starlinkRtspMono?: string | null
+        starlinkRtspStereo?: string | null
         satcomIp?: string | null
         satcomPort1?: number | null
         satcomPort2?: number | null

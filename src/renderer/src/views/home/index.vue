@@ -75,7 +75,7 @@ function go(name: string): void {
           <el-button type="info" plain>进入</el-button>
         </div>
       </el-col>
-      <el-col :xs="24" :sm="12" :md="8">
+      <el-col :xs="24" :sm="12" :md="8" v-if="false">
         <div class="menu-item demo" @click="go('demo')">
           <el-icon class="bg-icon"><Star /></el-icon>
           <h3>Demo 模块</h3>

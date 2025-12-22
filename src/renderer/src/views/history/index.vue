@@ -72,6 +72,9 @@ async function fetchData(): Promise<void> {
       height: item.height,
       battery: item.battery,
       signalStrength: item.signalStrength,
+      rollAngle: item.rollDeg,
+      pitchAngle: item.pitchDeg,
+      yawAngle: item.yawDeg,
       time: formatDate(new Date(item.time)),
       content: item.content,
       rawLine: item.rawLine
@@ -154,13 +157,6 @@ function openDetail(row: AlertItem): void {
 
 function closeDetail(): void {
   detailVisible.value = false
-}
-
-function baiduMarkerUrl(lat: number, lon: number, title?: string, time?: string): string {
-  const t = encodeURIComponent(title ?? '记录')
-  const c = encodeURIComponent(time ?? '')
-  // 使用无需AK的 marker 页面以 iframe 嵌入展示
-  return `http://api.map.baidu.com/marker?location=${lat},${lon}&title=${t}&content=${c}&output=html&src=ocean-fish`
 }
 
 // 信号强度可视化（根据 dBm 映射 0-5 档）
