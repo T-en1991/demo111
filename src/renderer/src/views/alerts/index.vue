@@ -84,6 +84,17 @@ const activeTab = ref<'mono' | 'stereo'>('mono')
 const monoUrl = ref<string>('')
 const stereoUrl = ref<string>('')
 const videoError = ref<string>('')
+const monoType = ref<string>('video/mp4')
+const stereoType = ref<string>('video/mp4')
+
+function guessType(p: string): string {
+  const ext = (p.split('.').pop() || '').toLowerCase()
+  if (ext === 'mp4') return 'video/mp4'
+  if (ext === 'mkv') return 'video/x-matroska'
+  if (ext === 'avi') return 'video/x-msvideo'
+  if (ext === 'mov') return 'video/quicktime'
+  return 'video/mp4'
+}
 
 async function openVideo(item: any): Promise<void> {
   const moment = item?.title || '';
@@ -92,6 +103,8 @@ async function openVideo(item: any): Promise<void> {
   const res = await window.api.video.findByMoment(moment)
   monoUrl.value = res?.mono?.path ? toVideoUrl(String(res.mono.path)) : ''
   stereoUrl.value = res?.stereo?.path ? toVideoUrl(String(res.stereo.path)) : ''
+  if (res?.mono?.path) monoType.value = guessType(String(res.mono.path))
+  if (res?.stereo?.path) stereoType.value = guessType(String(res.stereo.path))
   activeTab.value = monoUrl.value ? 'mono' : (stereoUrl.value ? 'stereo' : 'mono')
   videoError.value = ''
   videoDialogVisible.value = true
@@ -188,17 +201,19 @@ function onVideoError(e: Event): void {
       <el-tabs v-model="activeTab">
         <el-tab-pane label="单目" name="mono">
           <template v-if="monoUrl">
-            <video :src="monoUrl" controls muted autoplay playsinline preload="metadata"
+            <video controls muted autoplay playsinline preload="metadata"
               style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
               v-if="activeTab === 'mono'" />
+            <source :src="monoUrl" :type="monoType" />
           </template>
           <el-empty v-else description="未找到单目视频" />
         </el-tab-pane>
         <el-tab-pane label="双目" name="stereo">
           <template v-if="stereoUrl">
-            <video :src="stereoUrl" controls muted autoplay playsinline preload="metadata"
+            <video controls muted autoplay playsinline preload="metadata"
               style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
               v-if="activeTab === 'stereo'" />
+            <source :src="stereoUrl" :type="stereoType" />
           </template>
           <el-empty v-else description="未找到双目视频" />
         </el-tab-pane>
