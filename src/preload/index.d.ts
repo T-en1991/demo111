@@ -155,6 +155,7 @@ declare global {
             lightOnCommand?: string | null
             lightOffCommand?: string | null
             wifiCommand?: string | null
+            wifiOffCommand?: string | null
             description?: string | null
             track?: Prisma.InputJsonValue | null
           }

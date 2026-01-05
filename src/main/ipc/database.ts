@@ -71,6 +71,14 @@ export function registerDatabaseIpc(): void {
         forwardCommand?: string | null
         leftCommand?: string | null
         rightCommand?: string | null
+        upCommand?: string | null
+        downCommand?: string | null
+        surfCommand?: string | null
+        navigateCommand?: string | null
+        lightOnCommand?: string | null
+        lightOffCommand?: string | null
+        wifiCommand?: string | null
+        wifiOffCommand?: string | null
         manualCommand?: string | null
         exitManualCommand?: string | null
         returnCommand?: string | null
@@ -116,6 +124,14 @@ export function registerDatabaseIpc(): void {
         forwardCommand?: string | null
         leftCommand?: string | null
         rightCommand?: string | null
+        upCommand?: string | null
+        downCommand?: string | null
+        surfCommand?: string | null
+        navigateCommand?: string | null
+        lightOnCommand?: string | null
+        lightOffCommand?: string | null
+        wifiCommand?: string | null
+        wifiOffCommand?: string | null
         manualCommand?: string | null
         exitManualCommand?: string | null
         returnCommand?: string | null

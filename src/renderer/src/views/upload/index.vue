@@ -266,6 +266,7 @@ async function openWifi(): Promise<void> {
       <div class="actions">
         <el-button type="primary" plain @click="openWinSCP">打开 WinSCP</el-button>
         <el-button type="success" plain @click="openWifi">打开 WIFI</el-button>
+        <el-button type="danger" plain @click="openWifiOff">关闭 WIFI</el-button>
       </div>
       <el-tabs v-model="activeTab" class="upload-tabs">
         <el-tab-pane label="视频上传" name="video">

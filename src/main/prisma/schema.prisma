@@ -56,6 +56,7 @@ model Fish {
   lightOnCommand  String?
   lightOffCommand String?
   wifiCommand     String?
+  wifiOffCommand  String?
   description     String?
   // 轨迹（JSON 数组：{ lon, lat, alt|null, depth|null }[]）
   track Json?
@@ -128,7 +129,7 @@ model SystemLog {
   time      DateTime @default(now())
   content   String
   type      String   // 'send' | 'receive'
-  
+
   @@map("system_logs")
 }
 

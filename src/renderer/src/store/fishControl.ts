@@ -29,6 +29,7 @@ export interface Fish {
   lightOnCommand?: string | null
   lightOffCommand?: string | null
   wifiCommand?: string | null
+  wifiOffCommand?: string | null
   acousticLon?: number | null
   acousticLat?: number | null
 }
@@ -124,6 +125,7 @@ export const useFishControlStore = defineStore(
         | 'ascend'
         | 'descend'
         | 'wifi'
+        | 'wifiOff'
         | 'dive'
     ): Promise<void> {
       console.log('currentFish', currentFish.value)
@@ -217,6 +219,9 @@ export const useFishControlStore = defineStore(
           break
         case 'wifi':
           payload = currentFish.value.wifiCommand
+          break
+        case 'wifiOff':
+          payload = currentFish.value.wifiOffCommand
           break
       }
       if (!payload) {

@@ -527,6 +527,7 @@ export const fishService = {
     lightOnCommand?: string | null
     lightOffCommand?: string | null
     wifiCommand?: string | null
+    wifiOffCommand?: string | null
     description?: string | null
     track?: Prisma.JsonValue | null
   }): Promise<Fish> {
@@ -561,6 +562,7 @@ export const fishService = {
       lightOnCommand: data.lightOnCommand ?? null,
       lightOffCommand: data.lightOffCommand ?? null,
       wifiCommand: data.wifiCommand ?? null,
+      wifiOffCommand: data.wifiOffCommand ?? null,
       description: data.description ?? null,
       track:
         data.track === undefined
@@ -672,6 +674,7 @@ export const fishService = {
       lightOnCommand?: string | null
       lightOffCommand?: string | null
       wifiCommand?: string | null
+      wifiOffCommand?: string | null
       description?: string | null
       track?: Prisma.JsonValue | null
     }

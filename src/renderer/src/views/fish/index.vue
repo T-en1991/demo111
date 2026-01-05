@@ -30,6 +30,7 @@ interface Fish {
   lightOnCommand?: string
   lightOffCommand?: string
   wifiCommand?: string
+  wifiOffCommand?: string
   description?: string
   track?: TrackPoint[]
   // 额外通信参数（解析自 description 的结构化内容）
@@ -72,6 +73,7 @@ type FishFromBackend = {
   lightOnCommand?: string | null
   lightOffCommand?: string | null
   wifiCommand?: string | null
+  wifiOffCommand?: string | null
   description?: string | null
   // 新增：声通与微波通信参数（后端直接返回）
   satcomIp?: string | null
@@ -125,6 +127,7 @@ interface FishForm {
   cmdLightOn: string
   cmdLightOff: string
   cmdWifi: string
+  cmdWifiOff: string
   description: string
   track: TrackPoint[]
 }
@@ -227,6 +230,7 @@ async function loadFish(): Promise<void> {
         lightOnCommand: f.lightOnCommand ?? undefined,
         lightOffCommand: f.lightOffCommand ?? undefined,
         wifiCommand: f.wifiCommand ?? undefined,
+        wifiOffCommand: f.wifiOffCommand ?? undefined,
         description: typeof extra.text === 'string' ? extra.text : (f.description ?? undefined),
         track: toTrackPoints(f.track as unknown),
         // 额外通信参数：优先使用后端字段，其次兼容旧的 description JSON
@@ -297,6 +301,7 @@ const form = reactive<FishForm>({
   cmdLightOn: '',
   cmdLightOff: '',
   cmdWifi: '',
+  cmdWifiOff: '',
   description: '',
   track: []
 })
@@ -330,6 +335,7 @@ function openCreate(): void {
     cmdLightOn: '+++AT*SENDIM,7,2,ack,LIGHTON',
     cmdLightOff: '+++AT*SENDIM,8,2,ack,LIGHTOFF',
     cmdWifi: '+++AT*SENDIM,4,2,ack,WIFI',
+    cmdWifiOff: '+++AT*SENDIM,7,2,ack,WIFIOFF',
     description: '',
     track: []
   })
@@ -369,6 +375,7 @@ function openEdit(row: Fish): void {
     cmdLightOn: row.lightOnCommand ?? '',
     cmdLightOff: row.lightOffCommand ?? '',
     cmdWifi: row.wifiCommand ?? '',
+    cmdWifiOff: row.wifiOffCommand ?? '',
     description: row.description ?? '',
     track: (row.track ?? []).map((p) => ({ ...p }))
   })
@@ -473,6 +480,7 @@ async function save(): Promise<void> {
         lightOnCommand: form.cmdLightOn || null,
         lightOffCommand: form.cmdLightOff || null,
         wifiCommand: form.cmdWifi || null,
+        wifiOffCommand: form.cmdWifiOff || null,
         // 描述仅保存纯文本
         description: form.description || null,
         track: form.track.length
@@ -513,6 +521,7 @@ async function save(): Promise<void> {
         lightOnCommand: form.cmdLightOn || null,
         lightOffCommand: form.cmdLightOff || null,
         wifiCommand: form.cmdWifi || null,
+        wifiOffCommand: form.cmdWifiOff || null,
         // 描述仅保存纯文本
         description: form.description || null,
         track: form.track.length
@@ -718,8 +727,11 @@ function formatDate(input?: string | Date | null): string {
         <el-form-item label="灯关命令">
           <el-input v-model="form.cmdLightOff" placeholder="灯关命令" />
         </el-form-item>
-        <el-form-item label="WIFI命令">
-          <el-input v-model="form.cmdWifi" placeholder="WIFI命令" />
+        <el-form-item label="WIFI打开命令">
+          <el-input v-model="form.cmdWifi" placeholder="WIFI打开命令" />
+        </el-form-item>
+        <el-form-item label="WIFI关闭命令">
+          <el-input v-model="form.cmdWifiOff" placeholder="WIFI关闭命令" />
         </el-form-item>
         <el-form-item label="轨迹">
           <div style="width: 100%">
