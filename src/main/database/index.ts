@@ -412,7 +412,7 @@ export const alertService = {
       }
     })
   },
-  
+
   // 根据文件名查找告警
   async findByFilename(filename: string): Promise<Alert | null> {
     // 尝试直接匹配 imgFile，或者 imgFile 包含 filename
@@ -751,8 +751,8 @@ export const videoService = {
           ? data.recordedAt == null
             ? null
             : typeof data.recordedAt === 'string'
-              ? new Date(new Date(data.recordedAt).getTime() + 30 * 60 * 1000)
-              : new Date((data.recordedAt as Date).getTime() + 30 * 60 * 1000)
+              ? new Date(new Date(data.recordedAt).getTime() + 10 * 60 * 1000)
+              : new Date((data.recordedAt as Date).getTime() + 10 * 60 * 1000)
           : typeof data.endedAt === 'string'
             ? new Date(data.endedAt)
             : data.endedAt
