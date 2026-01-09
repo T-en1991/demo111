@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface AlertItem {
   id: number
@@ -89,7 +92,7 @@ async function fetchData(): Promise<void> {
     total.value = historyResult.total
   } catch (error) {
     console.error('Failed to fetch data:', error)
-    ElMessage.error('获取数据失败')
+    ElMessage.error(t('history.fetchFail'))
   } finally {
     loading.value = false
   }
@@ -194,19 +197,19 @@ onMounted(() => {
 <template>
   <section class="alerts-page">
     <header class="page-header">
-      <h1>历史记录</h1>
-      <p class="sub">支持条件过滤与分页</p>
+      <h1>{{ t('history.title') }}</h1>
+      <p class="sub">{{ t('history.sub') }}</p>
     </header>
 
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="88px">
-        <el-form-item label="时间范围">
-          <el-date-picker v-model="query.range" type="daterange" range-separator="至" start-placeholder="开始日期"
-            end-placeholder="结束日期" unlink-panels />
+        <el-form-item :label="t('history.timeRange')">
+          <el-date-picker v-model="query.range" type="daterange" range-separator="-" :start-placeholder="t('history.startDate')"
+            :end-placeholder="t('history.endDate')" unlink-panels />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="applyQuery">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
+          <el-button type="primary" @click="applyQuery">{{ t('history.query') }}</el-button>
+          <el-button @click="resetQuery">{{ t('history.reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -214,21 +217,21 @@ onMounted(() => {
     <el-card class="table-card" shadow="never">
       <el-table :data="currentPageData" border stripe style="width: 100%" v-loading="loading" height="560">
 
-        <el-table-column prop="id" label="ID" />
-        <el-table-column prop="lon" label="经度" />
-        <el-table-column prop="lat" label="纬度" />
-        <el-table-column prop="depth" label="深度" />
-        <el-table-column prop="height" label="高度" />
-        <el-table-column prop="rollAngle" label="横滚角" />
-        <el-table-column prop="pitchAngle" label="俯仰角" />
-        <el-table-column prop="yawAngle" label="航向角" />
-        <el-table-column prop="battery" label="电量" />
-        <el-table-column prop="signalStrength" label="信号强度" />
+        <el-table-column prop="id" :label="t('history.id')" />
+        <el-table-column prop="lon" :label="t('history.lon')" />
+        <el-table-column prop="lat" :label="t('history.lat')" />
+        <el-table-column prop="depth" :label="t('history.depth')" />
+        <el-table-column prop="height" :label="t('history.height')" />
+        <el-table-column prop="rollAngle" :label="t('history.roll')" />
+        <el-table-column prop="pitchAngle" :label="t('history.pitch')" />
+        <el-table-column prop="yawAngle" :label="t('history.yaw')" />
+        <el-table-column prop="battery" :label="t('history.battery')" />
+        <el-table-column prop="signalStrength" :label="t('history.signal')" />
         <!-- <el-table-column prop="content" label="内容" min-width="240" /> -->
-        <el-table-column prop="time" label="时间" />
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column prop="time" :label="t('history.time')" />
+        <el-table-column :label="t('common.operation')" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" plain @click="openDetail(row)">详情</el-button>
+            <el-button size="small" type="primary" plain @click="openDetail(row)">{{ t('common.detail') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -243,25 +246,25 @@ onMounted(() => {
         <div class="detail-header">
           <div class="line1">
             <span class="content" :title="detailItem?.content ?? ''">{{
-              detailItem?.content ?? '记录详情'
+              detailItem?.content ?? t('history.detailTitle')
             }}</span>
             <span class="time">{{ detailItem?.time }}</span>
           </div>
           <div class="meta-line">
-            <span class="meta-item">ID: {{ detailItem?.id }}</span>
+            <span class="meta-item">{{ t('history.id') }}: {{ detailItem?.id }}</span>
             <span class="sep">•</span>
-            <span class="meta-item">经度: {{ detailItem?.lon ?? '-' }}</span>
+            <span class="meta-item">{{ t('history.lon') }}: {{ detailItem?.lon ?? '-' }}</span>
             <span class="sep">•</span>
-            <span class="meta-item">纬度: {{ detailItem?.lat ?? '-' }}</span>
+            <span class="meta-item">{{ t('history.lat') }}: {{ detailItem?.lat ?? '-' }}</span>
             <span class="sep">•</span>
-            <span class="meta-item">深度: {{ detailItem?.depth ?? '-' }}</span>
+            <span class="meta-item">{{ t('history.depth') }}: {{ detailItem?.depth ?? '-' }}</span>
             <span class="sep">•</span>
-            <span class="meta-item">高度: {{ detailItem?.height ?? '-' }}</span>
+            <span class="meta-item">{{ t('history.height') }}: {{ detailItem?.height ?? '-' }}</span>
             <span class="sep">•</span>
-            <span class="meta-item">电量:
+            <span class="meta-item">{{ t('history.battery') }}:
               <span :class="batteryClass(detailItem?.battery)">{{ detailItem?.battery ?? '-' }}%</span></span>
             <span class="sep">•</span>
-            <span class="meta-item">信号:
+            <span class="meta-item">{{ t('history.signal') }}:
               <span :class="signalClass(detailItem?.signalStrength)">{{ detailItem?.signalStrength ?? '-' }}
                 dBm</span></span>
           </div>
@@ -270,35 +273,23 @@ onMounted(() => {
 
       <div class="video-pane" style="margin-top: 8px">
         <el-tabs v-model="activeTab">
-          <el-tab-pane label="单目" name="mono">
+          <el-tab-pane :label="t('history.mono')" name="mono">
             <template v-if="monoUrl">
               <video :src="monoUrl" controls autoplay style="width: 100%; max-height: 52vh; background: #000" />
             </template>
-            <el-empty v-else description="未找到单目视频" />
+            <el-empty v-else :description="t('history.noMono')" />
           </el-tab-pane>
-          <el-tab-pane label="双目" name="stereo">
+          <el-tab-pane :label="t('history.stereo')" name="stereo">
             <template v-if="stereoUrl">
               <video :src="stereoUrl" controls autoplay style="width: 100%; max-height: 52vh; background: #000" />
             </template>
-            <el-empty v-else description="未找到双目视频" />
+            <el-empty v-else :description="t('history.noStereo')" />
           </el-tab-pane>
         </el-tabs>
       </div>
 
-      <!-- <div class="map-pane" style="margin-top: 8px">
-        <div v-if="detailItem?.lat != null && detailItem?.lon != null">
-          <iframe :src="baiduMarkerUrl(
-            detailItem!.lat!,
-            detailItem!.lon!,
-            detailItem!.content,
-            detailItem!.time
-          )
-            " style="width: 100%; height: 420px; border: 0; border-radius: 8px" />
-        </div>
-        <el-empty v-else description="暂无坐标信息，无法在地图上标注" />
-      </div> -->
       <template #footer>
-        <el-button @click="closeDetail">关闭</el-button>
+        <el-button @click="closeDetail">{{ t('common.close') }}</el-button>
       </template>
     </el-dialog>
   </section>

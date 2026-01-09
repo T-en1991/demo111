@@ -3,10 +3,12 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '../../store/app'
 import { useFishControlStore, type Fish } from '../../store/fishControl'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const appStore = useAppStore()
 const fishControlStore = useFishControlStore()
+const { t } = useI18n()
 
 const VALID_USERNAME = 'admin_123'
 const VALID_PASSWORD = 'admin_123'
@@ -64,7 +66,7 @@ function submit(): void {
 
       router.push({ name: 'home' })
     } else {
-      error.value = '账号或密码错误'
+      error.value = t('login.error')
     }
   }, 400)
 }
@@ -80,42 +82,42 @@ function onEnter(e: KeyboardEvent): void {
       <div class="brand">
         <div class="logo-dot" />
         <h1>OceanFish</h1>
-        <p>欢迎登录</p>
+        <p>{{ t('login.welcome') }}</p>
       </div>
 
       <div class="form">
         <label class="field">
-          <span class="label">账号</span>
+          <span class="label">{{ t('login.account') }}</span>
           <input
             v-model.trim="form.username"
             class="input"
             type="text"
-            placeholder="请输入账号"
+            :placeholder="t('login.placeholderAccount')"
             @keydown="onEnter"
           />
         </label>
 
         <label class="field">
-          <span class="label">密码</span>
+          <span class="label">{{ t('login.password') }}</span>
           <div class="password-row">
             <input
               v-model.trim="form.password"
               class="input"
               :type="form.showPassword ? 'text' : 'password'"
-              placeholder="请输入密码"
+              :placeholder="t('login.placeholderPassword')"
               @keydown="onEnter"
             />
             <button class="ghost" type="button" @click="form.showPassword = !form.showPassword">
-              {{ form.showPassword ? '隐藏' : '显示' }}
+              {{ form.showPassword ? t('login.hide') : t('login.show') }}
             </button>
           </div>
         </label>
 
         <label class="field">
-          <span class="label">选择机器人</span>
+          <span class="label">{{ t('login.selectRobot') }}</span>
           <el-select
             v-model="form.robotId"
-            placeholder="请选择机器人"
+            :placeholder="t('login.placeholderRobot')"
             size="large"
             style="width: 100%"
           >
@@ -131,11 +133,11 @@ function onEnter(e: KeyboardEvent): void {
         <p v-if="error" class="error">{{ error }}</p>
 
         <button class="submit" :disabled="isDisabled()" @click="submit">
-          {{ loading ? '登录中…' : '登录' }}
+          {{ loading ? t('login.loggingIn') : t('login.loginBtn') }}
         </button>
       </div>
 
-      <div class="hint">体验账号：<code>admin_123</code> / 密码：<code>admin_123</code></div>
+      <div class="hint">{{ t('login.hint') }}</div>
     </div>
   </section>
 </template>

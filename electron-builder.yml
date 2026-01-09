@@ -11,6 +11,16 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  - '**/*.{node,dll,exe}'
+  - 'node_modules/.prisma/**'
+  - 'node_modules/@prisma/client/**'
+extraResources:
+  - from: src/main/prisma
+    to: prisma
+    filter:
+      - '**/*'
+  - 'node_modules/.prisma/**/*'
+  - 'node_modules/@prisma/client/**/*'
 win:
   executableName: ocean-fish
 nsis:

@@ -1,30 +1,36 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { HomeFilled, SwitchButton } from '@element-plus/icons-vue'
+import { HomeFilled, SwitchButton, MagicStick } from '@element-plus/icons-vue'
 import { useAppStore } from '../store/app'
 import { useFishControlStore } from '../store/fishControl'
+import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const route = useRoute()
 const app = useAppStore()
 const fishStore = useFishControlStore()
+const { t, locale } = useI18n()
 
 function goHome(): void {
   router.push({ name: 'home' })
 }
 
+function handleLanguage(lang: string) {
+  locale.value = lang
+}
+
 function exitApp(): void {
-  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(t('topbar.logoutConfirm'), t('topbar.tips'), {
+    confirmButtonText: t('common.confirm'),
+    cancelButtonText: t('common.cancel'),
     type: 'warning'
   })
     .then(() => {
       // 登出并返回登录页，清除登录态
       app.logout()
       router.push({ name: 'login' })
-      ElMessage.success('已退出登录')
+      ElMessage.success(t('topbar.logoutSuccess'))
     })
     .catch(() => {
       // 取消操作
@@ -34,20 +40,36 @@ function exitApp(): void {
 
 <template>
   <section v-if="route.name !== 'login'" class="global-topbar">
-    <div class="brand-name">深海鲲鹏-鲸鲨监控系统</div>
+    <div class="brand-name">{{ t('topbar.brand') }}</div>
     <div class="right-actions">
       <span v-if="fishStore.currentFish" class="current-device">
-        当前设备：{{ fishStore.currentFish.name }}
-        <span v-if="fishStore.currentStatus?.statusText" style="margin-left: 12px; color: #8ec5ff; font-weight: bold;">
-          [最新指令：{{ fishStore.currentStatus.statusText }}]
+        {{ t('topbar.currentDevice') }}{{ fishStore.currentFish.name }}
+        <span
+          v-if="fishStore.currentStatus?.statusText"
+          style="margin-left: 12px; color: #8ec5ff; font-weight: bold"
+        >
+          [{{ t('topbar.latestCommand') }}{{ t(fishStore.currentStatus.statusText) }}]
         </span>
       </span>
-      <el-tooltip effect="dark" content="返回主页" placement="bottom">
+
+      <el-dropdown trigger="click" @command="handleLanguage" style="display: none">
+        <el-button circle plain>
+          {{ locale === 'zh-CN' ? '中文' : 'En' }}
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="zh-CN">中文</el-dropdown-item>
+            <el-dropdown-item command="en-US">English</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+
+      <el-tooltip effect="dark" :content="t('topbar.home')" placement="bottom">
         <el-button type="primary" circle plain @click="goHome">
           <el-icon><HomeFilled /></el-icon>
         </el-button>
       </el-tooltip>
-      <el-tooltip effect="dark" content="退出登录" placement="bottom">
+      <el-tooltip effect="dark" :content="t('topbar.logout')" placement="bottom">
         <el-button type="danger" circle plain @click="exitApp">
           <el-icon><SwitchButton /></el-icon>
         </el-button>

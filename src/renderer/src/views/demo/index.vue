@@ -3,6 +3,9 @@ import { useRouter } from 'vue-router'
 import { onMounted, onUnmounted, ref } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // 修复 Leaflet 默认图标在 Vite/Webpack 构建下的路径问题
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
@@ -38,7 +41,7 @@ onMounted(() => {
     // 添加一个示例标记
     L.marker([31.2304, 121.4737])
       .addTo(map)
-      .bindPopup('OceanFish Demo Point<br>上海')
+      .bindPopup(t('demo.popup'))
       .openPopup()
   }
 })
@@ -55,7 +58,7 @@ onUnmounted(() => {
   <div class="demo-page">
     <el-page-header @back="goBack">
       <template #content>
-        <span class="text-large font-600 mr-3"> Demo 页面 - Leaflet Map </span>
+        <span class="text-large font-600 mr-3"> {{ t('demo.title') }} </span>
       </template>
     </el-page-header>
 

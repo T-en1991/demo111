@@ -9,6 +9,9 @@ import VideoPlayerJSMpeg from '../../components/VideoPlayerJSMpeg.vue'
 import { useAppStore } from '../../store/app'
 import { type RobotStatus, type SignalLevel } from '../../constants/robots'
 import { useFishControlStore } from '../../store/fishControl'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 // 轨迹点类型（仅前端使用，不持久化）
 interface TrackPoint {
@@ -50,20 +53,41 @@ interface BMap2DApi {
 }
 
 const robots = reactive<RobotStatus[]>([])
-const selectedId = computed(() => Number(appStore.selectedRobotId) || (robots.length > 0 ? robots[0].id : 0))
+const selectedId = computed(
+  () => Number(appStore.selectedRobotId) || (robots.length > 0 ? robots[0].id : 0)
+)
 const current = computed<RobotStatus | undefined>(() =>
   robots.find((r) => r.id === selectedId.value)
 )
 // 为模板提供已解包的派生值，优先使用实时状态
-const currentLng = computed<number>(() => fishControlStore.currentStatus?.lng ?? current.value?.lng ?? 0)
-const currentLat = computed<number>(() => fishControlStore.currentStatus?.lat ?? current.value?.lat ?? 0)
-const currentDepth = computed<number>(() => fishControlStore.currentStatus?.depth ?? current.value?.depth ?? 0)
-const currentAltitude = computed<number>(() => fishControlStore.currentStatus?.altitude ?? current.value?.altitude ?? 0)
-const currentBattery = computed<number>(() => fishControlStore.currentStatus?.battery ?? current.value?.battery ?? 0)
-const currentYaw = computed<number>(() => fishControlStore.currentStatus?.yaw ?? current.value?.yaw ?? 0)
-const currentPitch = computed<number>(() => fishControlStore.currentStatus?.pitch ?? current.value?.pitch ?? 0)
-const currentRoll = computed<number>(() => fishControlStore.currentStatus?.roll ?? current.value?.roll ?? 0)
-const currentAcoustic = computed<SignalLevel>(() => (fishControlStore.currentStatus?.acoustic as SignalLevel) ?? current.value?.acoustic ?? 'weak')
+const currentLng = computed<number>(
+  () => fishControlStore.currentStatus?.lng ?? current.value?.lng ?? 0
+)
+const currentLat = computed<number>(
+  () => fishControlStore.currentStatus?.lat ?? current.value?.lat ?? 0
+)
+const currentDepth = computed<number>(
+  () => fishControlStore.currentStatus?.depth ?? current.value?.depth ?? 0
+)
+const currentAltitude = computed<number>(
+  () => fishControlStore.currentStatus?.altitude ?? current.value?.altitude ?? 0
+)
+const currentBattery = computed<number>(
+  () => fishControlStore.currentStatus?.battery ?? current.value?.battery ?? 0
+)
+const currentYaw = computed<number>(
+  () => fishControlStore.currentStatus?.yaw ?? current.value?.yaw ?? 0
+)
+const currentPitch = computed<number>(
+  () => fishControlStore.currentStatus?.pitch ?? current.value?.pitch ?? 0
+)
+const currentRoll = computed<number>(
+  () => fishControlStore.currentStatus?.roll ?? current.value?.roll ?? 0
+)
+const currentAcoustic = computed<SignalLevel>(
+  () =>
+    (fishControlStore.currentStatus?.acoustic as SignalLevel) ?? current.value?.acoustic ?? 'weak'
+)
 let mapInstance: BMapLikeMap | null = null
 function getBMap(): BMap2DApi | undefined {
   return (window as { BMap?: unknown }).BMap as BMap2DApi | undefined
@@ -79,7 +103,7 @@ onMounted(async (): Promise<void> => {
     const list = await window.api.fish.findAll()
     if (list && list.length > 0) {
       // 转换为 RobotStatus 格式
-      const statusList: RobotStatus[] = list.map(f => ({
+      const statusList: RobotStatus[] = list.map((f) => ({
         id: f.id,
         name: f.name,
         battery: 100, // 默认电量
@@ -118,29 +142,38 @@ onMounted(() => {
   // 使用 window.electron.ipcRenderer 并做空值保护
   const ipc = (window as any)?.electron?.ipcRenderer
   if (!ipc || typeof ipc.on !== 'function' || typeof ipc.removeListener !== 'function') return
-  const handler = (_evt: unknown, payload: { time?: string; csq?: number; raw?: string; port?: string }) => {
+  const handler = (
+    _evt: unknown,
+    payload: { time?: string; csq?: number; raw?: string; port?: string }
+  ) => {
     try {
       const t = payload?.time ?? ''
       const csq = payload?.csq ?? ''
       const dt = t ? t.replace('_', ' ') : ''
-      ElMessageBox.alert(`上浮成功\n时间：${dt}\nCSQ：${csq}`, '提示', { type: 'success' })
-    } catch { /* ignore */ }
+      ElMessageBox.alert(t('screen.surfSuccessAlert', { time: dt, csq: csq }), t('common.tips'), {
+        type: 'success'
+      })
+    } catch {
+      /* ignore */
+    }
   }
   ipc.on('serial:surf', handler)
   removeSurfListener = () => ipc.removeListener('serial:surf', handler)
 })
 
-onBeforeUnmount(() => { removeSurfListener?.() })
+onBeforeUnmount(() => {
+  removeSurfListener?.()
+})
 
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
 function controlUp(): void {
   console.log('[tap] up')
-  ElMessage.success('向上指令已发送')
+  ElMessage.success(t('screen.upSent'))
   void fishControlStore.sendCommand('up')
 }
 function controlDown(): void {
   console.log('[tap] down')
-  ElMessage.success('向下指令已发送')
+  ElMessage.success(t('screen.downSent'))
   void fishControlStore.sendCommand('down')
 }
 function controlDive(): void {
@@ -150,25 +183,24 @@ function controlDive(): void {
 }
 function controlSurf(): void {
   console.log('[tap] surf')
-  ElMessage.success('上浮指令已发送')
+  ElMessage.success(t('screen.surfSent'))
   void fishControlStore.sendCommand('surf')
 }
 function moveForward(): void {
   console.log('[tap] forward')
-  ElMessage.success('向前指令已发送')
+  ElMessage.success(t('screen.forwardSent'))
   void fishControlStore.sendCommand('forward')
 }
 function moveLeft(): void {
   console.log('[tap] left')
-  ElMessage.success('向左指令已发送')
+  ElMessage.success(t('screen.leftSent'))
   void fishControlStore.sendCommand('left')
 }
 function moveRight(): void {
   console.log('[tap] right')
-  ElMessage.success('向右指令已发送')
+  ElMessage.success(t('screen.rightSent'))
   void fishControlStore.sendCommand('right')
 }
-
 
 // 防抖：用于非连续性操作避免短时间内重复触发
 function debounce<T extends (...args: unknown[]) => void>(
@@ -205,7 +237,7 @@ const returnHomeDebounced = debounce(returnHome, 500)
 const lightOn = ref(false)
 
 function enableManual(): void {
-  ElMessage.success('人工模式指令已发送')
+  ElMessage.success(t('screen.manualSent'))
   void fishControlStore.sendCommand('manual')
 }
 
@@ -214,7 +246,9 @@ const navigateDialogVisible = ref(false)
 const navigateTrack = ref<TrackPoint[]>([])
 const trackErrors = ref<number[]>([])
 const trackErrorDesc = computed(() =>
-  trackErrors.value.length ? `问题行：${trackErrors.value.map((i) => i + 1).join(', ')}` : ''
+  trackErrors.value.length
+    ? `${t('common.error')}：${trackErrors.value.map((i) => i + 1).join(', ')}`
+    : ''
 )
 
 function addTrackPoint(): void {
@@ -249,17 +283,13 @@ function recomputeTrackErrors(): void {
   trackErrors.value = errs
 }
 
-watch(
-  navigateTrack,
-  () => recomputeTrackErrors(),
-  { deep: true }
-)
+watch(navigateTrack, () => recomputeTrackErrors(), { deep: true })
 
 async function enableNavigate(): Promise<void> {
   const currentFish = fishControlStore.currentFish
   console.log('enableNavigate', currentFish)
   if (!currentFish) {
-    ElMessage.warning('请先选择机器鱼')
+    ElMessage.warning(t('login.placeholderRobot'))
     return
   }
 
@@ -293,11 +323,11 @@ async function enableNavigate(): Promise<void> {
       navigateTrack.value = tracks
       navigateDialogVisible.value = true
     } else {
-      ElMessage.error('获取机器鱼数据失败')
+      ElMessage.error(t('history.fetchFail'))
     }
   } catch (error) {
     console.error('获取机器鱼数据出错:', error)
-    ElMessage.error('获取机器鱼数据出错')
+    ElMessage.error(t('history.fetchFail'))
   }
 }
 
@@ -308,7 +338,7 @@ async function confirmNavigate(): Promise<void> {
   // 校验
   recomputeTrackErrors()
   if (trackErrors.value.length) {
-    ElMessage.error('轨迹校验失败：经度、纬度必填，且高度与深度必须二选一')
+    ElMessage.error(t('fish.trackError'))
     return
   }
 
@@ -331,10 +361,10 @@ async function confirmNavigate(): Promise<void> {
       track: cleanTrack
     })
 
-    ElMessage.success('轨迹已保存，开始执行导航流程')
+    ElMessage.success(t('screen.trackSaved'))
     // Start complex navigation flow (Navigate -> Wait -> Upload Trajectory)
     // Map UI TrackPoint to Store TrackPoint
-    const storeTrack = cleanTrack.map(p => ({
+    const storeTrack = cleanTrack.map((p) => ({
       lon: p.lon,
       lat: p.lat,
       alt: p.alt,
@@ -348,13 +378,13 @@ async function confirmNavigate(): Promise<void> {
     navigateDialogVisible.value = false
   } catch (error) {
     console.error('保存轨迹失败:', error)
-    ElMessage.error('保存轨迹失败')
+    ElMessage.error(t('fish.saveFail'))
   }
 }
 
 function setLight(on: boolean): void {
   lightOn.value = on
-  ElMessage.success(`灯光：${on ? '开启' : '关闭'}`)
+  ElMessage.success(on ? t('screen.lightOn') : t('screen.lightOff'))
   void fishControlStore.sendCommand(on ? 'lightOn' : 'lightOff')
 }
 function returnHome(): void {
@@ -371,11 +401,10 @@ function returnHome(): void {
   //   target.lat = home.lat
   //   ElMessage.success('已返航至初始位置')
   // }
-  ElMessage.success('返航指令已发送')
+  ElMessage.success(t('screen.returnSent'))
 
   void fishControlStore.sendCommand('return')
 }
-
 
 import type { Alert } from '@prisma/client'
 
@@ -393,7 +422,10 @@ onMounted(() => {
   const ipc = (window as any)?.electron?.ipcRenderer
   if (!ipc || typeof ipc.on !== 'function') return
 
-  const progressHandler = (_evt: unknown, payload: { imageId: string; current: number; total: number; filename: string }) => {
+  const progressHandler = (
+    _evt: unknown,
+    payload: { imageId: string; current: number; total: number; filename: string }
+  ) => {
     if (payload.filename) {
       imageProgress[payload.filename] = { current: payload.current, total: payload.total }
     }
@@ -423,8 +455,8 @@ onBeforeUnmount(() => {
 const alerts = reactive<AlertItem[]>([])
 
 function levelClass(level: string): string {
-  return level === '01'  ? 'lv-high' : 'lv-low'
-} 
+  return level === '01' ? 'lv-high' : 'lv-low'
+}
 
 function formatTime(iso: string): string {
   try {
@@ -450,10 +482,11 @@ async function fetchAlertsAndUpdate(): Promise<void> {
       fromSocket: true
     })
     const items = Array.isArray(res?.items) ? res.items : []
-    console.log('items',items)
+    console.log('items', items)
     // 按照 createdAt 倒序排序
     items.sort(
-      (a: AlertItem, b: AlertItem) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a: AlertItem, b: AlertItem) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
     const top100 = items.slice(0, 100)
     alerts.splice(0, alerts.length, ...top100)
@@ -470,7 +503,7 @@ async function focusAlert(a: AlertItem): Promise<void> {
   // 如果图片正在接收中，提示进度
   if (a.imgFile && imageProgress[a.imgFile]) {
     const p = imageProgress[a.imgFile]
-    ElMessage.warning(`图片接收中... ${p.current}/${p.total}`)
+    ElMessage.warning(t('screen.receiving', { current: p.current, total: p.total }))
     return
   }
 
@@ -487,20 +520,22 @@ async function focusAlert(a: AlertItem): Promise<void> {
   // 无图片数据时发送PICSTART命令
   else {
     // 提取图片文件名，从imageUrl或生成默认文件名
-    ElMessage.warning('请上浮')
-    const imageName = a.imgFile ? a.imgFile.split('/').pop() || `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg` : `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg`
+    ElMessage.warning(t('screen.pleaseSurf'))
+    const imageName = a.imgFile
+      ? a.imgFile.split('/').pop() || `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg`
+      : `fm_${new Date().toISOString().replace(/[-:.TZ]/g, '')}.jpg`
     try {
       // 从COM口发送PICSTART命令
       const command = `PICSTART ${imageName}`
       const ok = await (window as any).api?.serial?.write?.(command)
       if (ok) {
-        ElMessage.success(`已发送PICSTART命令: ${command}`)
+        ElMessage.success(t('screen.picStartSent', { cmd: command }))
       } else {
-        ElMessage.error('发送PICSTART命令失败')
+        ElMessage.error(t('screen.picStartFail'))
       }
     } catch (e) {
       console.error('发送PICSTART命令出错:', e)
-      ElMessage.error('发送PICSTART命令出错')
+      ElMessage.error(t('screen.picStartFail'))
     }
   }
 }
@@ -541,11 +576,11 @@ watch(videoMode, async (newMode) => {
         console.log(`已切换到${newMode}视频流`)
       } else {
         console.error('切换RTSP流类型失败:', result.message)
-        ElMessage.error('切换视频流失败: ' + result.message)
+        ElMessage.error(t('screen.switchVideoFail', { msg: result.message }))
       }
     } catch (error) {
       console.error('切换RTSP流类型失败:', error)
-      ElMessage.error('切换视频流失败，请检查连接')
+      ElMessage.error(t('screen.checkConnect'))
     } finally {
       // 无论成功失败，都关闭加载框
       setTimeout(() => {
@@ -555,7 +590,7 @@ watch(videoMode, async (newMode) => {
   }
 })
 // 使用本地示例视频，同时作为单目与双目演示源
-const currentVideoTitle = computed((): string => '实时视频')
+const currentVideoTitle = computed((): string => t('screen.videoDialogTitle'))
 const showVideoPlayer = ref(true)
 function openVideo(mode: VideoMode): void {
   videoMode.value = mode
@@ -587,7 +622,7 @@ function setCurrentMarker(lng: number, lat: number, size = 56): void {
   mapInstance.addOverlay(currentMarker)
   // 点击鱼标注，打开视频弹窗（默认单目）
   try {
-    ; (
+    ;(
       currentMarker as { addEventListener?: (type: string, handler: () => void) => void }
     ).addEventListener?.('click', (): void => {
       openVideo('microwaveMono')
@@ -613,8 +648,6 @@ function drawRoute(points: RoutePoint[]): void {
   mapInstance.addOverlay(polyline)
 }
 
-
-
 async function fetchFishData(
   id: number,
   _prevRoute: RoutePoint[]
@@ -633,7 +666,7 @@ async function fetchFishData(
   }
 
   // 优先使用实时状态（声通数据），否则使用数据库中的声通基准或内存中的最后状态
-  const store = (fishControlStore.currentFish?.id === id) ? fishControlStore.currentStatus : null
+  const store = fishControlStore.currentFish?.id === id ? fishControlStore.currentStatus : null
   // 辅助函数：优先取实时值，其次取数据库值，最后取默认值
   const val = (rt: number | undefined, db: number | null | undefined, def: number): number => {
     if (rt !== undefined && rt !== null) return rt
@@ -724,8 +757,6 @@ async function loadSelectedFishData(recenter = false): Promise<void> {
   routePoints.value = res.route
   drawRoute(routePoints.value)
 
-
-
   if (recenter) {
     const point = new BMap.Point(res.info.lng, res.info.lat)
     mapInstance.centerAndZoom(point, 14)
@@ -794,7 +825,6 @@ async function init(): Promise<void> {
   }
 }
 
-
 onUnmounted((): void => {
   if (pollTimer) {
     clearInterval(pollTimer)
@@ -829,64 +859,75 @@ watch(selectedId, (): void => {
       </div>
       <div class="side-panel">
         <div class="panel-card">
-          <div class="section-title">基本信息</div>
+          <div class="section-title">{{ t('screen.basicInfo') }}</div>
           <div class="status-grid">
             <div class="stat-card">
               <div class="stat-value">{{ Number(currentLng).toFixed(6) }}°</div>
-              <div class="stat-label">经</div>
+              <div class="stat-label">{{ t('history.lon') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ Number(currentLat).toFixed(6) }}°</div>
-              <div class="stat-label">纬</div>
+              <div class="stat-label">{{ t('history.lat') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentDepth }}m</div>
-              <div class="stat-label">深度</div>
+              <div class="stat-label">{{ t('history.depth') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentAltitude }}m</div>
-              <div class="stat-label">高度</div>
+              <div class="stat-label">{{ t('history.height') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentBattery }}%</div>
-              <div class="stat-label">电量</div>
+              <div class="stat-label">{{ t('history.battery') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentYaw }}°</div>
-              <div class="stat-label">航向角</div>
+              <div class="stat-label">{{ t('history.yaw') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentPitch }}°</div>
-              <div class="stat-label">俯仰角</div>
+              <div class="stat-label">{{ t('history.pitch') }}</div>
             </div>
             <div class="stat-card">
               <div class="stat-value">{{ currentRoll }}°</div>
-              <div class="stat-label">横滚角</div>
+              <div class="stat-label">{{ t('history.roll') }}</div>
             </div>
             <div class="stat-card signal">
               <div class="stat-value">
-                <span :class="[
-                  'sig',
-                  currentAcoustic === 'strong'
-                    ? 's-strong'
-                    : currentAcoustic === 'medium'
-                      ? 's-medium'
-                      : 's-weak'
-                ]">
+                <span
+                  :class="[
+                    'sig',
+                    currentAcoustic === 'strong'
+                      ? 's-strong'
+                      : currentAcoustic === 'medium'
+                        ? 's-medium'
+                        : 's-weak'
+                  ]"
+                >
                   {{
-                    currentAcoustic === 'strong' ? '强' : currentAcoustic === 'medium' ? '中' : '弱'
+                    currentAcoustic === 'strong'
+                      ? t('screen.strong')
+                      : currentAcoustic === 'medium'
+                        ? t('screen.medium')
+                        : t('screen.weak')
                   }}
                 </span>
               </div>
-              <div class="stat-label">声通信号强度</div>
+              <div class="stat-label">{{ t('screen.acousticSignal') }}</div>
             </div>
           </div>
         </div>
 
         <div class="panel-card alerts-card">
           <div class="section-header">
-            <div class="section-title">报警信息</div>
-            <button class="section-more" type="button" title="查看历史" @click="goHistory()">
+            <div class="section-title">{{ t('screen.alertInfo') }}</div>
+            <button
+              class="section-more"
+              type="button"
+              :title="t('screen.viewHistory')"
+              @click="goHistory()"
+            >
               ...
             </button>
           </div>
@@ -897,101 +938,136 @@ watch(selectedId, (): void => {
               </div>
               <div class="alert-main">
                 <div class="alert-title">
-                  <span v-if="a.imgFile" >
-                     {{ a.imgFile.split(/[/\\]/).pop() }}
+                  <span v-if="a.imgFile">
+                    {{ a.imgFile.split(/[/\\]/).pop() }}
                   </span>
-                  &nbsp;  &nbsp;
+                  &nbsp; &nbsp;
                   <span v-if="a.imageBase64" class="alert-image-icon">📷</span>
-                  <span v-else-if="a.imgFile && imageProgress[a.imgFile]" class="alert-image-icon" style="font-size: 0.8em; color: #e6a23c;">
+                  <span
+                    v-else-if="a.imgFile && imageProgress[a.imgFile]"
+                    class="alert-image-icon"
+                    style="font-size: 0.8em; color: #e6a23c"
+                  >
                     ⏳ {{ imageProgress[a.imgFile].current }}/{{ imageProgress[a.imgFile].total }}
                   </span>
                   <span v-else-if="a.imgFile" class="alert-image-icon">📷</span>
                 </div>
                 <div class="alert-sub">
-                  <span> {{ formatTime(a.createdAt.toString()) }}  &nbsp;  &nbsp;</span>
-                  经度 {{ Number(a.lon ?? 0).toFixed(6) }} · 纬度 {{ Number(a.lat ?? 0).toFixed(6) }}
-
+                  <span> {{ formatTime(a.createdAt.toString()) }} &nbsp; &nbsp;</span>
+                  {{ t('history.lon') }} {{ Number(a.lon ?? 0).toFixed(6) }} ·
+                  {{ t('history.lat') }} {{ Number(a.lat ?? 0).toFixed(6) }}
                 </div>
               </div>
-              <div class="alert-level" :class="levelClass(a.level || '')">{{ a.level==='01'?'高':'低' }}</div>
+              <div class="alert-level" :class="levelClass(a.level || '')">
+                {{ a.level === '01' ? t('screen.strong') : t('screen.weak') }}
+              </div>
             </div>
           </div>
         </div>
 
         <div class="panel-card">
-          <div class="section-title">控制台</div>
+          <div class="section-title">{{ t('screen.console') }}</div>
           <div class="actions-grid">
             <!-- 方向控制 -->
             <button class="action-btn primary" @click="moveForwardDebounced">
-              <span class="icon">↑</span><span class="text">向前</span>
+              <span class="icon">↑</span><span class="text">{{ t('screen.forward') }}</span>
             </button>
             <button class="action-btn primary" @click="moveLeftDebounced">
-              <span class="icon">←</span><span class="text">向左</span>
+              <span class="icon">←</span><span class="text">{{ t('screen.left') }}</span>
             </button>
             <button class="action-btn primary" @click="moveRightDebounced">
-              <span class="icon">→</span><span class="text">向右</span>
+              <span class="icon">→</span><span class="text">{{ t('screen.right') }}</span>
             </button>
             <!-- 垂直运动 -->
             <button class="action-btn accent" @click="controlUpDebounced">
-              <span class="icon">⤒</span><span class="text">向上</span>
+              <span class="icon">⤒</span><span class="text">{{ t('screen.up') }}</span>
             </button>
             <button class="action-btn accent" @click="controlDownDebounced">
-              <span class="icon">⤓</span><span class="text">向下</span>
+              <span class="icon">⤓</span><span class="text">{{ t('screen.down') }}</span>
             </button>
             <button class="action-btn accent" @click="controlDiveDebounced">
-              <span class="icon">⤓</span><span class="text">下潜</span>
+              <span class="icon">⤓</span><span class="text">{{ t('screen.dive') }}</span>
             </button>
             <!-- 模式/返航/上浮 -->
             <button class="action-btn warn" @click="enableManualDebounced">
-              <span class="icon">⚙️</span><span class="text">人工</span>
+              <span class="icon">⚙️</span><span class="text">{{ t('screen.manual') }}</span>
             </button>
             <button class="action-btn info" @click="returnHomeDebounced">
-              <span class="icon">🏠</span><span class="text">返航</span>
+              <span class="icon">🏠</span><span class="text">{{ t('screen.return') }}</span>
             </button>
             <button class="action-btn accent" @click="controlSurfDebounced">
-              <span class="icon">⤒</span><span class="text">上浮</span>
+              <span class="icon">⤒</span><span class="text">{{ t('screen.surf') }}</span>
             </button>
             <!-- 功耗与灯光 -->
             <button class="action-btn warn" @click="enableNavigateDebounced">
-              <span class="icon">🌙</span><span class="text">导航</span>
+              <span class="icon">🌙</span><span class="text">{{ t('screen.navigate') }}</span>
             </button>
             <button class="action-btn info" @click="setLightOnDebounced">
-              <span class="icon">💡</span><span class="text">灯开</span>
+              <span class="icon">💡</span><span class="text">{{ t('screen.lightOn') }}</span>
             </button>
             <button class="action-btn info" @click="setLightOffDebounced">
-              <span class="icon">💡</span><span class="text">灯关</span>
+              <span class="icon">💡</span><span class="text">{{ t('screen.lightOff') }}</span>
             </button>
           </div>
         </div>
       </div>
     </div>
     <!-- 视频查看弹窗：微波/星链 单目/双目切换 -->
-    <el-dialog v-model="videoDialogVisible" :title="currentVideoTitle" width="60%" class="video-dialog"
-      @close="onVideoDialogClose">
+    <el-dialog
+      v-model="videoDialogVisible"
+      :title="currentVideoTitle"
+      width="60%"
+      class="video-dialog"
+      @close="onVideoDialogClose"
+    >
       <div class="video-toolbar">
         <el-button-group>
-          <el-button type="primary" :plain="videoMode !== 'microwaveMono'" :loading="videoLoading"
-            @click="videoMode = 'microwaveMono'">微波单目</el-button>
-          <el-button type="primary" :plain="videoMode !== 'microwaveStereo'" :loading="videoLoading"
-            @click="videoMode = 'microwaveStereo'">微波双目</el-button>
+          <el-button
+            type="primary"
+            :plain="videoMode !== 'microwaveMono'"
+            :loading="videoLoading"
+            @click="videoMode = 'microwaveMono'"
+            >{{ t('screen.microwaveMono') }}</el-button
+          >
+          <el-button
+            type="primary"
+            :plain="videoMode !== 'microwaveStereo'"
+            :loading="videoLoading"
+            @click="videoMode = 'microwaveStereo'"
+            >{{ t('screen.microwaveStereo') }}</el-button
+          >
         </el-button-group>
         <el-divider direction="vertical" />
         <el-button-group>
-          <el-button type="success" :plain="videoMode !== 'starlinkMono'" :loading="videoLoading"
-            @click="videoMode = 'starlinkMono'">星链单目</el-button>
-          <el-button type="success" :plain="videoMode !== 'starlinkStereo'" :loading="videoLoading"
-            @click="videoMode = 'starlinkStereo'">星链双目</el-button>
+          <el-button
+            type="success"
+            :plain="videoMode !== 'starlinkMono'"
+            :loading="videoLoading"
+            @click="videoMode = 'starlinkMono'"
+            >{{ t('screen.starlinkMono') }}</el-button
+          >
+          <el-button
+            type="success"
+            :plain="videoMode !== 'starlinkStereo'"
+            :loading="videoLoading"
+            @click="videoMode = 'starlinkStereo'"
+            >{{ t('screen.starlinkStereo') }}</el-button
+          >
         </el-button-group>
       </div>
       <div class="video-body">
         <div :class="['video-container', { 'video-loading': videoLoading }]">
-          <el-loading v-loading="videoLoading" text="正在切换视频流..." background="rgba(0, 0, 0, 0.8)">
+          <el-loading
+            v-loading="videoLoading"
+            :text="t('screen.switchVideo')"
+            background="rgba(0, 0, 0, 0.8)"
+          >
             <template v-if="showVideoPlayer">
               <VideoPlayerJSMpeg url="ws://localhost:8085/" />
             </template>
             <template v-else>
               <div class="video-placeholder">
-                未配置视频流地址（{{ currentVideoTitle }}）。请接入真实 URL。
+                {{ t('screen.videoPlaceholder', { title: currentVideoTitle }) }}
               </div>
             </template>
           </el-loading>
@@ -999,75 +1075,133 @@ watch(selectedId, (): void => {
       </div>
     </el-dialog>
     <!-- 报警图片弹窗：有图则直接展示 -->
-    <el-dialog v-model="alertImageDialogVisible" title="报警图片" width="50%" class="image-dialog">
-      <div style="
+    <el-dialog
+      v-model="alertImageDialogVisible"
+      :title="t('screen.alertImage')"
+      width="50%"
+      class="image-dialog"
+    >
+      <div
+        style="
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 12px;
           padding: 10px;
           background: linear-gradient(135deg, #1f2230, #25293a);
-        ">
+        "
+      >
         <template v-if="currentAlertImageUrl">
           <img :src="currentAlertImageUrl" alt="报警图片" style="width: 100%; border-radius: 8px" />
         </template>
         <template v-else>
-          <div style="
+          <div
+            style="
               height: 320px;
               display: flex;
               align-items: center;
               justify-content: center;
               color: #9fb2ff;
-            ">
-            暂无图片信息
+            "
+          >
+            {{ t('screen.noAlertImage') }}
           </div>
         </template>
       </div>
     </el-dialog>
     <!-- 导航弹窗 -->
-    <el-dialog v-model="navigateDialogVisible" title="导航设置" width="800px" class="navigate-dialog">
+    <el-dialog
+      v-model="navigateDialogVisible"
+      :title="t('screen.navigateDialogTitle')"
+      width="800px"
+      class="navigate-dialog"
+    >
       <div class="dialog-content">
         <div style="margin-bottom: 8px">
-          <el-button type="primary" plain @click="addTrackPoint">添加轨迹点</el-button>
+          <el-button type="primary" plain @click="addTrackPoint">{{
+            t('fish.addTrackPoint')
+          }}</el-button>
         </div>
-        <el-table :data="navigateTrack" border stripe style="width: 100%" size="small" max-height="400">
-          <el-table-column label="经度">
+        <el-table
+          :data="navigateTrack"
+          border
+          stripe
+          style="width: 100%"
+          size="small"
+          max-height="400"
+        >
+          <el-table-column :label="t('history.lon')">
             <template #default="{ $index }">
-              <el-input-number v-model="navigateTrack[$index].lon" :min="-180" :max="180" :step="0.0001" :precision="4"
-                controls-position="right" style="width: 100%" />
+              <el-input-number
+                v-model="navigateTrack[$index].lon"
+                :min="-180"
+                :max="180"
+                :step="0.0001"
+                :precision="4"
+                controls-position="right"
+                style="width: 100%"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="纬度">
+          <el-table-column :label="t('history.lat')">
             <template #default="{ $index }">
-              <el-input-number v-model="navigateTrack[$index].lat" :min="-90" :max="90" :step="0.0001" :precision="4"
-                controls-position="right" style="width: 100%" />
+              <el-input-number
+                v-model="navigateTrack[$index].lat"
+                :min="-90"
+                :max="90"
+                :step="0.0001"
+                :precision="4"
+                controls-position="right"
+                style="width: 100%"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="高度">
+          <el-table-column :label="t('history.height')">
             <template #default="{ $index }">
-              <el-input-number v-model="navigateTrack[$index].alt" :min="0" :step="0.01" :precision="2" controls-position="right"
-                style="width: 100%" />
+              <el-input-number
+                v-model="navigateTrack[$index].alt"
+                :min="0"
+                :step="0.01"
+                :precision="2"
+                controls-position="right"
+                style="width: 100%"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="深度">
+          <el-table-column :label="t('history.depth')">
             <template #default="{ $index }">
-              <el-input-number v-model="navigateTrack[$index].depth" :min="0" :step="0.01" :precision="2" controls-position="right"
-                style="width: 100%" />
+              <el-input-number
+                v-model="navigateTrack[$index].depth"
+                :min="0"
+                :step="0.01"
+                :precision="2"
+                controls-position="right"
+                style="width: 100%"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="80" fixed="right">
+          <el-table-column :label="t('common.operation')" width="80" fixed="right">
             <template #default="{ $index }">
-              <el-button size="small" type="danger" plain @click="removeTrackPoint($index)">删除</el-button>
+              <el-button size="small" type="danger" plain @click="removeTrackPoint($index)">{{
+                t('common.delete')
+              }}</el-button>
             </template>
           </el-table-column>
         </el-table>
         <div v-if="trackErrors.length" style="margin-top: 8px">
-          <el-alert type="error" show-icon :closable="false" :title="'轨迹校验失败：经度、纬度必填，且高度与深度必须二选一'"
-            :description="trackErrorDesc" />
+          <el-alert
+            type="error"
+            show-icon
+            :closable="false"
+            :title="t('fish.trackError')"
+            :description="trackErrorDesc"
+          />
         </div>
       </div>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="navigateDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmNavigate">保存并开始导航</el-button>
+          <el-button @click="navigateDialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="confirmNavigate">{{
+            t('screen.saveAndNavigate')
+          }}</el-button>
         </span>
       </template>
     </el-dialog>

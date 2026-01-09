@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 
 import { useFishControlStore } from '../../store/fishControl'
 import type { Fish as StoreFish } from '../../store/fishControl'
 
+const { t } = useI18n()
 const fishControlStore = useFishControlStore()
 
 interface Fish {
@@ -249,7 +251,7 @@ async function loadFish(): Promise<void> {
     allFish.value = normalized
   } catch (error) {
     console.error('加载机器鱼失败:', error)
-    ElMessage.error('加载数据失败')
+    ElMessage.error(t('history.fetchFail'))
   } finally {
     loading.value = false
   }
@@ -414,6 +416,7 @@ function recomputeTrackErrors(): void {
     // 高度和深度二选一
     if (!((hasAlt && !hasDepth) || (!hasAlt && hasDepth))) {
       errs.push(idx)
+      return
     }
   })
   trackErrors.value = errs
@@ -424,23 +427,23 @@ watch(
   { deep: true, immediate: true }
 )
 const trackErrorDesc = computed(() =>
-  trackErrors.value.length ? `问题行：${trackErrors.value.map((i) => i + 1).join(', ')}` : ''
+  trackErrors.value.length ? `${t('common.error')}：${trackErrors.value.map((i) => i + 1).join(', ')}` : ''
 )
 
 async function save(): Promise<void> {
   let rtspChanged = false
   if (!form.name.trim()) {
-    ElMessage.error('请填写名称')
+    ElMessage.error(t('fish.nameRequired'))
     return
   }
   if (form.name.trim().length > 20) {
-    ElMessage.error('名称不能超过 20 个字')
+    ElMessage.error(t('fish.nameLength'))
     return
   }
   // 轨迹校验：若存在错误行则阻止保存
   recomputeTrackErrors()
   if (trackErrors.value.length) {
-    ElMessage.error('轨迹校验失败：经度、纬度必填，且高度与深度必须二选一')
+    ElMessage.error(t('fish.trackError'))
     return
   }
 
@@ -492,7 +495,7 @@ async function save(): Promise<void> {
           }))
           : []
       } as any)
-      ElMessage.success('已更新机器鱼')
+      ElMessage.success(t('fish.saveSuccess'))
     } else {
       // 创建机器鱼
       const res = await window.api.fish.create({
@@ -537,7 +540,7 @@ async function save(): Promise<void> {
       if (resAny && resAny.error) {
         throw new Error(resAny.error)
       }
-      ElMessage.success('已新增机器鱼')
+      ElMessage.success(t('fish.saveSuccess'))
     }
 
     dialogVisible.value = false
@@ -552,12 +555,12 @@ async function save(): Promise<void> {
     }
 
     if (rtspChanged) {
-      ElMessageBox.alert('RTSP流地址已变更，需重启应用才能生效。', '提示', { type: 'warning' })
+      ElMessageBox.alert(t('fish.rtspChanged'), t('common.tips'), { type: 'warning' })
     }
   } catch (error) {
     console.error('保存失败:', error)
     const msg = error instanceof Error ? error.message : String(error)
-    ElMessage.error(msg || '保存失败')
+    ElMessage.error(msg || t('fish.saveFail'))
   } finally {
     saving.value = false
   }
@@ -565,15 +568,15 @@ async function save(): Promise<void> {
 
 async function remove(row: Fish): Promise<void> {
   try {
-    await ElMessageBox.confirm(`确认删除 ${row.name} 吗？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(t('fish.confirmDelete', { name: row.name }), t('common.tips'), { type: 'warning' })
 
     await window.api.fish.delete(row.id)
-    ElMessage.success('已删除')
+    ElMessage.success(t('fish.deleteSuccess'))
     await loadFish() // 重新加载数据
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
-      ElMessage.error('删除失败')
+      ElMessage.error(t('fish.deleteFail'))
     }
   }
 }
@@ -611,187 +614,185 @@ function formatDate(input?: string | Date | null): string {
 <template>
   <section class="fish-page">
     <header class="page-header">
-      <h1>机器鱼管理</h1>
-      <p class="sub">这是一段介绍文字</p>
+      <h1>{{ t('fish.title') }}</h1>
+      <p class="sub">{{ t('fish.sub') }}</p>
     </header>
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="80px">
         <div class="spacer" />
         <el-form-item>
-          <el-button type="success" @click="openCreate">新增机器鱼</el-button>
+          <el-button type="success" @click="openCreate">{{ t('fish.add') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-
-
     <el-card v-loading="loading" class="table-card" shadow="never">
       <el-table :data="allFish" border stripe style="width: 100%" height="560">
         <el-table-column type="index" label="#" width="60" />
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="name" label="名称" min-width="160" />
-        <el-table-column prop="createdAt" label="创建日期" width="140">
+        <el-table-column prop="id" :label="t('history.id')" width="80" />
+        <el-table-column prop="name" :label="t('fish.name')" min-width="160" />
+        <el-table-column prop="createdAt" :label="t('fish.createdAt')" width="140">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column :label="t('common.operation')" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" plain @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" plain @click="remove(row)">删除</el-button>
+            <el-button size="small" type="primary" plain @click="openEdit(row)">{{ t('common.edit') }}</el-button>
+            <el-button size="small" type="danger" plain @click="remove(row)">{{ t('common.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑机器鱼' : '新增机器鱼'" width="60%" class="fish-dialog">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? t('fish.editTitle') : t('fish.addTitle')" width="60%" class="fish-dialog">
       <el-form label-width="180px">
         <!-- 第一行：名称 -->
         <el-row :gutter="12">
           <el-col :span="24">
-            <el-form-item label="名称">
-              <el-input v-model="form.name" placeholder="请输入名称" />
+            <el-form-item :label="t('fish.name')">
+              <el-input v-model="form.name" :placeholder="t('fish.placeholderName')" />
             </el-form-item>
           </el-col>
         </el-row>
         <!-- 第二行：声通IP、声通端口1、声通端口2 -->
         <el-row :gutter="12">
           <el-col :span="8">
-            <el-form-item label="声通 IP">
-              <el-input v-model="form.satcomIp" placeholder="声通 IP" />
+            <el-form-item :label="t('fish.satcomIp')">
+              <el-input v-model="form.satcomIp" :placeholder="t('fish.satcomIp')" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="声通端口1">
+            <el-form-item :label="t('fish.satcomPort1')">
               <el-input-number v-model="form.satcomPort1" :min="0" :max="65535" controls-position="right" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="声通端口2">
+            <el-form-item :label="t('fish.satcomPort2')">
               <el-input-number v-model="form.satcomPort2" :min="0" :max="65535" controls-position="right" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="串口">
-          <el-select v-model="selectedCom" placeholder="选择串口">
+        <el-form-item :label="t('fish.serial')">
+          <el-select v-model="selectedCom" :placeholder="t('fish.selectSerial')">
             <el-option v-for="p in comPorts" :key="p.path" :label="p.path" :value="p.path" />
           </el-select>
         </el-form-item>
-        <el-form-item label="波特率">
+        <el-form-item :label="t('fish.baudRate')">
           <el-input-number v-model="form.microwavePort" :min="1200" :max="921600" />
         </el-form-item>
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-form-item label="声通基准经度">
+            <el-form-item :label="t('fish.acousticLon')">
               <el-input-number v-model="form.acousticLon" :precision="6" :step="0.000001" controls-position="right"
                 style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="声通基准纬度">
+            <el-form-item :label="t('fish.acousticLat')">
               <el-input-number v-model="form.acousticLat" :precision="6" :step="0.000001" controls-position="right"
                 style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="向上命令">
-          <el-input v-model="form.cmdUp" placeholder="向上命令" />
+        <el-form-item :label="t('fish.cmdUp')">
+          <el-input v-model="form.cmdUp" :placeholder="t('fish.cmdUp')" />
         </el-form-item>
-        <el-form-item label="向下命令">
-          <el-input v-model="form.cmdDown" placeholder="向下命令" />
+        <el-form-item :label="t('fish.cmdDown')">
+          <el-input v-model="form.cmdDown" :placeholder="t('fish.cmdDown')" />
         </el-form-item>
-        <el-form-item label="上浮命令">
-          <el-input v-model="form.cmdSurf" placeholder="上浮命令" />
+        <el-form-item :label="t('fish.cmdSurf')">
+          <el-input v-model="form.cmdSurf" :placeholder="t('fish.cmdSurf')" />
         </el-form-item>
-        <el-form-item label="向前命令">
-          <el-input v-model="form.cmdForward" placeholder="向前命令" />
+        <el-form-item :label="t('fish.cmdForward')">
+          <el-input v-model="form.cmdForward" :placeholder="t('fish.cmdForward')" />
         </el-form-item>
-        <el-form-item label="向左命令">
-          <el-input v-model="form.cmdLeft" placeholder="向左命令" />
+        <el-form-item :label="t('fish.cmdLeft')">
+          <el-input v-model="form.cmdLeft" :placeholder="t('fish.cmdLeft')" />
         </el-form-item>
-        <el-form-item label="向右命令">
-          <el-input v-model="form.cmdRight" placeholder="向右命令" />
+        <el-form-item :label="t('fish.cmdRight')">
+          <el-input v-model="form.cmdRight" :placeholder="t('fish.cmdRight')" />
         </el-form-item>
-        <el-form-item label="人工命令">
-          <el-input v-model="form.cmdManual" placeholder="人工命令" />
+        <el-form-item :label="t('fish.cmdManual')">
+          <el-input v-model="form.cmdManual" :placeholder="t('fish.cmdManual')" />
         </el-form-item>
-        <el-form-item label="返航命令">
-          <el-input v-model="form.cmdReturn" placeholder="返航命令" />
+        <el-form-item :label="t('fish.cmdReturn')">
+          <el-input v-model="form.cmdReturn" :placeholder="t('fish.cmdReturn')" />
         </el-form-item>
-        <el-form-item label="导航命令">
-          <el-input v-model="form.cmdNavigate" placeholder="导航命令" />
+        <el-form-item :label="t('fish.cmdNavigate')">
+          <el-input v-model="form.cmdNavigate" :placeholder="t('fish.cmdNavigate')" />
         </el-form-item>
-        <el-form-item label="灯开命令">
-          <el-input v-model="form.cmdLightOn" placeholder="灯开命令" />
+        <el-form-item :label="t('fish.cmdLightOn')">
+          <el-input v-model="form.cmdLightOn" :placeholder="t('fish.cmdLightOn')" />
         </el-form-item>
-        <el-form-item label="灯关命令">
-          <el-input v-model="form.cmdLightOff" placeholder="灯关命令" />
+        <el-form-item :label="t('fish.cmdLightOff')">
+          <el-input v-model="form.cmdLightOff" :placeholder="t('fish.cmdLightOff')" />
         </el-form-item>
-        <el-form-item label="WIFI打开命令">
-          <el-input v-model="form.cmdWifi" placeholder="WIFI打开命令" />
+        <el-form-item :label="t('fish.cmdWifi')">
+          <el-input v-model="form.cmdWifi" :placeholder="t('fish.cmdWifi')" />
         </el-form-item>
-        <el-form-item label="WIFI关闭命令">
-          <el-input v-model="form.cmdWifiOff" placeholder="WIFI关闭命令" />
+        <el-form-item :label="t('fish.cmdWifiOff')">
+          <el-input v-model="form.cmdWifiOff" :placeholder="t('fish.cmdWifiOff')" />
         </el-form-item>
-        <el-form-item label="轨迹">
+        <el-form-item :label="t('fish.track')">
           <div style="width: 100%">
             <div style="margin-bottom: 8px">
-              <el-button type="primary" plain @click="addTrackPoint">添加轨迹点</el-button>
+              <el-button type="primary" plain @click="addTrackPoint">{{ t('fish.addTrackPoint') }}</el-button>
             </div>
             <el-table :data="form.track" border stripe style="width: 100%" size="small">
-              <el-table-column label="经度">
+              <el-table-column :label="t('history.lon')">
                 <template #default="{ $index }">
                   <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.0001"
                     :precision="4" controls-position="right" />
                 </template>
               </el-table-column>
-              <el-table-column label="纬度">
+              <el-table-column :label="t('history.lat')">
                 <template #default="{ $index }">
                   <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.0001" :precision="4"
                     controls-position="right" />
                 </template>
               </el-table-column>
-              <el-table-column label="高度">
+              <el-table-column :label="t('history.height')">
                 <template #default="{ $index }">
                   <el-input-number v-model="form.track[$index].alt" :min="0" :step="0.01" :precision="2" controls-position="right" />
                 </template>
               </el-table-column>
-              <el-table-column label="深度">
+              <el-table-column :label="t('history.depth')">
                 <template #default="{ $index }">
                   <el-input-number v-model="form.track[$index].depth" :min="0" :step="0.01" :precision="2" controls-position="right" />
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="120" fixed="right">
+              <el-table-column :label="t('common.operation')" width="120" fixed="right">
                 <template #default="{ $index }">
-                  <el-button size="small" type="danger" plain @click="removeTrackPoint($index)">删除</el-button>
+                  <el-button size="small" type="danger" plain @click="removeTrackPoint($index)">{{ t('common.delete') }}</el-button>
                 </template>
               </el-table-column>
             </el-table>
             <div v-if="trackErrors.length" style="margin-top: 8px">
-              <el-alert type="error" show-icon :closable="false" :title="'轨迹校验失败：经度、纬度必填，且高度与深度必须二选一'"
+              <el-alert type="error" show-icon :closable="false" :title="t('fish.trackError')"
                 :description="trackErrorDesc" />
             </div>
           </div>
         </el-form-item>
-        <el-form-item label="微波RTSP单目流地址">
+        <el-form-item :label="t('fish.rtspMono')">
           <el-input v-model="form.rtspUrl" placeholder="rtsp://..." />
         </el-form-item>
-        <el-form-item label="微波RTSP双目流地址">
+        <el-form-item :label="t('fish.rtspStereo')">
           <el-input v-model="form.rtsp2" placeholder="rtsp://... (第二路, 可选)" />
         </el-form-item>
-        <el-form-item label="星链RTSP单目流地址">
+        <el-form-item :label="t('fish.starlinkMono')">
           <el-input v-model="form.starlinkRtspMono" placeholder="rtsp://..." />
         </el-form-item>
-        <el-form-item label="星链RTSP双目流地址">
+        <el-form-item :label="t('fish.starlinkStereo')">
           <el-input v-model="form.starlinkRtspStereo" placeholder="rtsp://..." />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" type="textarea" placeholder="描述" :rows="3" />
+        <el-form-item :label="t('fish.description')">
+          <el-input v-model="form.description" type="textarea" :placeholder="t('fish.description')" :rows="3" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="closeDialog">取消</el-button>
-        <el-button type="primary" @click="save">保存</el-button>
+        <el-button @click="closeDialog">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="save">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </section>

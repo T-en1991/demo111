@@ -7,23 +7,23 @@ export interface FishStatusMapping {
 }
 
 export const FISH_STATUS_CONFIG: FishStatusMapping[] = [
-    { keyword: 'NAVIGATE', status: 'navigation', label: '导航模式中' },
-  { keyword: 'NAVIGATE-SUCCESS', status: 'navigation-success', label: '导航模式' },
-  { keyword: 'FORWARD', status: 'forward', label: '向前' },
-  { keyword: 'LEFT', status: 'left', label: '向左' },
-  { keyword: 'RIGHT', status: 'right', label: '向右' },
-  { keyword: 'UP', status: 'up', label: '向上' },
-  { keyword: 'DOWN', status: 'down', label: '向下' },
-  { keyword: 'SURF', status: 'surf', label: '上浮' },
-  { keyword: 'DONE', status: 'done', label: '下潜' },
-  { keyword: 'MAN', status: 'manual', label: '人工模式' },
-  { keyword: 'RETURN', status: 'return', label: '返航' },
-  { keyword: 'LIGHTON', status: 'light-on', label: '灯光开启' },
-  { keyword: 'LIGHTOFF', status: 'light-off', label: '灯光关闭' },
-  { keyword: 'WIFI', status: 'wifi', label: 'WIFI模式' }
+  { keyword: 'NAVIGATE', status: 'navigation', label: 'status.navigate' },
+  { keyword: 'NAVIGATE-SUCCESS', status: 'navigation-success', label: 'status.navigateSuccess' },
+  { keyword: 'FORWARD', status: 'forward', label: 'status.forward' },
+  { keyword: 'LEFT', status: 'left', label: 'status.left' },
+  { keyword: 'RIGHT', status: 'right', label: 'status.right' },
+  { keyword: 'UP', status: 'up', label: 'status.up' },
+  { keyword: 'DOWN', status: 'down', label: 'status.down' },
+  { keyword: 'SURF', status: 'surf', label: 'status.surf' },
+  { keyword: 'DONE', status: 'done', label: 'status.dive' },
+  { keyword: 'MAN', status: 'manual', label: 'status.manual' },
+  { keyword: 'RETURN', status: 'return', label: 'status.return' },
+  { keyword: 'LIGHTON', status: 'light-on', label: 'status.lightOn' },
+  { keyword: 'LIGHTOFF', status: 'light-off', label: 'status.lightOff' },
+  { keyword: 'WIFI', status: 'wifi', label: 'status.wifi' }
 ]
 
 export const serial_FISH_STATUS_CONFIG: FishStatusMapping[] = [
-  { keyword: 'SURF', status: 'surf', label: '上浮成功' },
-  { keyword: 'NAME=', status: 'name', label: '获取图片' }
+  { keyword: 'SURF', status: 'surf', label: 'status.surfSuccess' },
+  { keyword: 'NAME=', status: 'name', label: 'status.fetchImage' }
 ]

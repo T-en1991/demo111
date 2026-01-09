@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { Picture, Calendar, Location } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 type DateRange = [Date, Date] | []
 
@@ -107,19 +110,19 @@ function onVideoError(_e: Event): void {
 <template>
   <section class="alerts-page">
     <header class="page-header">
-      <h1>报警记录</h1>
-      <p class="sub">支持条件过滤</p>
+      <h1>{{ t('alerts.title') }}</h1>
+      <p class="sub">{{ t('alerts.sub') }}</p>
     </header>
 
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="88px">
-        <el-form-item label="时间范围">
-          <el-date-picker v-model="query.range" type="daterange" range-separator="至" start-placeholder="开始日期"
-            end-placeholder="结束日期" unlink-panels />
+        <el-form-item :label="t('history.timeRange')">
+          <el-date-picker v-model="query.range" type="daterange" range-separator="-" :start-placeholder="t('history.startDate')"
+            :end-placeholder="t('history.endDate')" unlink-panels />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="applyQuery">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
+          <el-button type="primary" @click="applyQuery">{{ t('history.query') }}</el-button>
+          <el-button @click="resetQuery">{{ t('history.reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -136,7 +139,7 @@ function onVideoError(_e: Event): void {
                   <el-icon>
                     <Picture />
                   </el-icon>
-                  <span>暂无图片</span>
+                  <span>{{ t('alerts.noImage') }}</span>
                 </div>
               </template>
             </el-image>
@@ -147,7 +150,7 @@ function onVideoError(_e: Event): void {
               <el-icon>
                 <Picture />
               </el-icon>
-              <span>暂无媒体</span>
+              <span>{{ t('alerts.noMedia') }}</span>
             </div>
           </div>
 
@@ -157,14 +160,14 @@ function onVideoError(_e: Event): void {
               <el-icon class="info-icon">
                 <Calendar />
               </el-icon>
-              <span class="info-label">时间：</span>
+              <span class="info-label">{{ t('history.time') }}：</span>
               <span class="info-value">{{ item.title }}</span>
             </div>
             <div class="info-item">
               <el-icon class="info-icon">
                 <Location />
               </el-icon>
-              <span class="info-label">经纬度：</span>
+              <span class="info-label">{{ t('history.lon') }}/{{ t('history.lat') }}：</span>
               <span class="info-value">{{ item.lat?.toFixed(4) }}, {{ item.lon?.toFixed(4) }}</span>
             </div>
             <!-- <div class="info-item" v-if="item.message">
@@ -175,7 +178,7 @@ function onVideoError(_e: Event): void {
               <span class="info-value">{{ item.message }}</span>
             </div> -->
             <div style="margin-top:8px;">
-              <el-button type="primary" size="small" @click="openVideo(item)">查看视频</el-button>
+              <el-button type="primary" size="small" @click="openVideo(item)">{{ t('alerts.viewVideo') }}</el-button>
             </div>
           </div>
         </div>
@@ -185,25 +188,25 @@ function onVideoError(_e: Event): void {
           :current-page="page" :page-sizes="[10, 20, 50]" @size-change="onSizeChange" @current-change="onPageChange" />
       </div>
     </el-card>
-    <el-dialog v-model="videoDialogVisible" title="查看视频" width="60%" append-to-body destroy-on-close>
+    <el-dialog v-model="videoDialogVisible" :title="t('alerts.videoTitle')" width="60%" append-to-body destroy-on-close>
       <el-tabs v-model="activeTab">
-        <el-tab-pane label="单目" name="mono">
+        <el-tab-pane :label="t('history.mono')" name="mono">
           <template v-if="monoUrl">
             <video controls muted autoplay playsinline preload="metadata"
               style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
               v-if="activeTab === 'mono'" />
             <source :src="monoUrl" :type="monoType" />
           </template>
-          <el-empty v-else description="未找到单目视频" />
+          <el-empty v-else :description="t('history.noMono')" />
         </el-tab-pane>
-        <el-tab-pane label="双目" name="stereo">
+        <el-tab-pane :label="t('history.stereo')" name="stereo">
           <template v-if="stereoUrl">
             <video controls muted autoplay playsinline preload="metadata"
               style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
               v-if="activeTab === 'stereo'" />
             <source :src="stereoUrl" :type="stereoType" />
           </template>
-          <el-empty v-else description="未找到双目视频" />
+          <el-empty v-else :description="t('history.noStereo')" />
         </el-tab-pane>
       </el-tabs>
       <div v-if="videoError" style="margin-top:8px;color:#f56c6c;">{{ videoError }}</div>

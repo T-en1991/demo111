@@ -2,17 +2,154 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import type { User, Alert, Fish, ImageFrame } from '@prisma/client'
 import logger from '../logger'
 import * as XLSX from 'xlsx'
-import { existsSync } from 'fs'
-import { extname } from 'path'
+import { existsSync, copyFileSync } from 'fs'
+import { extname, join } from 'path'
+import { app } from 'electron'
+
+const isDev = process.env.NODE_ENV === 'development'
+const dbUrl = isDev
+  ? process.env.DATABASE_URL
+  : `file:${join(app.getPath('userData'), 'ocean-fish.db')}`
 
 const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error']
+  datasources: {
+    db: {
+      url: dbUrl
+    }
+  },
+  log: isDev ? ['query', 'info', 'warn', 'error'] : ['error']
 })
+
+async function initTables() {
+  const sqls = [
+    `CREATE TABLE IF NOT EXISTS "users" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "email" TEXT NOT NULL,
+    "name" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");`,
+    `CREATE TABLE IF NOT EXISTS "fish" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "type" TEXT NOT NULL DEFAULT 'default',
+    "ip" TEXT,
+    "port" INTEGER,
+    "rtspUrl" TEXT,
+    "rtsp2" TEXT,
+    "starlinkRtspMono" TEXT,
+    "starlinkRtspStereo" TEXT,
+    "satcomIp" TEXT,
+    "satcomPort1" INTEGER,
+    "satcomPort2" INTEGER,
+    "microwaveIp" TEXT,
+    "microwavePort" INTEGER,
+    "acousticLon" REAL,
+    "acousticLat" REAL,
+    "status" TEXT NOT NULL DEFAULT 'running',
+    "ascendCommand" TEXT,
+    "descendCommand" TEXT,
+    "forwardCommand" TEXT,
+    "leftCommand" TEXT,
+    "rightCommand" TEXT,
+    "upCommand" TEXT,
+    "downCommand" TEXT,
+    "surfCommand" TEXT,
+    "manualCommand" TEXT,
+    "returnCommand" TEXT,
+    "navigateCommand" TEXT,
+    "lightOnCommand" TEXT,
+    "lightOffCommand" TEXT,
+    "wifiCommand" TEXT,
+    "wifiOffCommand" TEXT,
+    "description" TEXT,
+    "track" JSONB,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);`,
+    `CREATE TABLE IF NOT EXISTS "alerts" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "title" TEXT NOT NULL,
+    "message" TEXT,
+    "level" TEXT,
+    "type" TEXT,
+    "source" TEXT,
+    "imgFile" TEXT,
+    "lat" REAL,
+    "lon" REAL,
+    "fishId" INTEGER,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "fromSocket" BOOLEAN NOT NULL DEFAULT true,
+    "imageBase64" TEXT,
+    CONSTRAINT "alerts_fishId_fkey" FOREIGN KEY ("fishId") REFERENCES "fish" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);`,
+    `CREATE TABLE IF NOT EXISTS "History" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "lon" REAL,
+    "lat" REAL,
+    "depth" REAL,
+    "height" REAL,
+    "battery" INTEGER,
+    "signalStrength" INTEGER,
+    "time" DATETIME NOT NULL
+);`,
+    `CREATE TABLE IF NOT EXISTS "ImageFrame" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "packetId" INTEGER NOT NULL,
+    "totalPackets" INTEGER NOT NULL,
+    "data" TEXT NOT NULL,
+    "receivedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);`
+  ]
+
+  for (const sql of sqls) {
+    await prisma.$executeRawUnsafe(sql)
+  }
+  logger.info('Database tables initialized successfully')
+}
 
 // 确保数据库连接正常
 export async function connectDatabase(): Promise<void> {
   try {
+    // 生产环境初始化数据库
+    if (!isDev) {
+      const dbPath = join(app.getPath('userData'), 'ocean-fish.db')
+
+      // 如果数据库文件不存在，尝试从模板拷贝
+      if (!existsSync(dbPath)) {
+        try {
+          // 模板文件路径：在打包后的 resources/prisma/template.db
+          const templatePath = join(process.resourcesPath ?? '', 'prisma', 'template.db')
+
+          if (existsSync(templatePath)) {
+            logger.info(`Initializing database from template: ${templatePath}`)
+            copyFileSync(templatePath, dbPath)
+            logger.info('Database initialized from template successfully')
+          } else {
+            logger.warn(
+              `Template database not found at ${templatePath}, falling back to SQL initialization`
+            )
+            await initTables()
+          }
+        } catch (e) {
+          logger.error('Failed to copy database template, falling back to SQL initialization', e)
+          await initTables()
+        }
+      }
+    }
+
     await prisma.$connect()
+
+    // 二次确认：检查表是否存在
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM fish LIMIT 1`
+    } catch (e) {
+      logger.warn('Database connected but tables not found, executing SQL initialization...')
+      await initTables()
+    }
+
     logger.info('Database connected successfully')
   } catch (error) {
     logger.error('Database connection failed:', error)
@@ -419,10 +556,7 @@ export const alertService = {
     // 优先完整匹配
     let alert = await prisma.alert.findFirst({
       where: {
-        OR: [
-          { imgFile: filename },
-          { imgFile: { contains: filename } }
-        ]
+        OR: [{ imgFile: filename }, { imgFile: { contains: filename } }]
       },
       orderBy: { createdAt: 'desc' }
     })
@@ -435,8 +569,6 @@ export const alertService = {
       where: { id }
     })
   },
-
-
 
   // 解决告警
   async resolve(id: number): Promise<Alert> {
@@ -473,19 +605,22 @@ export const alertService = {
   },
 
   // 更新告警
-  async update(id: number, data: {
-    title?: string
-    message?: string | null
-    level?: string | null
-    type?: string | null
-    source?: string | null
-    imgFile?: string | null
-    lat?: number | null
-    lon?: number | null
-    fishId?: number | null
-    status?: 'active' | 'resolved' | 'acknowledged'
-    imageBase64?: string | null
-  }): Promise<Alert> {
+  async update(
+    id: number,
+    data: {
+      title?: string
+      message?: string | null
+      level?: string | null
+      type?: string | null
+      source?: string | null
+      imgFile?: string | null
+      lat?: number | null
+      lon?: number | null
+      fishId?: number | null
+      status?: 'active' | 'resolved' | 'acknowledged'
+      imageBase64?: string | null
+    }
+  ): Promise<Alert> {
     return prisma.alert.update({
       where: { id },
       data
@@ -897,14 +1032,15 @@ export const imageFrameService = {
 
   // Get progress info (current unique count / total)
   // Logic: query one record to get 'total' (since total is consistent for same imageId), then count unique frames.
-  async getProgress(imageId: string): Promise<{ collected: number; total: number; filename: string | null }> {
+  async getProgress(
+    imageId: string
+  ): Promise<{ collected: number; total: number; filename: string | null }> {
     const sample = await prisma.imageFrame.findFirst({ where: { imageId } })
     if (!sample) return { collected: 0, total: 0, filename: null }
     const collected = await this.countFrames(imageId)
     return { collected, total: sample.total, filename: sample.filename }
   }
 }
-
 
 export const systemLogService = {
   async create(data: { content: string; type: string; time?: Date | string }) {

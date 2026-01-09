@@ -2,6 +2,9 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useFishControlStore } from '@renderer/store/fishControl'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 type UploadKind = 'video' | 'data' | 'alarm'
 interface UFile {
@@ -35,7 +38,7 @@ function clearAlarm(): void {
 async function selectAlarmFolder(): Promise<void> {
   try {
     if (typeof window === 'undefined' || !(window as any).api || !(window as any).api.dialog) {
-      ElMessage.error('当前环境不支持系统对话框，请在 Electron 中使用此功能')
+      ElMessage.error(t('common.error'))
       return
     }
     // @ts-ignore
@@ -49,14 +52,14 @@ async function selectAlarmFolder(): Promise<void> {
     alarmFiles.value = files
   } catch (e) {
     console.error('selectAlarmFolder failed', e)
-    ElMessage.error('选择文件夹失败')
+    ElMessage.error(t('upload.selectFolder') + ' ' + t('common.error'))
   }
 }
 
 // Import alarm data from selected folder
 async function importAlarmData(): Promise<void> {
   if (!selectedAlarmFolder.value) {
-    ElMessage.warning('请先选择文件夹')
+    ElMessage.warning(t('upload.selectFolder'))
     return
   }
 
@@ -65,20 +68,20 @@ async function importAlarmData(): Promise<void> {
     const result = await window.api.alarm.importFolder(selectedAlarmFolder.value)
 
     if (result.ok > 0) {
-      ElMessage.success(`成功导入 ${result.ok} 条报警记录`)
+      ElMessage.success(t('upload.importSuccess', { count: result.ok }))
     }
     if (result.fail > 0) {
-      ElMessage.warning(`${result.fail} 条报警记录导入失败`)
+      ElMessage.warning(t('upload.importFail', { count: result.fail }))
     }
     if (result.updated > 0) {
-      ElMessage.info(`更新了 ${result.updated} 条报警记录`)
+      ElMessage.info(t('upload.importUpdate', { count: result.updated }))
     }
 
     // Clear selection after import
     clearAlarm()
   } catch (e) {
     console.error('importAlarmData failed', e)
-    ElMessage.error('导入报警数据失败')
+    ElMessage.error(t('upload.importFail', { count: 0 }))
   }
 }
 
@@ -90,7 +93,7 @@ function isAbsWinPath(p: string): boolean {
 async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'): Promise<void> {
   const files = videoFiles.value
   if (!files.length) {
-    ElMessage.warning('请先选择视频文件')
+    ElMessage.warning(t('upload.selectVideo'))
     return
   }
 
@@ -143,11 +146,11 @@ async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'):
   }
 
   if (ok > 0) {
-    ElMessage.success(`成功保存 ${ok} 个视频记录`)
+    ElMessage.success(t('upload.saveSuccess', { count: ok }))
     clearVideo()
   }
   if (fail > 0) {
-    ElMessage.warning(`${fail} 个文件保存失败（命名或路径不符合要求）`)
+    ElMessage.warning(t('upload.saveFail', { count: fail }))
   }
 }
 
@@ -156,7 +159,7 @@ async function chooseFiles(): Promise<void> {
   try {
     // @ts-ignore
     if (typeof window === 'undefined' || !(window as any).api || !(window as any).api.dialog) {
-      ElMessage.error('当前环境不支持系统对话框，请在 Electron 中使用此功能')
+      ElMessage.error(t('common.error'))
       return
     }
     // @ts-ignore
@@ -165,18 +168,25 @@ async function chooseFiles(): Promise<void> {
     dataFiles.value = items
   } catch (e) {
     console.error('chooseFiles failed', e)
-    ElMessage.error('选择文件失败')
+    ElMessage.error(t('upload.selectFile') + ' ' + t('common.error'))
   }
 }
 
 // Import all selected files sequentially and show aggregated results
 async function importSelectedFiles(): Promise<void> {
   if (!dataFiles.value.length) {
-    ElMessage.warning('请先选择文件')
+    ElMessage.warning(t('upload.selectFile'))
     return
   }
   try {
-    const results: { file: string; ok: boolean; error?: string; inserted?: number; updated?: number; failed?: number }[] = []
+    const results: {
+      file: string
+      ok: boolean
+      error?: string
+      inserted?: number
+      updated?: number
+      failed?: number
+    }[] = []
     let totalInserted = 0
     let totalUpdated = 0
     let totalFailed = 0
@@ -208,11 +218,13 @@ async function importSelectedFiles(): Promise<void> {
     }
 
     // Show aggregated summary of imported rows
-    ElMessage.success(`已导入：${totalInserted} 条，更新：${totalUpdated} 条，失败：${totalFailed} 条`)
+    ElMessage.success(
+      t('upload.dataImportResult', { inserted: totalInserted, updated: totalUpdated, failed: totalFailed })
+    )
     dataFiles.value = []
   } catch (e) {
     console.error('importSelectedFiles failed', e)
-    ElMessage.error('导入过程中发生错误')
+    ElMessage.error(t('upload.importFail', { count: 0 }))
   }
 }
 
@@ -229,7 +241,7 @@ async function selectVideosAndSave(): Promise<void> {
     // do not auto-save here — the user should click 导入 to perform the import (same UX as Excel)
   } catch (e) {
     console.error('open dialog failed:', e)
-    ElMessage.error('选择视频失败')
+    ElMessage.error(t('upload.selectVideo') + ' ' + t('common.error'))
   }
 }
 
@@ -237,11 +249,11 @@ async function openWinSCP(): Promise<void> {
   try {
     const ok = await window.api.openWinSCP()
     if (!ok) {
-      ElMessage.error('无法打开 WinSCP，请确认本机已安装')
+      ElMessage.error(t('upload.winScpFail'))
     }
   } catch (e) {
     console.error('Open WinSCP failed:', e)
-    ElMessage.error('打开 WinSCP 失败')
+    ElMessage.error(t('upload.openWinSCP') + ' ' + t('common.error'))
   }
 }
 
@@ -250,7 +262,16 @@ async function openWifi(): Promise<void> {
     await fishControlStore.sendCommand('wifi')
   } catch (e) {
     console.error('Open WIFI failed:', e)
-    ElMessage.error('发送 WIFI 指令失败')
+    ElMessage.error(t('upload.openWifi') + ' ' + t('common.error'))
+  }
+}
+
+async function openWifiOff(): Promise<void> {
+  try {
+    await fishControlStore.sendCommand('wifiOff')
+  } catch (e) {
+    console.error('Close WIFI failed:', e)
+    ElMessage.error(t('upload.closeWifi') + ' ' + t('common.error'))
   }
 }
 </script>
@@ -258,32 +279,33 @@ async function openWifi(): Promise<void> {
 <template>
   <section class="upload-page">
     <header class="page-header">
-      <h1>上传数据</h1>
-      <p class="sub">支持拖拽或点击选择文件，分为：视频上传、数据上传、报警数据上传</p>
+      <h1>{{ t('upload.title') }}</h1>
+      <p class="sub">{{ t('upload.sub') }}</p>
     </header>
 
     <el-card class="upload-card" shadow="hover">
       <div class="actions">
-        <el-button type="primary" plain @click="openWinSCP">打开 WinSCP</el-button>
-        <el-button type="success" plain @click="openWifi">打开 WIFI</el-button>
-        <el-button type="danger" plain @click="openWifiOff">关闭 WIFI</el-button>
+        <el-button type="primary" plain @click="openWinSCP">{{ t('upload.openWinSCP') }}</el-button>
+        <el-button type="success" plain @click="openWifi">{{ t('upload.openWifi') }}</el-button>
+        <el-button type="danger" plain @click="openWifiOff">{{ t('upload.closeWifi') }}</el-button>
       </div>
       <el-tabs v-model="activeTab" class="upload-tabs">
-        <el-tab-pane label="视频上传" name="video">
+        <el-tab-pane :label="t('upload.videoUpload')" name="video">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">选择.mkv视频文件（支持多选）</div>
-              <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
-                <el-button type="primary" @click="selectVideosAndSave">选择文件</el-button>
+              <div class="el-upload__text">{{ t('upload.selectVideo') }}</div>
+              <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center">
+                <el-button type="primary" @click="selectVideosAndSave">{{ t('upload.selectFile') }}</el-button>
 
-
-                <el-button type="primary" @click="() => saveVideosWithCamera('stereo')">保存</el-button>
-                <el-button text type="danger" @click="clearVideo">清空</el-button>
+                <el-button type="primary" @click="() => saveVideosWithCamera('stereo')"
+                  >{{ t('upload.save') }}</el-button
+                >
+                <el-button text type="danger" @click="clearVideo">{{ t('upload.clear') }}</el-button>
               </div>
 
-              <div v-if="videoFiles.length" class="upload-list" style="margin-top:12px">
+              <div v-if="videoFiles.length" class="upload-list" style="margin-top: 12px">
                 <div class="list-head">
-                  <span>已选择 {{ videoFiles.length }} 个文件</span>
+                  <span>{{ t('upload.selectedFiles', { count: videoFiles.length }) }}</span>
                 </div>
                 <ul>
                   <li v-for="f in videoFiles" :key="'v:' + f.path">
@@ -296,18 +318,18 @@ async function openWifi(): Promise<void> {
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="数据上传" name="data">
+        <el-tab-pane :label="t('upload.dataUpload')" name="data">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">选择csv文件（支持多选,通常tx开头文件）</div>
-              <div style="margin-top:12px; display:flex; gap:8px;">
-                <el-button type="primary" @click="chooseFiles">选择文件</el-button>
-                <el-button type="primary" @click="importSelectedFiles">导入</el-button>
-                <el-button text type="danger" @click="clearData">清空</el-button>
+              <div class="el-upload__text">{{ t('upload.selectData') }}</div>
+              <div style="margin-top: 12px; display: flex; gap: 8px">
+                <el-button type="primary" @click="chooseFiles">{{ t('upload.selectFile') }}</el-button>
+                <el-button type="primary" @click="importSelectedFiles">{{ t('upload.import') }}</el-button>
+                <el-button text type="danger" @click="clearData">{{ t('upload.clear') }}</el-button>
               </div>
-              <div v-if="dataFiles.length" class="upload-list" style="margin-top:12px">
+              <div v-if="dataFiles.length" class="upload-list" style="margin-top: 12px">
                 <div class="list-head">
-                  <span>已选择 {{ dataFiles.length }} 个文件</span>
+                  <span>{{ t('upload.selectedFiles', { count: dataFiles.length }) }}</span>
                 </div>
                 <ul>
                   <li v-for="f in dataFiles" :key="'d:' + f.path">
@@ -319,19 +341,21 @@ async function openWifi(): Promise<void> {
             </div>
           </div>
         </el-tab-pane>
-        <el-tab-pane label="报警数据上传" name="alarm">
+        <el-tab-pane :label="t('upload.alarmUpload')" name="alarm">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">选择包含报警数据的文件夹(logs\anomaly_alerts)</div>
-              <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
-                <el-button type="primary" @click="selectAlarmFolder">选择文件夹</el-button>
-                <el-button type="primary" @click="importAlarmData" :disabled="!selectedAlarmFolder">导入</el-button>
-                <el-button text type="danger" @click="clearAlarm">清空</el-button>
+              <div class="el-upload__text">{{ t('upload.selectAlarm') }}</div>
+              <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center">
+                <el-button type="primary" @click="selectAlarmFolder">{{ t('upload.selectFolder') }}</el-button>
+                <el-button type="primary" @click="importAlarmData" :disabled="!selectedAlarmFolder"
+                  >{{ t('upload.import') }}</el-button
+                >
+                <el-button text type="danger" @click="clearAlarm">{{ t('upload.clear') }}</el-button>
               </div>
 
-              <div v-if="selectedAlarmFolder" class="upload-list" style="margin-top:12px">
+              <div v-if="selectedAlarmFolder" class="upload-list" style="margin-top: 12px">
                 <div class="list-head">
-                  <span>已选择文件夹：{{ selectedAlarmFolder }}</span>
+                  <span>{{ t('upload.selectedFolder', { path: selectedAlarmFolder }) }}</span>
                 </div>
                 <div v-if="alarmFiles.length > 0" class="list-body">
                   <div class="sub-title">包含报警文件：</div>

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface LogItem {
   id: number
@@ -87,19 +90,19 @@ function handleSizeChange(size: number) {
 
 async function clearLogs() {
   try {
-    await ElMessageBox.confirm('确定要清空所有日志记录吗？此操作不可恢复。', '警告', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(t('logs.clearConfirm'), t('common.warning'), {
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
       type: 'warning'
     })
     
     await window.api.systemLog.clear()
-    ElMessage.success('日志已清空')
+    ElMessage.success(t('logs.clearSuccess'))
     fetchLogs()
   } catch (err) {
     if (err !== 'cancel') {
       console.error('Failed to clear logs:', err)
-      ElMessage.error('清空日志失败')
+      ElMessage.error(t('logs.clearFail'))
     }
   }
 }
@@ -112,51 +115,51 @@ onMounted(() => {
 <template>
   <section class="logs-page">
     <header class="page-header">
-      <h1>日志记录</h1>
-      <p class="sub">查看系统发送和接收的日志信息</p>
+      <h1>{{ t('home.logs') }}</h1>
+      <p class="sub">{{ t('home.logsDesc') }}</p>
     </header>
 
     <el-card class="toolbar" shadow="hover">
       <el-form inline>
-        <el-form-item label="时间范围">
+        <el-form-item :label="t('history.timeRange')">
           <el-date-picker
             v-model="query.range"
             type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
+            range-separator="-"
+            :start-placeholder="t('history.startDate')"
+            :end-placeholder="t('history.endDate')"
             :default-time="[new Date(2000, 1, 1, 0, 0, 0), new Date(2000, 1, 1, 23, 59, 59)]"
           />
         </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="query.type" placeholder="全部" clearable style="width: 120px">
-            <el-option label="发送" value="send" />
-            <el-option label="接收" value="receive" />
+        <el-form-item :label="t('common.type')">
+          <el-select v-model="query.type" :placeholder="t('common.search')" clearable style="width: 120px">
+            <el-option :label="t('logs.send')" value="send" />
+            <el-option :label="t('logs.receive')" value="receive" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="applyQuery">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
-          <el-button type="danger" plain @click="clearLogs">清空日志</el-button>
+          <el-button type="primary" @click="applyQuery">{{ t('history.query') }}</el-button>
+          <el-button @click="resetQuery">{{ t('common.reset') }}</el-button>
+          <el-button type="danger" plain @click="clearLogs">{{ t('common.delete') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-card class="table-card" shadow="never">
       <el-table :data="logs" border stripe style="width: 100%" v-loading="loading">
-        <el-table-column prop="time" label="时间" width="200">
+        <el-table-column prop="time" :label="t('history.time')" width="200">
           <template #default="{ row }">
             {{ fmt(row.time) }}
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="类型" width="100">
+        <el-table-column prop="type" :label="t('common.type')" width="100">
           <template #default="{ row }">
             <el-tag :type="row.type === 'send' ? 'success' : 'warning'">
-              {{ row.type === 'send' ? '发送' : '接收' }}
+              {{ row.type === 'send' ? t('logs.send') : t('logs.receive') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="content" label="内容" min-width="320" />
+        <el-table-column prop="content" :label="t('logs.content')" min-width="320" />
       </el-table>
       
       <div class="pagination-container">

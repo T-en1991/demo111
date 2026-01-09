@@ -3,6 +3,9 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { realtimeDataParser, type FishTelemetry } from '../utils/realtimeDataParser'
 import { FISH_STATUS_CONFIG } from '../config'
+import i18n from '../locales'
+
+const t = (key: string, args?: any) => i18n.global.t(key, args)
 
 export interface Fish {
   id: number
@@ -85,7 +88,7 @@ export const useFishControlStore = defineStore(
 
     async function connect(): Promise<void> {
       if (!currentFish.value?.satcomIp || !currentFish.value?.satcomPort1) {
-        ElMessage.warning('当前机器鱼未配置声通IP或端口')
+        ElMessage.warning(t('store.fishControl.noIpPort'))
         return
       }
 
@@ -105,7 +108,7 @@ export const useFishControlStore = defineStore(
 
       if (!connected1) {
         connectionStatus.value = 'error'
-        ElMessage.error('连接失败')
+        ElMessage.error(t('store.fishControl.connectFail'))
       }
     }
 
@@ -130,7 +133,7 @@ export const useFishControlStore = defineStore(
     ): Promise<void> {
       console.log('currentFish', currentFish.value)
       if (!currentFish.value) {
-        ElMessage.warning('未选择机器鱼')
+        ElMessage.warning(t('store.fishControl.noFish'))
         return
       }
       // Special-case: 'dive' uses COM port to send 'done' command
@@ -138,7 +141,7 @@ export const useFishControlStore = defineStore(
         const comPath = currentFish.value.microwaveIp || ''
         const baudRate = currentFish.value.microwavePort || 9600
         if (!comPath) {
-          ElMessage.warning('未配置串口（microwaveIp），无法下潜')
+          ElMessage.warning(t('store.fishControl.noSerial'))
           return
         }
 
@@ -162,9 +165,9 @@ export const useFishControlStore = defineStore(
 
         if (ok) {
           logs.value.push(`[${new Date().toLocaleTimeString()}] COM SEND(${comPath}): done`)
-          ElMessage.success('已通过串口发送下潜指令')
+          ElMessage.success(t('store.fishControl.serialSendSuccess'))
         } else {
-          ElMessage.error('串口发送失败：请检查串口是否占用或未打开')
+          ElMessage.error(t('store.fishControl.serialSendFail'))
         }
         return
       }
@@ -225,7 +228,7 @@ export const useFishControlStore = defineStore(
           break
       }
       if (!payload) {
-        ElMessage.warning(`未配置 ${cmdType} 指令`)
+        ElMessage.warning(t('store.fishControl.noCmd', { cmd: cmdType }))
         return
       }
 
@@ -239,7 +242,7 @@ export const useFishControlStore = defineStore(
         console.log('发送的控制台命令:', payload)
         logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${payload}`)
       } else {
-        ElMessage.error(`发送指令失败`)
+        ElMessage.error(t('store.fishControl.sendFail'))
       }
     }
 
@@ -272,18 +275,18 @@ export const useFishControlStore = defineStore(
       if (!currentFish.value) return false
 
       // 1. Send Navigate Command
-      ElMessage.info('正在发送导航模式指令...')
+      ElMessage.info(t('store.fishControl.sendingNav'))
 
       await sendCommand('navigate')
 
       // 2. Wait for NAVIGATE-SUCCESS
       try {
-        ElMessage.info('等待设备确认导航模式...')
+        ElMessage.info(t('store.fishControl.waitingNav'))
         await waitFor((data) => data.includes('NAVIGATE-SUCCESS'), 10000)
-        ElMessage.success('导航模式启动成功，请配置轨迹...')
+        ElMessage.success(t('store.fishControl.navSuccess'))
         return true
       } catch (e) {
-        ElMessage.error('导航模式启动超时或失败')
+        ElMessage.error(t('store.fishControl.navFail'))
         return false
       }
     }
@@ -293,7 +296,7 @@ export const useFishControlStore = defineStore(
 
       // 3. Send Trajectory Points
       try {
-        ElMessage.info('开始下发轨迹...')
+        ElMessage.info(t('store.fishControl.startTrack'))
         // Group points by 2
         const packets: TrackPoint[][] = []
         for (let i = 0; i < track.length; i += 2) {
@@ -350,10 +353,10 @@ export const useFishControlStore = defineStore(
           // await new Promise(r => setTimeout(r, 100))
         }
 
-        ElMessage.success('轨迹下发完成')
+        ElMessage.success(t('store.fishControl.trackSuccess'))
       } catch (e) {
         console.error(e)
-        ElMessage.error(`轨迹下发失败: ${e instanceof Error ? e.message : 'Unknown error'}`)
+        ElMessage.error(t('store.fishControl.trackFail', { msg: e instanceof Error ? e.message : 'Unknown error' }))
       }
     }
 
@@ -448,7 +451,7 @@ export const useFishControlStore = defineStore(
           if (currentFish.value?.satcomPort1 === port) {
             connectionStatus.value = 'error'
             logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${error}`)
-            ElMessage.error(`连接错误: ${error}`)
+            ElMessage.error(t('store.fishControl.connectError', { error }))
           }
         }
       })
@@ -467,7 +470,7 @@ export const useFishControlStore = defineStore(
           logs.value.push(
             `[${new Date().toLocaleTimeString()}] SURF: time=${payload.time} CSQ=${payload.csq} (${payload.port})`
           )
-          ElMessage.success(`上浮成功: ${payload.time} CSQ=${payload.csq}`)
+          ElMessage.success(t('store.fishControl.surfSuccess', { time: payload.time, csq: payload.csq }))
         }
         ipc.on('serial:surf', handler)
         cleanupListeners.push(() => {
