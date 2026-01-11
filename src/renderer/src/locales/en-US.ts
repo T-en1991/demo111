@@ -183,6 +183,7 @@ export default {
     pleaseSurf: 'Please Surf',
     upSent: 'Up command sent',
     downSent: 'Down command sent',
+    diveSent:"Dive command sent",
     surfSent: 'Surf command sent',
     forwardSent: 'Forward command sent',
     leftSent: 'Left command sent',
@@ -193,8 +194,6 @@ export default {
     switchVideoFail: 'Failed to switch video stream: {msg}',
     checkConnect: 'Failed to switch video stream, please check connection',
     surfSuccessAlert: 'Surf Success\nTime: {time}\nCSQ: {csq}',
-    picStartSent: 'PICSTART sent: {cmd}',
-    picStartFail: 'Failed to send PICSTART',
     trackSaved: 'Trajectory saved, starting navigation flow'
   },
   upload: {

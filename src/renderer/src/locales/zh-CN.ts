@@ -184,6 +184,7 @@ export default {
     upSent: '向上指令已发送',
     downSent: '向下指令已发送',
     surfSent: '上浮指令已发送',
+    diveSent:"下潜指令已发送",
     forwardSent: '向前指令已发送',
     leftSent: '向左指令已发送',
     rightSent: '向右指令已发送',
@@ -193,8 +194,6 @@ export default {
     switchVideoFail: '切换视频流失败: {msg}',
     checkConnect: '切换视频流失败，请检查连接',
     surfSuccessAlert: '上浮成功\n时间：{time}\nCSQ：{csq}',
-    picStartSent: '已发送PICSTART命令: {cmd}',
-    picStartFail: '发送PICSTART命令失败',
     trackSaved: '轨迹已保存，开始执行导航流程'
   },
   upload: {

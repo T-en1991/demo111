@@ -147,9 +147,9 @@ onMounted(() => {
     payload: { time?: string; csq?: number; raw?: string; port?: string }
   ) => {
     try {
-      const t = payload?.time ?? ''
+      const timeStr = payload?.time ?? ''
       const csq = payload?.csq ?? ''
-      const dt = t ? t.replace('_', ' ') : ''
+      const dt = timeStr ? timeStr.replace('_', ' ') : ''
       ElMessageBox.alert(t('screen.surfSuccessAlert', { time: dt, csq: csq }), t('common.tips'), {
         type: 'success'
       })
@@ -158,12 +158,90 @@ onMounted(() => {
     }
   }
   ipc.on('serial:surf', handler)
-  removeSurfListener = () => ipc.removeListener('serial:surf', handler)
+  // 启动轮询
+  updateGamepads()
 })
 
 onBeforeUnmount(() => {
   removeSurfListener?.()
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+  }
 })
+
+// ---------------------- 摇杆控制逻辑开始 ----------------------
+let animationFrameId: number | null = null
+const lastSentTime = ref(0)
+const JOYSTICK_THROTTLE = 1000 // 1秒防抖
+
+function updateGamepads() {
+  const gamepads = navigator.getGamepads()
+  if (!gamepads) return
+
+  for (const gp of gamepads) {
+    if (!gp) continue
+
+    // 防抖检查
+    const now = Date.now()
+    if (now - lastSentTime.value < JOYSTICK_THROTTLE) continue
+
+    // 读取轴数据
+    // Axis 0: 左/右 (负数向左, 正数向右)
+    // Axis 1: 前/后 (负数向前, 正数向后 - 需根据实际设备测试反转)
+    // Axis 3: 上浮/下潜 (假设: 负数上浮, 正数下潜)
+    const axisLeftRight = gp.axes[0] || 0
+    const axisForwardBack = gp.axes[1] || 0
+    const axisSurfDive = gp.axes[3] || 0
+    const DEADZONE = 0.5 // 死区
+
+    let cmd = ''
+
+    // 优先级：上浮/下潜 > 前后 > 左右
+    if (Math.abs(axisSurfDive) > DEADZONE) {
+      // Axis 3: > 0.5 下潜 (Dive), < -0.5 上浮 (Surf)
+      if (axisSurfDive > DEADZONE) cmd = 'dive'
+      else if (axisSurfDive < -DEADZONE) cmd = 'surf'
+    } else if (Math.abs(axisForwardBack) > DEADZONE) {
+      // Axis 1: > 0.5 向后/返航 (Return), < -0.5 向前 (Forward)
+      if (axisForwardBack > DEADZONE) cmd = '' // 向后映射为返航
+      else if (axisForwardBack < -DEADZONE) cmd = 'forward'
+    } else if (Math.abs(axisLeftRight) > DEADZONE) {
+      if (axisLeftRight < -DEADZONE) cmd = 'left'
+      else if (axisLeftRight > DEADZONE) cmd = 'right'
+    }
+
+    if (cmd) {
+      console.log(`[Joystick] Detected command: ${cmd}`)
+
+      // 执行对应指令
+      switch (cmd) {
+        case 'forward':
+          moveForward()
+          break
+        // case 'return':
+        //   returnHome() // 向后 -> 返航
+        //   break
+        case 'left':
+          moveLeft()
+          break
+        case 'right':
+          moveRight()
+          break
+        case 'surf':
+          controlSurf()
+          break
+        case 'dive':
+          controlDive()
+          break
+      }
+
+      lastSentTime.value = now
+    }
+  }
+
+  animationFrameId = requestAnimationFrame(updateGamepads)
+}
+// ---------------------- 摇杆控制逻辑结束 ----------------------
 
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
 function controlUp(): void {
@@ -179,6 +257,7 @@ function controlDown(): void {
 function controlDive(): void {
   console.log('[tap] dive')
   // Store handles the serial logic and messages
+  ElMessage.success(t('screen.diveSent'))
   void fishControlStore.sendCommand('dive')
 }
 function controlSurf(): void {
@@ -622,7 +701,7 @@ function setCurrentMarker(lng: number, lat: number, size = 56): void {
   mapInstance.addOverlay(currentMarker)
   // 点击鱼标注，打开视频弹窗（默认单目）
   try {
-    ;(
+    ; (
       currentMarker as { addEventListener?: (type: string, handler: () => void) => void }
     ).addEventListener?.('click', (): void => {
       openVideo('microwaveMono')
@@ -895,16 +974,14 @@ watch(selectedId, (): void => {
             </div>
             <div class="stat-card signal">
               <div class="stat-value">
-                <span
-                  :class="[
-                    'sig',
-                    currentAcoustic === 'strong'
-                      ? 's-strong'
-                      : currentAcoustic === 'medium'
-                        ? 's-medium'
-                        : 's-weak'
-                  ]"
-                >
+                <span :class="[
+                  'sig',
+                  currentAcoustic === 'strong'
+                    ? 's-strong'
+                    : currentAcoustic === 'medium'
+                      ? 's-medium'
+                      : 's-weak'
+                ]">
                   {{
                     currentAcoustic === 'strong'
                       ? t('screen.strong')
@@ -922,12 +999,7 @@ watch(selectedId, (): void => {
         <div class="panel-card alerts-card">
           <div class="section-header">
             <div class="section-title">{{ t('screen.alertInfo') }}</div>
-            <button
-              class="section-more"
-              type="button"
-              :title="t('screen.viewHistory')"
-              @click="goHistory()"
-            >
+            <button class="section-more" type="button" :title="t('screen.viewHistory')" @click="goHistory()">
               ...
             </button>
           </div>
@@ -943,11 +1015,8 @@ watch(selectedId, (): void => {
                   </span>
                   &nbsp; &nbsp;
                   <span v-if="a.imageBase64" class="alert-image-icon">📷</span>
-                  <span
-                    v-else-if="a.imgFile && imageProgress[a.imgFile]"
-                    class="alert-image-icon"
-                    style="font-size: 0.8em; color: #e6a23c"
-                  >
+                  <span v-else-if="a.imgFile && imageProgress[a.imgFile]" class="alert-image-icon"
+                    style="font-size: 0.8em; color: #e6a23c">
                     ⏳ {{ imageProgress[a.imgFile].current }}/{{ imageProgress[a.imgFile].total }}
                   </span>
                   <span v-else-if="a.imgFile" class="alert-image-icon">📷</span>
@@ -1013,55 +1082,26 @@ watch(selectedId, (): void => {
       </div>
     </div>
     <!-- 视频查看弹窗：微波/星链 单目/双目切换 -->
-    <el-dialog
-      v-model="videoDialogVisible"
-      :title="currentVideoTitle"
-      width="60%"
-      class="video-dialog"
-      @close="onVideoDialogClose"
-    >
+    <el-dialog v-model="videoDialogVisible" :title="currentVideoTitle" width="60%" class="video-dialog"
+      @close="onVideoDialogClose">
       <div class="video-toolbar">
         <el-button-group>
-          <el-button
-            type="primary"
-            :plain="videoMode !== 'microwaveMono'"
-            :loading="videoLoading"
-            @click="videoMode = 'microwaveMono'"
-            >{{ t('screen.microwaveMono') }}</el-button
-          >
-          <el-button
-            type="primary"
-            :plain="videoMode !== 'microwaveStereo'"
-            :loading="videoLoading"
-            @click="videoMode = 'microwaveStereo'"
-            >{{ t('screen.microwaveStereo') }}</el-button
-          >
+          <el-button type="primary" :plain="videoMode !== 'microwaveMono'" :loading="videoLoading"
+            @click="videoMode = 'microwaveMono'">{{ t('screen.microwaveMono') }}</el-button>
+          <el-button type="primary" :plain="videoMode !== 'microwaveStereo'" :loading="videoLoading"
+            @click="videoMode = 'microwaveStereo'">{{ t('screen.microwaveStereo') }}</el-button>
         </el-button-group>
         <el-divider direction="vertical" />
         <el-button-group>
-          <el-button
-            type="success"
-            :plain="videoMode !== 'starlinkMono'"
-            :loading="videoLoading"
-            @click="videoMode = 'starlinkMono'"
-            >{{ t('screen.starlinkMono') }}</el-button
-          >
-          <el-button
-            type="success"
-            :plain="videoMode !== 'starlinkStereo'"
-            :loading="videoLoading"
-            @click="videoMode = 'starlinkStereo'"
-            >{{ t('screen.starlinkStereo') }}</el-button
-          >
+          <el-button type="success" :plain="videoMode !== 'starlinkMono'" :loading="videoLoading"
+            @click="videoMode = 'starlinkMono'">{{ t('screen.starlinkMono') }}</el-button>
+          <el-button type="success" :plain="videoMode !== 'starlinkStereo'" :loading="videoLoading"
+            @click="videoMode = 'starlinkStereo'">{{ t('screen.starlinkStereo') }}</el-button>
         </el-button-group>
       </div>
       <div class="video-body">
         <div :class="['video-container', { 'video-loading': videoLoading }]">
-          <el-loading
-            v-loading="videoLoading"
-            :text="t('screen.switchVideo')"
-            background="rgba(0, 0, 0, 0.8)"
-          >
+          <el-loading v-loading="videoLoading" :text="t('screen.switchVideo')" background="rgba(0, 0, 0, 0.8)">
             <template v-if="showVideoPlayer">
               <VideoPlayerJSMpeg url="ws://localhost:8085/" />
             </template>
@@ -1075,107 +1115,61 @@ watch(selectedId, (): void => {
       </div>
     </el-dialog>
     <!-- 报警图片弹窗：有图则直接展示 -->
-    <el-dialog
-      v-model="alertImageDialogVisible"
-      :title="t('screen.alertImage')"
-      width="50%"
-      class="image-dialog"
-    >
-      <div
-        style="
+    <el-dialog v-model="alertImageDialogVisible" :title="t('screen.alertImage')" width="50%" class="image-dialog">
+      <div style="
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 12px;
           padding: 10px;
           background: linear-gradient(135deg, #1f2230, #25293a);
-        "
-      >
+        ">
         <template v-if="currentAlertImageUrl">
           <img :src="currentAlertImageUrl" alt="报警图片" style="width: 100%; border-radius: 8px" />
         </template>
         <template v-else>
-          <div
-            style="
+          <div style="
               height: 320px;
               display: flex;
               align-items: center;
               justify-content: center;
               color: #9fb2ff;
-            "
-          >
+            ">
             {{ t('screen.noAlertImage') }}
           </div>
         </template>
       </div>
     </el-dialog>
     <!-- 导航弹窗 -->
-    <el-dialog
-      v-model="navigateDialogVisible"
-      :title="t('screen.navigateDialogTitle')"
-      width="800px"
-      class="navigate-dialog"
-    >
+    <el-dialog v-model="navigateDialogVisible" :title="t('screen.navigateDialogTitle')" width="800px"
+      class="navigate-dialog">
       <div class="dialog-content">
         <div style="margin-bottom: 8px">
           <el-button type="primary" plain @click="addTrackPoint">{{
             t('fish.addTrackPoint')
           }}</el-button>
         </div>
-        <el-table
-          :data="navigateTrack"
-          border
-          stripe
-          style="width: 100%"
-          size="small"
-          max-height="400"
-        >
+        <el-table :data="navigateTrack" border stripe style="width: 100%" size="small" max-height="400">
           <el-table-column :label="t('history.lon')">
             <template #default="{ $index }">
-              <el-input-number
-                v-model="navigateTrack[$index].lon"
-                :min="-180"
-                :max="180"
-                :step="0.0001"
-                :precision="4"
-                controls-position="right"
-                style="width: 100%"
-              />
+              <el-input-number v-model="navigateTrack[$index].lon" :min="-180" :max="180" :step="0.0001" :precision="4"
+                controls-position="right" style="width: 100%" />
             </template>
           </el-table-column>
           <el-table-column :label="t('history.lat')">
             <template #default="{ $index }">
-              <el-input-number
-                v-model="navigateTrack[$index].lat"
-                :min="-90"
-                :max="90"
-                :step="0.0001"
-                :precision="4"
-                controls-position="right"
-                style="width: 100%"
-              />
+              <el-input-number v-model="navigateTrack[$index].lat" :min="-90" :max="90" :step="0.0001" :precision="4"
+                controls-position="right" style="width: 100%" />
             </template>
           </el-table-column>
           <el-table-column :label="t('history.height')">
             <template #default="{ $index }">
-              <el-input-number
-                v-model="navigateTrack[$index].alt"
-                :min="0"
-                :step="0.01"
-                :precision="2"
-                controls-position="right"
-                style="width: 100%"
-              />
+              <el-input-number v-model="navigateTrack[$index].alt" :min="0" :step="0.01" :precision="2"
+                controls-position="right" style="width: 100%" />
             </template>
           </el-table-column>
           <el-table-column :label="t('history.depth')">
             <template #default="{ $index }">
-              <el-input-number
-                v-model="navigateTrack[$index].depth"
-                :min="0"
-                :step="0.01"
-                :precision="2"
-                controls-position="right"
-                style="width: 100%"
-              />
+              <el-input-number v-model="navigateTrack[$index].depth" :min="0" :step="0.01" :precision="2"
+                controls-position="right" style="width: 100%" />
             </template>
           </el-table-column>
           <el-table-column :label="t('common.operation')" width="80" fixed="right">
@@ -1187,13 +1181,8 @@ watch(selectedId, (): void => {
           </el-table-column>
         </el-table>
         <div v-if="trackErrors.length" style="margin-top: 8px">
-          <el-alert
-            type="error"
-            show-icon
-            :closable="false"
-            :title="t('fish.trackError')"
-            :description="trackErrorDesc"
-          />
+          <el-alert type="error" show-icon :closable="false" :title="t('fish.trackError')"
+            :description="trackErrorDesc" />
         </div>
       </div>
       <template #footer>
