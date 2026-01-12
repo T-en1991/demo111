@@ -158,6 +158,7 @@ onMounted(() => {
     }
   }
   ipc.on('serial:surf', handler)
+  removeSurfListener = () => ipc.removeListener('serial:surf', handler)
   // 启动轮询
   updateGamepads()
 })

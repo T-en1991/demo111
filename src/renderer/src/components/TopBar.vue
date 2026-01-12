@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { HomeFilled, SwitchButton, MagicStick } from '@element-plus/icons-vue'
+import { HomeFilled, SwitchButton } from '@element-plus/icons-vue'
 import { useAppStore } from '../store/app'
 import { useFishControlStore } from '../store/fishControl'
 import { useI18n } from 'vue-i18n'
