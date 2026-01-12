@@ -209,6 +209,10 @@ function updateGamepads() {
     } else if (Math.abs(axisLeftRight) > DEADZONE) {
       if (axisLeftRight < -DEADZONE) cmd = 'left'
       else if (axisLeftRight > DEADZONE) cmd = 'right'
+    } else if (gp.buttons[14]?.pressed) {
+      cmd = 'lightOn'
+    } else if (gp.buttons[15]?.pressed) {
+      cmd = 'lightOff'
     }
 
     if (cmd) {
@@ -233,6 +237,12 @@ function updateGamepads() {
           break
         case 'dive':
           controlDive()
+          break
+        case 'lightOn':
+          setLight(true)
+          break
+        case 'lightOff':
+          setLight(false)
           break
       }
 

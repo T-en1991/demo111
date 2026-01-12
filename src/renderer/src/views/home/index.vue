@@ -78,14 +78,14 @@ function go(name: string): void {
           <el-button type="info" plain>{{ t('home.enter') }}</el-button>
         </div>
       </el-col>
-      <el-col :xs="24" :sm="12" :md="8" v-if="false">
-        <div class="menu-item demo" @click="go('demo')">
+      <!-- <el-col :xs="24" :sm="12" :md="8">
+        <div class="menu-item demo" @click="go('joystick-test')">
           <el-icon class="bg-icon"><Star /></el-icon>
-          <h3>{{ t('home.demo') }}</h3>
-          <p>{{ t('home.demoDesc') }}</p>
+          <h3>Joystick Test</h3>
+          <p>Test USB Gamepad inputs</p>
           <el-button type="default" plain>{{ t('home.enter') }}</el-button>
         </div>
-      </el-col>
+      </el-col> -->
     </el-row>
 
     <!-- 视频弹窗和按钮 -->
