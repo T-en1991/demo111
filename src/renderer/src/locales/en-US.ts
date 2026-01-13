@@ -47,7 +47,12 @@ export default {
     logout: 'Logout',
     logoutConfirm: 'Are you sure you want to logout?',
     tips: 'Tips',
-    logoutSuccess: 'Logged out successfully'
+    logoutSuccess: 'Logged out successfully',
+    satcomStatus: 'Satcom: ',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    connecting: 'Connecting',
+    error: 'Error'
   },
   login: {
     welcome: 'Welcome Login',
@@ -194,7 +199,10 @@ export default {
     switchVideoFail: 'Failed to switch video stream: {msg}',
     checkConnect: 'Failed to switch video stream, please check connection',
     surfSuccessAlert: 'Surf Success\nTime: {time}\nCSQ: {csq}',
-    trackSaved: 'Trajectory saved, starting navigation flow'
+    trackSaved: 'Trajectory saved, starting navigation flow',
+    initialTarget: 'Target',
+    setInitialTarget: 'Set Initial Target',
+    initialTargetSent: 'Initial target sent: {lon}, {lat}'
   },
   upload: {
     title: 'Upload Data',

@@ -97,6 +97,26 @@ function getBMap(): BMap2DApi | undefined {
 const homes: Record<number, { lng: number; lat: number }> = {}
 const initialDepths: Record<number, number> = {}
 
+const initialTargetDialogVisible = ref(false)
+const initialTargetLon = ref<number>(0)
+const initialTargetLat = ref<number>(0)
+
+function openInitialTargetDialog(): void {
+  initialTargetDialogVisible.value = true
+  // Optional: Reset to 0 or keep last value. Keeping last value is usually better UX.
+  if (initialTargetLon.value === 0 && initialTargetLat.value === 0) {
+    initialTargetLon.value = 0
+    initialTargetLat.value = 0
+  }
+}
+
+async function confirmInitialTarget(): Promise<void> {
+  const lonStr = initialTargetLon.value.toFixed(7)
+  const latStr = initialTargetLat.value.toFixed(7)
+  await fishControlStore.sendInitialTarget(lonStr, latStr)
+  initialTargetDialogVisible.value = false
+}
+
 onMounted(async (): Promise<void> => {
   // 从后端获取机器鱼列表
   try {
@@ -1120,6 +1140,9 @@ watch(selectedId, (): void => {
             <button class="action-btn info" @click="setLightOffDebounced">
               <span class="icon">💡</span><span class="text">{{ t('screen.lightOff') }}</span>
             </button>
+            <button class="action-btn info" @click="openInitialTargetDialog">
+              <span class="icon">📍</span><span class="text">{{ t('screen.initialTarget') }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1233,6 +1256,28 @@ watch(selectedId, (): void => {
           <el-button @click="navigateDialogVisible = false">{{ t('common.cancel') }}</el-button>
           <el-button type="primary" @click="confirmNavigate">{{
             t('screen.saveAndNavigate')
+          }}</el-button>
+        </span>
+      </template>
+    </el-dialog>
+    <el-dialog v-model="initialTargetDialogVisible" :title="t('screen.setInitialTarget')" width="400px">
+      <div style="display: flex; flex-direction: column; gap: 16px; padding: 10px">
+        <div>
+          <label style="display: block; margin-bottom: 8px">{{ t('history.lon') }}</label>
+          <el-input-number v-model="initialTargetLon" :precision="7" :step="0.0000001" style="width: 100%"
+            controls-position="right" />
+        </div>
+        <div>
+          <label style="display: block; margin-bottom: 8px">{{ t('history.lat') }}</label>
+          <el-input-number v-model="initialTargetLat" :precision="7" :step="0.0000001" style="width: 100%"
+            controls-position="right" />
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="initialTargetDialogVisible = false">{{ t('common.cancel') }}</el-button>
+          <el-button type="primary" @click="confirmInitialTarget">{{
+            t('common.confirm')
           }}</el-button>
         </span>
       </template>

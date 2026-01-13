@@ -47,7 +47,12 @@ export default {
     logout: '退出登录',
     logoutConfirm: '确定要退出登录吗？',
     tips: '提示',
-    logoutSuccess: '已退出登录'
+    logoutSuccess: '已退出登录',
+    satcomStatus: '声通连接：',
+    connected: '已连接',
+    disconnected: '已断开',
+    connecting: '连接中',
+    error: '错误'
   },
   login: {
     welcome: '欢迎登录',
@@ -194,7 +199,10 @@ export default {
     switchVideoFail: '切换视频流失败: {msg}',
     checkConnect: '切换视频流失败，请检查连接',
     surfSuccessAlert: '上浮成功\n时间：{time}\nCSQ：{csq}',
-    trackSaved: '轨迹已保存，开始执行导航流程'
+    trackSaved: '轨迹已保存，开始执行导航流程',
+    initialTarget: '初始目标点',
+    setInitialTarget: '设置初始目标点',
+    initialTargetSent: '初始目标点指令已发送'
   },
   upload: {
     title: '上传数据',

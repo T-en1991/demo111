@@ -16,7 +16,7 @@ function goHome(): void {
   router.push({ name: 'home' })
 }
 
-function handleLanguage(lang: string) {
+function handleLanguage(lang: string): void {
   locale.value = lang
 }
 
@@ -49,6 +49,22 @@ function exitApp(): void {
           style="margin-left: 12px; color: #8ec5ff; font-weight: bold"
         >
           [{{ t('topbar.latestCommand') }}{{ t(fishStore.currentStatus.statusText) }}]
+        </span>
+        <span style="margin-left: 16px; font-size: 13px; display: inline-flex; align-items: center">
+          <span style="color: #a6b0c3">{{ t('topbar.satcomStatus') }}</span>
+          <span
+            :style="{
+              color:
+                fishStore.connectionStatus === 'connected'
+                  ? '#67c23a'
+                  : fishStore.connectionStatus === 'connecting'
+                    ? '#e6a23c'
+                    : '#f56c6c',
+              fontWeight: 'bold'
+            }"
+          >
+            {{ t(`topbar.${fishStore.connectionStatus}`) }}
+          </span>
         </span>
       </span>
 

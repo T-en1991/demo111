@@ -480,6 +480,36 @@ export const useFishControlStore = defineStore(
       // 如果未检测到 ipcRenderer，可忽略监听，避免报错
     }
 
+    async function sendInitialTarget(lon: string, lat: string): Promise<void> {
+      if (!currentFish.value) {
+        ElMessage.warning(t('store.fishControl.noFish'))
+        return
+      }
+      if (connectionStatus.value !== 'connected') {
+        await connect()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((connectionStatus.value as any) !== 'connected') return
+      }
+
+      const id = currentFish.value.id
+      const content = `POS,${lon},${lat}`
+      const len = content.length
+      // +++AT*SENDIM,LEN,ID,ack,POS,LONGITUDE,LATITUDE
+      const payload = `+++AT*SENDIM,${len},${id},ack,${content}`
+
+      const { satcomIp, satcomPort1 } = currentFish.value
+      if (!satcomIp || !satcomPort1) return
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const success = await (window.api as any).tcp.sendClient(satcomIp, satcomPort1, payload)
+      if (success) {
+        logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${payload}`)
+        ElMessage.success(t('screen.initialTargetSent'))
+      } else {
+        ElMessage.error(t('store.fishControl.sendFail'))
+      }
+    }
+
     return {
       currentFish,
       currentStatus,
@@ -493,7 +523,8 @@ export const useFishControlStore = defineStore(
       enterNavigationMode,
       sendTrajectory,
       initListeners,
-      clearLogs
+      clearLogs,
+      sendInitialTarget
     }
   },
   {
