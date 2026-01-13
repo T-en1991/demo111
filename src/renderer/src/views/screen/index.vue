@@ -882,11 +882,25 @@ async function init(): Promise<void> {
     if (useOffline) {
       await loadOfflineBMap()
     } else {
-      await loadBMapGL(AK)
+      try {
+        await loadBMapGL(AK)
+      } catch (e) {
+        console.warn('First attempt to load Baidu Map failed, retrying...', e)
+        // 失败后等待 1 秒重试
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        try {
+          await loadBMapGL(AK)
+        } catch (retryErr) {
+          console.error('Retry loading Baidu Map failed:', retryErr)
+        }
+      }
     }
 
     const BMap = (window as { BMap?: unknown }).BMap as BMap2DApi | undefined
     if (BMap) {
+      // 确保 DOM 已渲染
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
       const container = document.getElementById('bmap-container') as HTMLElement | null
       if (!container) {
         console.error('Baidu Map container not found')

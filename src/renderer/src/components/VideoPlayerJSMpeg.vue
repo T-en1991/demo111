@@ -5,7 +5,7 @@
       class="jsmpeg-player"
       style="width: 640px; height: 360px; background: #000"
     ></div>
-    <div class="jsmpeg-controls">
+    <!-- <div class="jsmpeg-controls">
       <el-button size="small" @click="togglePlay">{{ isPlaying ? '暂停' : '播放' }}</el-button>
       <div class="progress-volume-row">
         <label style="margin-right: 8px">进度</label>
@@ -33,11 +33,13 @@
 
         <span style="margin-left: 8px">{{ Math.round(volume * 100) }}%</span>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
 <script setup lang="ts">
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 // @ts-ignore: No types for @cycjimmy/jsmpeg-player, safe to ignore for runtime import
 import JSMpeg from '@cycjimmy/jsmpeg-player'
@@ -51,7 +53,7 @@ const duration = ref(0)
 const volume = ref(1)
 let progressTimer: any = null
 
-function togglePlay() {
+function togglePlay(): void {
   if (!player) return
   if (isPlaying.value) {
     player.pause()
@@ -62,33 +64,34 @@ function togglePlay() {
   }
 }
 
-function onSeek(e: Event) {
+function onSeek(e: Event): void {
   if (!player || !player.player) return
   const val = Number((e.target as HTMLInputElement).value)
   player.player.currentTime = val
   progress.value = val
 }
 
-function onVolume(e: Event) {
+function onVolume(e: Event): void {
   if (!player || !player.player) return
   const val = Number((e.target as HTMLInputElement).value)
   player.player.volume = val
   volume.value = val
 }
 
-function formatTime(sec: number) {
+function formatTime(sec: number): string {
   if (!sec || isNaN(sec)) return '00:00'
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-function syncProgress() {
+function syncProgress(): void {
   if (!player || !player.player) return
   progress.value = player.player.currentTime
   duration.value = player.player.duration || 0
   isPlaying.value = player.player.isPlaying
 }
+
 
 onMounted(() => {
   if (videoContainer.value) {
