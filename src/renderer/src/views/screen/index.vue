@@ -649,49 +649,67 @@ const videoDialogVisible = ref(false)
 const videoMode = ref<VideoMode>('microwaveMono')
 const videoLoading = ref(false)
 
-// 监听videoMode变化，切换RTSP流类型
-watch(videoMode, async (newMode) => {
-  if (current.value && videoDialogVisible.value) {
-    try {
-      // 显示加载框
-      videoLoading.value = true
+// 切换视频流的封装逻辑
+async function switchVideoStream(mode: VideoMode): Promise<void> {
+  if (!current.value) return
 
-      // 调用RTSP API切换流类型，传递fishId和正确的流类型
-      const result = await window.electron.ipcRenderer.invoke(
-        'rtsp:start',
-        current.value.id,
-        newMode
-      )
-      if (result.success) {
-        console.log(`已切换到${newMode}视频流`)
-      } else {
-        console.error('切换RTSP流类型失败:', result.message)
-        ElMessage.error(t('screen.switchVideoFail', { msg: result.message }))
-      }
-    } catch (error) {
-      console.error('切换RTSP流类型失败:', error)
-      ElMessage.error(t('screen.checkConnect'))
-    } finally {
-      // 无论成功失败，都关闭加载框
-      setTimeout(() => {
-        videoLoading.value = false
-      }, 300) // 添加短暂延迟让用户能看到加载状态
+  try {
+    // 1. 销毁播放器，断开旧连接
+    showVideoPlayer.value = false
+    videoLoading.value = true
+
+    // 2. 请求后端切换流
+    const result = await window.electron.ipcRenderer.invoke(
+      'rtsp:start',
+      current.value.id,
+      mode
+    )
+
+    if (result.success) {
+      console.log(`已切换到${mode}视频流`)
+    } else {
+      console.error('切换RTSP流类型失败:', result.message)
+      ElMessage.error(t('screen.switchVideoFail', { msg: result.message }))
     }
+  } catch (error) {
+    console.error('切换RTSP流类型失败:', error)
+    ElMessage.error(t('screen.checkConnect'))
+  } finally {
+    // 3. 延迟重建播放器，确保后端流就绪
+    setTimeout(() => {
+      // 如果弹窗已关闭，不再显示播放器
+      if (!videoDialogVisible.value) return
+      videoLoading.value = false
+      showVideoPlayer.value = true
+    }, 500)
+  }
+}
+
+// 监听videoMode变化，切换RTSP流类型
+watch(videoMode, (newMode) => {
+  if (videoDialogVisible.value) {
+    void switchVideoStream(newMode)
   }
 })
+
 // 使用本地示例视频，同时作为单目与双目演示源
 const currentVideoTitle = computed((): string => t('screen.videoDialogTitle'))
 const showVideoPlayer = ref(true)
+
 function openVideo(mode: VideoMode): void {
-  videoMode.value = mode
-  showVideoPlayer.value = true
   videoDialogVisible.value = true
+  // 如果模式不同，赋值会触发 watch -> switchVideoStream
+  if (videoMode.value !== mode) {
+    videoMode.value = mode
+  } else {
+    // 如果模式相同，watch 不触发，需手动强制刷新
+    void switchVideoStream(mode)
+  }
 }
+
 function onVideoDialogClose(): void {
   showVideoPlayer.value = false
-  setTimeout(() => {
-    showVideoPlayer.value = true
-  }, 100)
+  videoLoading.value = false
   videoDialogVisible.value = false
 }
 
