@@ -85,8 +85,8 @@ async function importAlarmData(): Promise<void> {
   }
 }
 
-function isAbsWinPath(p: string): boolean {
-  return /^(?:[A-Za-z]:\\|\\\\)/.test(p)
+function isAbsolutePath(p: string): boolean {
+  return /^(?:[A-Za-z]:\\|\\\\)/.test(p) || p.startsWith('/')
 }
 
 // Save videos but auto-detect camera type from filename prefix (mcam=mono, bcam=stereo)
@@ -118,7 +118,7 @@ async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'):
     const isoString = `${Y}-${M}-${D}T${h}:${m}:${s}`
 
     const p = f.path
-    if (!p || !isAbsWinPath(p)) {
+    if (!p || !isAbsolutePath(p)) {
       fail++
       continue
     }

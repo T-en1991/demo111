@@ -219,15 +219,31 @@ export const importService = {
         mi: number,
         s: number
       ): Date => new Date(Date.UTC(y, mo - 1, d, h - 8, mi, s))
-      if (t instanceof Date) {
-        const y = t.getFullYear()
-        const mo = t.getMonth() + 1
-        const d = t.getDate()
-        const h = t.getHours()
-        const mi = t.getMinutes()
-        const s = t.getSeconds()
-        time = makeCnDate(y, mo, d, h, mi, s)
-      } else if (typeof t === 'string') {
+
+      // 优先从 rawLine 解析时间
+      if (typeof obj.rawLine === 'string') {
+        const m = /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/.exec(obj.rawLine)
+        if (m) {
+          const y = Number(m[1])
+          const mo = Number(m[2])
+          const d = Number(m[3])
+          const h = Number(m[4])
+          const mi = Number(m[5])
+          const s = Number(m[6])
+          time = makeCnDate(y, mo, d, h, mi, s)
+        }
+      }
+
+      if (!time) {
+        if (t instanceof Date) {
+          const y = t.getFullYear()
+          const mo = t.getMonth() + 1
+          const d = t.getDate()
+          const h = t.getHours()
+          const mi = t.getMinutes()
+          const s = t.getSeconds()
+          time = makeCnDate(y, mo, d, h, mi, s)
+        } else if (typeof t === 'string') {
         const s = t.trim()
         const m =
           /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s) ||
@@ -246,6 +262,7 @@ export const importService = {
       } else {
         time = null
       }
+    }
       if (!time || isNaN(time.getTime())) return null
       const num = (v: unknown): number | null => (v == null || v === '' ? null : Number(v))
       return {

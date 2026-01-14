@@ -68,7 +68,7 @@ function exitApp(): void {
         </span>
       </span>
 
-      <el-dropdown trigger="click" @command="handleLanguage" style="display: none">
+      <el-dropdown trigger="click" @command="handleLanguage">
         <el-button circle plain>
           {{ locale === 'zh-CN' ? '中文' : 'En' }}
         </el-button>
