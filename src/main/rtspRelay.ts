@@ -27,7 +27,7 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
     console.log('WebSocket client connected')
     //const ffmpegCmd = resolveFfmpegPath()
     const child = spawn(
-      'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+      process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
       [
         '-rtsp_transport',
         'tcp',

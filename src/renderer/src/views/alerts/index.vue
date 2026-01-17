@@ -101,10 +101,9 @@ async function openVideo(item: any): Promise<void> {
   videoDialogVisible.value = true
 }
 
-function onVideoError(e: Event): void {
-  const el = e.target as HTMLVideoElement
-  videoError.value = `无法播放：${el?.currentSrc || ''} (MIME: ${el?.networkState === 3 ? 'Decode Error' : 'Loading Error'})`
-  console.error('Video Playback Error:', e, el.error, el.currentSrc)
+function onVideoError(_e: Event): void {
+  // const el = e.target as HTMLVideoElement
+  // videoError.value = `无法播放：${el?.src || ''}`
 }
 </script>
 
@@ -154,6 +153,7 @@ function onVideoError(e: Event): void {
               <span>{{ t('alerts.noMedia') }}</span>
             </div>
           </div>
+
           <!-- 信息展示 -->
           <div class="info-panel">
             <div class="info-item">
@@ -192,7 +192,7 @@ function onVideoError(e: Event): void {
       <el-tabs v-model="activeTab">
         <el-tab-pane :label="t('history.mono')" name="mono">
           <template v-if="monoUrl">
-            <video :key="monoUrl" controls muted autoplay playsinline preload="metadata"
+            <video controls muted autoplay playsinline preload="metadata"
               style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
               v-if="activeTab === 'mono'">
               <source :src="monoUrl" :type="monoType" />
@@ -202,7 +202,7 @@ function onVideoError(e: Event): void {
         </el-tab-pane>
         <el-tab-pane :label="t('history.stereo')" name="stereo">
           <template v-if="stereoUrl">
-            <video :key="stereoUrl" controls muted autoplay playsinline preload="metadata"
+            <video controls muted autoplay playsinline preload="metadata"
               style="width: 100%; max-height: 52vh; background: #000" @error="onVideoError"
               v-if="activeTab === 'stereo'">
               <source :src="stereoUrl" :type="stereoType" />

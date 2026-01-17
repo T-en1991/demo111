@@ -60,7 +60,7 @@ function submit(): void {
         fishControlStore.setCurrentFish(target)
         fishControlStore.initListeners()
         // 登录成功后启动后台监听（串口/TCP）
-        void (window.api as any).startMonitoring()
+        // void (window.api as any).startMonitoring()
         void fishControlStore.connect()
       }
 

@@ -1,5 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http'
 import { existsSync, statSync, createReadStream } from 'fs'
+import { spawn } from 'child_process'
 import { extname } from 'path'
 import logger from './logger'
 
@@ -19,6 +20,13 @@ function contentTypeByExt(p: string): string {
   return 'application/octet-stream'
 }
 
+function getFfmpegPath(): string {
+  if (process.platform === 'win32') return 'ffmpeg.exe'
+  if (existsSync('/opt/homebrew/bin/ffmpeg')) return '/opt/homebrew/bin/ffmpeg'
+  if (existsSync('/usr/local/bin/ffmpeg')) return '/usr/local/bin/ffmpeg'
+  return 'ffmpeg'
+}
+
 function handleVideo(req: IncomingMessage, res: ServerResponse): void {
   const url = new URL(req.url || '', `http://localhost:${currentPort}`)
   const p = url.searchParams.get('path')
@@ -32,6 +40,59 @@ function handleVideo(req: IncomingMessage, res: ServerResponse): void {
   const range = req.headers.range
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Accept-Ranges', 'bytes')
+
+  // Check if transcoding is needed (MKV)
+  const ext = extname(p).toLowerCase()
+  if (ext === '.mkv') {
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'video/mp4')
+    // Use ffmpeg to transcode to fragmented MP4
+    const ffmpegCmd = getFfmpegPath()
+    logger.info(`[fileServer] Transcoding MKV with ${ffmpegCmd}: ${p}`)
+
+    const ffmpeg = spawn(ffmpegCmd, [
+      '-i',
+      p,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-c:a',
+      'aac',
+      '-movflags',
+      'frag_keyframe+empty_moov+default_base_moof',
+      '-f',
+      'mp4',
+      'pipe:1'
+    ])
+
+    ffmpeg.stdout.pipe(res)
+
+    ffmpeg.stderr.on('data', (d) => {
+      // Uncomment for debugging
+      const msg = d.toString()
+      // Filter out routine progress info to avoid log spam, but show errors/warnings
+      if (!msg.startsWith('frame=') && !msg.startsWith('size=')) {
+        logger.info(`[ffmpeg] ${msg}`)
+      }
+    })
+
+    ffmpeg.on('error', (err) => {
+      logger.error(`[fileServer] ffmpeg spawn error: ${err.message}`)
+    })
+
+    ffmpeg.on('close', (code) => {
+      if (code !== 0 && code !== null) {
+        logger.warn(`[fileServer] ffmpeg exited with code ${code}`)
+      }
+    })
+
+    req.on('close', () => {
+      ffmpeg.kill()
+    })
+    return
+  }
+
   const type = contentTypeByExt(p)
   if (range) {
     const match = /bytes=(\d+)-(\d+)?/.exec(range)
