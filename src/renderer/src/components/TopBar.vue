@@ -1,14 +1,32 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { HomeFilled, SwitchButton } from '@element-plus/icons-vue'
+import { HomeFilled, SwitchButton, Connection, Link } from '@element-plus/icons-vue'
 import { useAppStore } from '../store/app'
+import { useFishControlStore } from '../store/fishControl'
 import { useI18n } from 'vue-i18n'
+import { computed } from 'vue'
 
 const router = useRouter()
 const route = useRoute()
 const app = useAppStore()
+const fishControlStore = useFishControlStore()
 const { t, locale } = useI18n()
+
+const connectionState = computed(() => {
+  const status = fishControlStore.connectionStatus
+  switch (status) {
+    case 'connected':
+      return { text: t('common.connected'), type: 'success', icon: Link }
+    case 'connecting':
+      return { text: t('common.connecting'), type: 'warning', icon: Connection }
+    case 'error':
+      return { text: t('common.error'), type: 'danger', icon: Connection }
+    case 'disconnected':
+    default:
+      return { text: t('common.disconnected'), type: 'info', icon: Connection }
+  }
+})
 
 function goHome(): void {
   router.push({ name: 'home' })
@@ -40,6 +58,19 @@ function exitApp(): void {
   <section v-if="route.name !== 'login'" class="global-topbar">
     <div class="brand-name">{{ t('topbar.brand') }}</div>
     <div class="right-actions">
+      <!-- 声通连接状态 -->
+      <el-tag
+        v-if="fishControlStore.currentFish"
+        :type="connectionState.type"
+        effect="dark"
+        round
+        class="status-tag"
+      >
+        <el-icon class="is-loading" v-if="fishControlStore.connectionStatus === 'connecting'"><Connection /></el-icon>
+        <el-icon v-else><component :is="connectionState.icon" /></el-icon>
+        <span style="margin-left: 4px">{{ connectionState.text }}</span>
+      </el-tag>
+
       <el-dropdown trigger="click" @command="handleLanguage">
         <el-button circle plain>
           {{ locale === 'zh-CN' ? '中文' : 'En' }}
