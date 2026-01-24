@@ -88,6 +88,7 @@ async function findOrCreateAlert(alarmData: {
   pos: { lat: number; lon: number }
   fileName: string
   filePath: string
+  fishId?: number
 }): Promise<{ ok: boolean; updated: boolean }> {
   try {
     // 这里需要根据时间和报警文件作为判断条件，检查是否已存在相同的报警记录
@@ -115,7 +116,8 @@ async function findOrCreateAlert(alarmData: {
       status: 'active' as const,
       imgFile: filePath,
       lat: alarmData.pos.lat,
-      lon: alarmData.pos.lon
+      lon: alarmData.pos.lon,
+      fishId: alarmData.fishId ?? null
     }
 
     if (existingAlert) {
@@ -160,7 +162,7 @@ export function registerAlarmIpc(): void {
   })
 
   // 导入文件夹中的报警数据
-  ipcMain.handle('alarm:importFolder', async (_, folderPath: string) => {
+  ipcMain.handle('alarm:importFolder', async (_, folderPath: string, fishId?: number) => {
     try {
       let ok = 0
       let fail = 0
@@ -191,7 +193,8 @@ export function registerAlarmIpc(): void {
           const result = await findOrCreateAlert({
             ...alarm,
             fileName,
-            filePath
+            filePath,
+            fishId
           })
 
           if (result.ok) {

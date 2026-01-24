@@ -27,8 +27,8 @@ const api = {
     listFiles(folderPath: string): Promise<Array<{ name: string; size: number }>> {
       return ipcRenderer.invoke('alarm:listFiles', folderPath)
     },
-    importFolder(folderPath: string): Promise<{ ok: number; fail: number; updated: number }> {
-      return ipcRenderer.invoke('alarm:importFolder', folderPath)
+    importFolder(folderPath: string, fishId?: number): Promise<{ ok: number; fail: number; updated: number }> {
+      return ipcRenderer.invoke('alarm:importFolder', folderPath, fishId)
     }
   },
   history: {
@@ -45,14 +45,16 @@ const api = {
     }): Promise<any> {
       return ipcRenderer.invoke('history:create', data)
     },
-    importXlsx(filePath: string): Promise<any> {
-      return ipcRenderer.invoke('history:importXlsx', filePath)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    importXlsx(filePath: string, fishId?: number): Promise<any> {
+      return ipcRenderer.invoke('history:importXlsx', filePath, fishId)
     },
     list(params: {
       page?: number
       pageSize?: number
       startTime?: string
       endTime?: string
+      fishId?: number
     } = {}): Promise<any> {
       return ipcRenderer.invoke('history:list', params)
     }
@@ -70,6 +72,7 @@ const api = {
 
   video: {
     create(data: {
+      fishId?: number | null
       path: string
       name: string
       size?: number | null
@@ -79,7 +82,7 @@ const api = {
     }): Promise<any> {
       return ipcRenderer.invoke('video:create', data)
     },
-    list(params: { page?: number; pageSize?: number; keyword?: string } = {}): Promise<any> {
+    list(params: { page?: number; pageSize?: number; keyword?: string; fishId?: number } = {}): Promise<any> {
       return ipcRenderer.invoke('video:list', params)
     },
     findByMoment(moment: string): Promise<{ mono: any | null; stereo: any | null }> {
@@ -101,12 +104,21 @@ const api = {
       ipcRenderer.invoke('fish:search', query),
     create: (data: {
       name: string
+      acousticId?: string
+      fishCode?: string | null
+      showOnMap?: boolean
+      initialLon?: number | null
+      initialLat?: number | null
+      ip?: string
+      port?: number
+      rtspUrl?: string
+      rtsp2?: string
       // 新增：卫通与微波通信参数
       satcomIp?: string | null
       satcomPort1?: number | null
       satcomPort2?: number | null
-      microwaveIp?: string | null
-      microwavePort?: number | null
+      serialPortPath?: string | null
+      serialBaudRate?: number | null
       acousticLon?: number | null
       acousticLat?: number | null
       type?: string
@@ -116,8 +128,16 @@ const api = {
       forwardCommand?: string | null
       leftCommand?: string | null
       rightCommand?: string | null
+      upCommand?: string | null
+      downCommand?: string | null
+      surfCommand?: string | null
       manualCommand?: string | null
       returnCommand?: string | null
+      navigateCommand?: string | null
+      lightOnCommand?: string | null
+      lightOffCommand?: string | null
+      wifiCommand?: string | null
+      wifiOffCommand?: string | null
       description?: string | null
       track?: import('@prisma/client').Prisma.JsonValue | null
     }) => ipcRenderer.invoke('fish:create', data),
@@ -125,30 +145,52 @@ const api = {
       id: number,
       data: {
         name?: string
+        acousticId?: string
+        fishCode?: string | null
+        showOnMap?: boolean
+        initialLon?: number | null
+        initialLat?: number | null
+        ip?: string
+        port?: number
+        rtspUrl?: string
+        rtsp2?: string
+        starlinkRtspMono?: string | null
+        starlinkRtspStereo?: string | null
+        type?: string
+        status?: 'running' | 'stopped'
         // 新增：卫通与微波通信参数
         satcomIp?: string | null
         satcomPort1?: number | null
         satcomPort2?: number | null
-        microwaveIp?: string | null
-        microwavePort?: number | null
+        serialPortPath?: string | null
+        serialBaudRate?: number | null
         acousticLon?: number | null
         acousticLat?: number | null
-        type?: string
-        status?: 'running' | 'stopped'
+        // 控制命令与描述
         ascendCommand?: string | null
         descendCommand?: string | null
         forwardCommand?: string | null
         leftCommand?: string | null
         rightCommand?: string | null
+        upCommand?: string | null
+        downCommand?: string | null
+        surfCommand?: string | null
         manualCommand?: string | null
         returnCommand?: string | null
+        navigateCommand?: string | null
+        lightOnCommand?: string | null
+        lightOffCommand?: string | null
+        wifiCommand?: string | null
+        wifiOffCommand?: string | null
         description?: string | null
         track?: import('@prisma/client').Prisma.JsonValue | null
       }
     ) => ipcRenderer.invoke('fish:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('fish:delete', id),
     deleteMany: (ids: number[]) => ipcRenderer.invoke('fish:deleteMany', ids),
-    seed: (count: number) => ipcRenderer.invoke('fish:seed', count)
+    seed: (count: number) => ipcRenderer.invoke('fish:seed', count),
+    sendCommand: (fishId: number, protocol: 'acoustic' | 'iridium', command: string, params?: string[]) =>
+      ipcRenderer.invoke('fish:sendCommand', { fishId, protocol, command, params })
   },
 
   systemLog: {
@@ -233,6 +275,9 @@ const api = {
       ipcRenderer.on('serial:data', fn)
       return () => ipcRenderer.removeListener('serial:data', fn)
     }
+  },
+  media: {
+    transcode: (filePath: string) => ipcRenderer.invoke('media:transcode', filePath)
   }
 }
 

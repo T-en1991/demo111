@@ -61,9 +61,9 @@ export function registerSystemIpc(): void {
   ipcMain.handle('dialog:openXlsx', async () => {
     try {
       const result = await dialog.showOpenDialog({
-        title: '选择 Excel 文件',
+        title: '选择数据文件',
         properties: ['openFile', 'multiSelections'],
-        filters: [{ name: 'Excel', extensions: ['xlsx', 'xls', 'csv'] }]
+        filters: [{ name: 'Data Files', extensions: ['xlsx', 'xls', 'csv'] }]
       })
       if (result.canceled || !result.filePaths || result.filePaths.length === 0) return null
       return result.filePaths.map((p) => {

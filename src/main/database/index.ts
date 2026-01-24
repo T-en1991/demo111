@@ -32,6 +32,7 @@ async function initTables() {
     `CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");`,
     `CREATE TABLE IF NOT EXISTS "fish" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "deviceId" INTEGER NOT NULL DEFAULT 0,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL DEFAULT 'default',
     "ip" TEXT,
@@ -47,6 +48,9 @@ async function initTables() {
     "microwavePort" INTEGER,
     "acousticLon" REAL,
     "acousticLat" REAL,
+    "showOnMap" BOOLEAN NOT NULL DEFAULT 1,
+    "initialLon" REAL,
+    "initialLat" REAL,
     "status" TEXT NOT NULL DEFAULT 'running',
     "ascendCommand" TEXT,
     "descendCommand" TEXT,
@@ -68,6 +72,7 @@ async function initTables() {
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "fish_deviceId_key" ON "fish"("deviceId");`,
     `CREATE TABLE IF NOT EXISTS "alerts" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "title" TEXT NOT NULL,
@@ -85,27 +90,64 @@ async function initTables() {
     "imageBase64" TEXT,
     CONSTRAINT "alerts_fishId_fkey" FOREIGN KEY ("fishId") REFERENCES "fish" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );`,
-    `CREATE TABLE IF NOT EXISTS "History" (
+    `CREATE TABLE IF NOT EXISTS "history" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "fishId" INTEGER,
     "lon" REAL,
     "lat" REAL,
     "depth" REAL,
     "height" REAL,
     "battery" INTEGER,
     "signalStrength" INTEGER,
-    "time" DATETIME NOT NULL
+    "time" DATETIME NOT NULL,
+    "content" TEXT,
+    "raw_line" TEXT,
+    "rollDeg" REAL,
+    "pitchDeg" REAL,
+    "yawDeg" REAL,
+    "axMs2" REAL,
+    "ayMs2" REAL,
+    "azMs2" REAL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "history_fishId_fkey" FOREIGN KEY ("fishId") REFERENCES "fish" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );`,
-    `CREATE TABLE IF NOT EXISTS "ImageFrame" (
+    `CREATE TABLE IF NOT EXISTS "videos" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "packetId" INTEGER NOT NULL,
-    "totalPackets" INTEGER NOT NULL,
+    "fishId" INTEGER,
+    "path" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "size" INTEGER,
+    "camera" TEXT NOT NULL DEFAULT 'unknown',
+    "recordedAt" DATETIME,
+    "endedAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "videos_fishId_fkey" FOREIGN KEY ("fishId") REFERENCES "fish" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);`,
+    `CREATE TABLE IF NOT EXISTS "image_frames" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "imageId" TEXT NOT NULL,
+    "current" INTEGER NOT NULL,
+    "total" INTEGER NOT NULL,
     "data" TEXT NOT NULL,
-    "receivedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "crc" TEXT,
+    "filename" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);`,
+    `CREATE TABLE IF NOT EXISTS "system_logs" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "time" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "content" TEXT NOT NULL,
+    "type" TEXT NOT NULL
 );`
   ]
 
   for (const sql of sqls) {
-    await prisma.$executeRawUnsafe(sql)
+    try {
+      await prisma.$executeRawUnsafe(sql)
+    } catch (e) {
+      // Ignore errors if table already exists or column exists
+      logger.warn('Error executing init SQL (safe to ignore if table exists):', e)
+    }
   }
   logger.info('Database tables initialized successfully')
 }
@@ -159,8 +201,10 @@ export async function connectDatabase(): Promise<void> {
 
 export const importService = {
   async importHistoryFromXlsx(
-    filePath: string
+    filePath: string,
+    fishId?: number
   ): Promise<{ inserted: number; updated: number; failed: number }> {
+    logger.info(`importHistoryFromXlsx called with file: ${filePath}, fishId: ${fishId} (type: ${typeof fishId})`)
     if (!filePath || typeof filePath !== 'string') {
       throw new Error('Invalid file path')
     }
@@ -178,37 +222,55 @@ export const importService = {
       raw: true,
       defval: null
     })
-    const norm = (s: string): string => s.trim().toLowerCase()
+    logger.info(`Parsed ${rows.length} rows from file. First row keys: ${rows.length > 0 ? Object.keys(rows[0]).join(', ') : 'none'}`)
+
+    // Enhanced normalization to remove BOM and other invisible characters
+    const norm = (s: string): string => s.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '').toLowerCase()
+
     const mapKey = (k: string): string => {
       const s = norm(k)
-      if (['utc_time', 'uct_time', 'utc time', '时间'].includes(s)) return 'time'
-      if (['lon_deg', '经度'].includes(s)) return 'lon'
-      if (['lat_deg', '纬度'].includes(s)) return 'lat'
-      if (['depth_m', '深度'].includes(s)) return 'depth'
+      // Debug log for key mapping
+      // logger.info(`Mapping key: '${k}' -> norm: '${s}'`)
+
+      if (['utc_time', 'uct_time', 'utc time', '时间', 'time_wall'].includes(s)) return 'time'
+      if (['lon_deg', '经度', 'fused_lon'].includes(s)) return 'lon'
+      if (['lat_deg', '纬度', 'fused_lat'].includes(s)) return 'lat'
+      if (['depth_m', '深度'].includes(s) || s === 'depth[m]') return 'depth'
       if (['alt_m', '高度', 'alt', 'dvl_alt[m]'].includes(s)) return 'height'
       if (['battery_percent', '电量'].includes(s)) return 'battery'
       if (['si', '信号强度', 'signal'].includes(s)) return 'signalStrength'
       if (['content', '内容'].includes(s)) return 'content'
-      if (['roll_deg', '横滚角', 'roll'].includes(s)) return 'rollDeg'
-      if (['pitch_deg', '俯仰角', 'pitch'].includes(s)) return 'pitchDeg'
-      if (['yaw_deg', '偏航角', '航向角', 'yaw'].includes(s)) return 'yawDeg'
+      if (['roll_deg', '横滚角', 'roll'].includes(s) || s === 'roll[deg]') return 'rollDeg'
+      if (['pitch_deg', '俯仰角', 'pitch'].includes(s) || s === 'pitch[deg]') return 'pitchDeg'
+      if (['yaw_deg', '偏航角', '航向角', 'yaw'].includes(s) || s === 'yaw[deg]') return 'yawDeg'
       if (['raw_line', '元数据', 'raw', '原始行'].includes(s)) return 'rawLine'
-      // if (['ax[m/s^2]', '角速度x', 'ax'].includes(s)) return 'axMs2'
-      // if (['ay[m/s^2]', '角速度y', 'ay'].includes(s)) return 'ayMs2'
-      // if (['az[m/s^2]', '角速度z', 'az'].includes(s)) return 'azMs2'
+      if (['ax[m/s^2]', '角速度x', 'ax'].includes(s)) return 'axMs2'
+      if (['ay[m/s^2]', '角速度y', 'ay'].includes(s)) return 'ayMs2'
+      if (['az[m/s^2]', '角速度z', 'az'].includes(s)) return 'azMs2'
       return k
     }
 
     let inserted = 0
-    let updated = 0
+    const updated = 0
     let failed = 0
 
-    const toPayloads = rows.map((row) => {
+    // Ensure fishId is a number if present
+    const targetFishId = fishId != null ? Number(fishId) : null
+
+    const toPayloads = rows.map((row, index) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const obj: any = {}
       Object.keys(row).forEach((k) => {
         obj[mapKey(k)] = row[k]
       })
+
+      // Debug logging for first row mapping
+      if (index === 0) {
+        logger.info(`Row 0 raw keys: ${Object.keys(row).join(', ')}`)
+        logger.info(`Row 0 mapped keys: ${Object.keys(obj).join(', ')}`)
+        logger.info(`Row 0 time value: ${obj.time} (type: ${typeof obj.time})`)
+      }
+
       const t = obj.time
       let time: Date | null = null
       const makeCnDate = (
@@ -217,22 +279,23 @@ export const importService = {
         d: number,
         h: number,
         mi: number,
-        s: number
-      ): Date => new Date(Date.UTC(y, mo - 1, d, h - 8, mi, s))
+        s: number,
+        ms: number = 0
+      ): Date => new Date(Date.UTC(y, mo - 1, d, h - 8, mi, s, ms))
 
       // 优先从 rawLine 解析时间
-      if (typeof obj.rawLine === 'string') {
-        const m = /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/.exec(obj.rawLine)
-        if (m) {
-          const y = Number(m[1])
-          const mo = Number(m[2])
-          const d = Number(m[3])
-          const h = Number(m[4])
-          const mi = Number(m[5])
-          const s = Number(m[6])
-          time = makeCnDate(y, mo, d, h, mi, s)
-        }
-      }
+      // if (typeof obj.rawLine === 'string') {
+      //   const m = /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/.exec(obj.rawLine)
+      //   if (m) {
+      //     const y = Number(m[1])
+      //     const mo = Number(m[2])
+      //     const d = Number(m[3])
+      //     const h = Number(m[4])
+      //     const mi = Number(m[5])
+      //     const s = Number(m[6])
+      //     time = makeCnDate(y, mo, d, h, mi, s)
+      //   }
+      // }
 
       if (!time) {
         if (t instanceof Date) {
@@ -242,30 +305,61 @@ export const importService = {
           const h = t.getHours()
           const mi = t.getMinutes()
           const s = t.getSeconds()
-          time = makeCnDate(y, mo, d, h, mi, s)
+          const ms = t.getMilliseconds()
+          time = makeCnDate(y, mo, d, h, mi, s, ms)
         } else if (typeof t === 'string') {
         const s = t.trim()
-        const m =
-          /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s) ||
-          /^(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(s)
-        if (m) {
+        // Support YYYY-MM-DD HH:mm:ss, YYYY/MM/DD HH:mm:ss, and ISO format with T and ms
+          const m = new RegExp('^(\\d{4})[-/](\\d{2})[-/](\\d{2})[T\\s](\\d{2}):(\\d{2})(?::(\\d{2}))?(?:\\.(\\d+))?').exec(s)
+          if (m) {
           const y = Number(m[1])
           const mo = Number(m[2])
           const d = Number(m[3])
           const h = Number(m[4])
           const mi = Number(m[5])
           const sec = m[6] ? Number(m[6]) : 0
-          time = makeCnDate(y, mo, d, h, mi, sec)
+          // Handle milliseconds: .123 is 123ms, .1 is 100ms
+          let ms = 0
+          if (m[7]) {
+             const msStr = m[7].substring(0, 3)
+             ms = Number(msStr.padEnd(3, '0'))
+          }
+          time = makeCnDate(y, mo, d, h, mi, sec, ms)
         } else {
           time = null
         }
+      } else if (typeof t === 'number') {
+        // Excel serial date to JS Date
+        // 25569 is 1970-01-01 in Excel serial days
+        const utc_days = Math.floor(t - 25569)
+        const utc_value = utc_days * 86400;
+        const date_info = new Date(utc_value * 1000);
+
+        const fractional_day = t - Math.floor(t) + 0.0000001;
+        const total_seconds = Math.floor(86400 * fractional_day);
+        const seconds = total_seconds % 60;
+        const hours = Math.floor(total_seconds / (60 * 60));
+        const minutes = Math.floor(total_seconds / 60) % 60;
+
+        // Construct date
+        const y = date_info.getUTCFullYear()
+        const mo = date_info.getUTCMonth() + 1
+        const d = date_info.getUTCDate()
+        time = makeCnDate(y, mo, d, hours, minutes, seconds)
       } else {
         time = null
       }
     }
-      if (!time || isNaN(time.getTime())) return null
+      if (!time || isNaN(time.getTime())) {
+        if (failed < 5) {
+          logger.warn(`Row ${index} time parse failed. t=${t} (type ${typeof t}), rawLine=${obj.rawLine}`)
+        }
+        return null
+      }
       const num = (v: unknown): number | null => (v == null || v === '' ? null : Number(v))
-      return {
+
+      const payload = {
+        fishId: targetFishId,
         time,
         content: obj.content ?? null,
         rawLine: obj.rawLine ?? null,
@@ -285,14 +379,52 @@ export const importService = {
         ayMs2: num(obj.ayMs2),
         azMs2: num(obj.azMs2)
       }
+
+      if (index === 0) {
+        logger.info(`First row payload sample: ${JSON.stringify(payload)}`)
+      }
+      return payload
     })
 
-    const payloads = toPayloads.filter(Boolean) as Prisma.HistoryCreateInput[]
+    const payloads = toPayloads.filter(Boolean) as any[]
+
+    // Deduplicate payloads based on time within the file itself
+    const uniquePayloadsMap = new Map<number, any>()
+    for (const p of payloads) {
+      const t = p.time instanceof Date ? p.time.getTime() : 0
+      if (t > 0 && !uniquePayloadsMap.has(t)) {
+        uniquePayloadsMap.set(t, p)
+      }
+    }
+    const uniquePayloads = Array.from(uniquePayloadsMap.values())
+
+    if (uniquePayloads.length > 0) {
+      logger.info(`Ready to insert ${uniquePayloads.length} rows (deduplicated from ${payloads.length}). Sample fishId from first row: ${uniquePayloads[0].fishId}`)
+    } else {
+      logger.warn('No valid payloads generated from rows')
+    }
+
     const chunk = 500
-    for (let i = 0; i < payloads.length; i += chunk) {
-      const part = payloads.slice(i, i + chunk)
-      const res = await prisma.history.createMany({ data: part as any })
-      inserted += res.count
+    for (let i = 0; i < uniquePayloads.length; i += chunk) {
+      const part = uniquePayloads.slice(i, i + chunk)
+
+      // Check for existing records in database to avoid duplicates
+      const times = part.map(p => p.time)
+      const existing = await prisma.history.findMany({
+        where: {
+          fishId: targetFishId,
+          time: { in: times }
+        } as any,
+        select: { time: true }
+      })
+
+      const existingTimes = new Set(existing.map(e => e.time.getTime()))
+      const newRecords = part.filter(p => !existingTimes.has(p.time.getTime()))
+
+      if (newRecords.length > 0) {
+        const res = await prisma.history.createMany({ data: newRecords as any })
+        inserted += res.count
+      }
     }
 
     failed = rows.length - (inserted + updated)
@@ -351,6 +483,7 @@ export const userService = {
 export const historyService = {
   // 创建历史记录（允许相同 time 多条记录）
   async create(data: {
+    fishId?: number | null
     time: Date | string
     content?: string | null
     rawLine?: string | null
@@ -369,6 +502,7 @@ export const historyService = {
   }) {
     const timeValue = typeof data.time === 'string' ? new Date(data.time) : data.time
     const payload = {
+      fishId: data.fishId ?? null,
       time: timeValue,
       content: data.content ?? null,
       rawLine: data.rawLine ?? null,
@@ -386,7 +520,7 @@ export const historyService = {
       azMs2: data.azMs2 ?? null
     }
 
-    const existing = await prisma.history.findFirst({ where: { time: timeValue } })
+    const existing = await prisma.history.findFirst({ where: { time: timeValue, fishId: data.fishId ?? null } as any })
     if (existing) {
       return { inserted: 0, updated: 0, skipped: 1, record: existing }
     }
@@ -401,6 +535,7 @@ export const historyService = {
       pageSize?: number
       startTime?: string
       endTime?: string
+      fishId?: number
     } = {}
   ): Promise<{
     items: any[]
@@ -424,6 +559,9 @@ export const historyService = {
         ...where.time,
         lte: new Date(params.endTime)
       }
+    }
+    if (params.fishId) {
+      where.fishId = params.fishId
     }
 
     const [items, total] = await Promise.all([
@@ -499,6 +637,7 @@ export const alertService = {
       startTime?: string
       endTime?: string
       fromSocket?: boolean
+      fishId?: number
     } = {}
   ): Promise<{
     items: any[]
@@ -525,6 +664,9 @@ export const alertService = {
     }
     if (params.fromSocket !== undefined) {
       where.fromSocket = params.fromSocket
+    }
+    if (params.fishId) {
+      where.fishId = params.fishId
     }
 
     const [items, total] = await Promise.all([
@@ -650,6 +792,11 @@ export const fishService = {
   // 创建机器鱼
   async create(data: {
     name: string
+    acousticId?: string
+    fishCode?: string | null
+    showOnMap?: boolean
+    initialLon?: number | null
+    initialLat?: number | null
     ip?: string | null
     port?: number | null
     rtspUrl?: string | null
@@ -659,8 +806,8 @@ export const fishService = {
     satcomIp?: string | null
     satcomPort1?: number | null
     satcomPort2?: number | null
-    microwaveIp?: string | null
-    microwavePort?: number | null
+    serialPortPath?: string | null
+    serialBaudRate?: number | null
     acousticLon?: number | null
     acousticLat?: number | null
     type?: string
@@ -685,6 +832,11 @@ export const fishService = {
   }): Promise<Fish> {
     const payload = {
       name: data.name,
+      acousticId: data.acousticId ?? '',
+      fishCode: data.fishCode ?? null,
+      showOnMap: data.showOnMap ?? true,
+      initialLon: data.initialLon ?? null,
+      initialLat: data.initialLat ?? null,
       type: data.type ?? 'default',
       status: data.status ?? 'stopped',
       ip: data.ip ?? null,
@@ -696,8 +848,8 @@ export const fishService = {
       satcomIp: data.satcomIp ?? null,
       satcomPort1: data.satcomPort1 ?? null,
       satcomPort2: data.satcomPort2 ?? null,
-      microwaveIp: data.microwaveIp ?? null,
-      microwavePort: data.microwavePort ?? null,
+      serialPortPath: data.serialPortPath ?? null,
+      serialBaudRate: data.serialBaudRate ?? null,
       acousticLon: data.acousticLon ?? null,
       acousticLat: data.acousticLat ?? null,
       ascendCommand: data.ascendCommand ?? null,
@@ -728,11 +880,8 @@ export const fishService = {
 
   // 获取所有机器鱼
   async findAll(): Promise<Fish[]> {
-    return prisma.fish.findMany({
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+    // 数据库结构由 Prisma 迁移管理 (npx prisma db push)，不再需要手动执行 CREATE TABLE
+    return prisma.fish.findMany()
   },
 
   // 根据ID查找机器鱼
@@ -797,6 +946,11 @@ export const fishService = {
     id: number,
     data: {
       name?: string
+      acousticId?: string
+      fishCode?: string | null
+      showOnMap?: boolean
+      initialLon?: number | null
+      initialLat?: number | null
       ip?: string | null
       port?: number | null
       rtspUrl?: string | null
@@ -806,8 +960,8 @@ export const fishService = {
       satcomIp?: string | null
       satcomPort1?: number | null
       satcomPort2?: number | null
-      microwaveIp?: string | null
-      microwavePort?: number | null
+      serialPortPath?: string | null
+      serialBaudRate?: number | null
       acousticLon?: number | null
       acousticLat?: number | null
       type?: string
@@ -870,6 +1024,7 @@ export const fishService = {
     for (let i = 0; i < count; i++) {
       mocks.push({
         name: `Mock Fish ${i + 1}`,
+        acousticId: String(1000 + i),
         ip: `192.168.1.${100 + i}`,
         status: i % 2 === 0 ? 'running' : 'stopped'
       })
@@ -882,6 +1037,7 @@ export { prisma }
 
 export const videoService = {
   async create(data: {
+    fishId?: number | null
     path: string
     name: string
     size?: number | null
@@ -891,6 +1047,7 @@ export const videoService = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }): Promise<any> {
     const payload = {
+      fishId: data.fishId ?? null,
       path: data.path,
       name: data.name,
       size: data.size ?? null,
@@ -951,11 +1108,18 @@ export const videoService = {
     return { mono, stereo }
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async list(params: { page?: number; pageSize?: number; keyword?: string }): Promise<any> {
+  async list(params: { page?: number; pageSize?: number; keyword?: string; fishId?: number }): Promise<any> {
     const page = Math.max(1, Number(params.page) || 1)
     const pageSize = Math.min(100, Math.max(1, Number(params.pageSize) || 10))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = params.keyword ? { name: { contains: String(params.keyword) } } : {}
+    const where: any = {}
+    if (params.keyword) {
+      where.name = { contains: String(params.keyword) }
+    }
+    if (params.fishId) {
+      where.fishId = params.fishId
+    }
+
     const [items, total] = await Promise.all([
       // @ts-ignore: Video model not recognized by client yet
       prisma.video.findMany({

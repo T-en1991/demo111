@@ -9,12 +9,16 @@ const t = (key: string, args?: any) => i18n.global.t(key, args)
 
 export interface Fish {
   id: number
+  acousticId: string
+  fishCode?: string
   name: string
+  initialLon?: number | null
+  initialLat?: number | null
   satcomIp?: string | null
   satcomPort1?: number | null
   satcomPort2?: number | null
-  microwaveIp?: string | null
-  microwavePort?: number | null
+  serialPortPath?: string | null
+  serialBaudRate?: number | null
   starlinkRtspMono?: string | null
   starlinkRtspStereo?: string | null
 
@@ -102,7 +106,7 @@ export const useFishControlStore = defineStore(
       // Connect Port 1
       if (satcomPort1) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const res = await (window.api as any).tcp.connect(satcomIp, satcomPort1)
+        const res = await window.api.tcp.connect(satcomIp, satcomPort1)
         if (res) connected1 = true
       }
 
@@ -136,112 +140,105 @@ export const useFishControlStore = defineStore(
         ElMessage.warning(t('store.fishControl.noFish'))
         return
       }
-      // Special-case: 'dive' uses COM port to send 'done' command
-      if (cmdType === 'dive') {
-        const comPath = currentFish.value.microwaveIp || ''
-        const baudRate = currentFish.value.microwavePort || 9600
-        if (!comPath) {
-          ElMessage.warning(t('store.fishControl.noSerial'))
-          return
-        }
 
-        // 直接发送 'done'，假设后台监听已打开串口
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let ok = await (window.api as any).serial.write('done')
-
-        // 如果发送失败，可能是串口未打开，尝试打开一次
-        if (!ok) {
-          console.warn('串口发送失败，尝试重新打开串口...')
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (window.api as any).serial.open({ path: comPath, baudRate })
-            // 重试发送
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ok = await (window.api as any).serial.write('done')
-          } catch (e) {
-            console.error('重新打开串口失败:', e)
-          }
-        }
-
-        if (ok) {
-          logs.value.push(`[${new Date().toLocaleTimeString()}] COM SEND(${comPath}): done`)
-          ElMessage.success(t('store.fishControl.serialSendSuccess'))
-        } else {
-          ElMessage.error(t('store.fishControl.serialSendFail'))
-        }
-        return
-      }
-
-      // Other commands: ensure TCP connection and send via satcom
-      if (connectionStatus.value !== 'connected') {
-        await connect()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((connectionStatus.value as any) !== 'connected') return
-      }
-
-      let payload: string | null | undefined = ''
-      switch (cmdType) {
-        case 'forward':
-          payload = currentFish.value.forwardCommand
-          break
-        case 'left':
-          payload = currentFish.value.leftCommand
-          break
-        case 'right':
-          payload = currentFish.value.rightCommand
-          break
-        case 'up':
-          payload = currentFish.value.upCommand
-          break
-        case 'down':
-          payload = currentFish.value.downCommand
-          break
-        case 'surf':
-          payload = currentFish.value.surfCommand
-          break
-        case 'manual':
-          payload = currentFish.value.manualCommand
-          break
-        case 'return':
-          payload = currentFish.value.returnCommand
-          break
-        case 'navigate':
-          payload = currentFish.value.navigateCommand
-          break
-        case 'lightOn':
-          payload = currentFish.value.lightOnCommand
-          break
-        case 'lightOff':
-          payload = currentFish.value.lightOffCommand
-          break
-        case 'ascend':
-          payload = currentFish.value.ascendCommand
-          break
-        case 'descend':
-          payload = currentFish.value.descendCommand
-          break
-        case 'wifi':
-          payload = currentFish.value.wifiCommand
-          break
-        case 'wifiOff':
-          payload = currentFish.value.wifiOffCommand
-          break
-      }
-      if (!payload) {
-        ElMessage.warning(t('store.fishControl.noCmd', { cmd: cmdType }))
-        return
-      }
-
-      const { satcomIp, satcomPort1 } = currentFish.value
-      if (!satcomIp || !satcomPort1) return
-
+      // Map cmdType to Protocol Command
+      let protocol: 'acoustic' | 'iridium' = 'acoustic'
+      let command = ''
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const success = await (window.api as any).tcp.sendClient(satcomIp, satcomPort1, payload)
-      console.log(success,221)
-      if (success) {
-        console.log('发送的控制台命令:', payload)
-        logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${payload}`)
+      const params: any[] = []
+
+      if (cmdType === 'dive') {
+        protocol = 'iridium'
+        command = 'DONE'
       } else {
+        protocol = 'acoustic'
+        // Map to AcousticCommandType
+        switch (cmdType) {
+          case 'forward':
+            command = 'FORWARD'
+            break
+          case 'left':
+            command = 'LEFT'
+            break
+          case 'right':
+            command = 'RIGHT'
+            break
+          case 'up':
+            command = 'UP'
+            break
+          case 'down':
+            command = 'DOWN'
+            break
+          case 'surf':
+            command = 'SURF'
+            break
+          case 'manual':
+            command = 'MAN'
+            break
+          case 'return':
+            command = 'RETURN'
+            break
+          case 'navigate':
+            command = 'NAVIGATE'
+            break
+          case 'lightOn':
+            command = 'LIGHTON'
+            break
+          case 'lightOff':
+            command = 'LIGHTOFF'
+            break
+          // Ascend/Descend seem duplicates of Up/Down in this context or specific?
+          // Based on index.vue, they map to specific fields.
+          // If the backend handles 'UP'/'DOWN', we use those.
+          case 'ascend':
+            command = 'UP'
+            break
+          case 'descend':
+            command = 'DOWN'
+            break
+          case 'wifi':
+            command = 'WIFI'
+            break
+          case 'wifiOff':
+            command = 'WIFIOFF'
+            break
+          default:
+            ElMessage.warning(`Unknown command type: ${cmdType}`)
+            return
+        }
+      }
+
+      // Ensure connection if acoustic
+      if (protocol === 'acoustic') {
+        if (connectionStatus.value !== 'connected') {
+          await connect()
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if ((connectionStatus.value as any) !== 'connected') return
+        }
+      }
+
+      try {
+        const res = await window.api.fish.sendCommand(
+          currentFish.value.id,
+          protocol,
+          command,
+          params
+        )
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = res as any // The result from sendCommand is { success: boolean, command?: string, error?: string } but maybe not fully typed in window.api yet if we didn't update types well enough or if invoke returns any
+
+        if (result.success) {
+          logs.value.push(`[${new Date().toLocaleTimeString()}] SEND(${protocol}): ${command}`)
+          ElMessage.success(t('store.fishControl.sendSuccess'))
+        } else {
+          console.error('Send failed:', result.error)
+          ElMessage.error(
+            t('store.fishControl.sendFail') + (result.error ? `: ${result.error}` : '')
+          )
+        }
+      } catch (e) {
+        console.error(e)
         ElMessage.error(t('store.fishControl.sendFail'))
       }
     }
@@ -324,33 +321,33 @@ export const useFishControlStore = defineStore(
             return `${lat},${lon},${depth},${alt}`
           }
 
-          const payloadData = `${seq},${fmt(points[0])}|${fmt(points[1])}`
+          const payloadData = `${fmt(points[0])}|${fmt(points[1])}`
 
-          // Construct full AT command
-          // +++AT*SENDIM,<Length>,<Dest>,ack,<Payload>
-          // Length is bytes of payloadData
-          const len = new TextEncoder().encode(payloadData).length
-          const dest = 2 // Default destination
-          const cmd = `+++AT*SENDIM,${len},${dest},ack,${payloadData}`
+          // Send via IPC
+          // We use 'acoustic' protocol.
+          try {
+             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             const res = await (window.api as any).fish.sendCommand(
+                currentFish.value.id,
+                'acoustic',
+                seq,
+                [payloadData]
+             )
 
-          // Send directly via TCP
-          const { satcomIp, satcomPort1 } = currentFish.value
-          if (!satcomIp || !satcomPort1) throw new Error('No Satcom connection')
+             if (!res.success) {
+                 throw new Error(res.error || 'Send failed')
+             }
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const success = await (window.api as any).tcp.sendClient(satcomIp, satcomPort1, cmd)
-          if (!success) throw new Error(`Failed to send packet ${seq}`)
+             logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${seq} ${payloadData}`)
+             console.log('Sending trajectory packet:', seq, payloadData)
 
-          logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${cmd}`)
-          console.log('Sending trajectory packet:', cmd)
+             // Wait for CMD-OK,seq
+             const expect = `CMD-OK,${seq}`
+             await waitFor((data) => data.includes(expect), 5000)
 
-          // Wait for CMD-OK,seq
-          // Example: CMD-OK,P1 or CMD-OK,PE
-          const expect = `CMD-OK,${seq}`
-          await waitFor((data) => data.includes(expect), 5000)
-
-          // Optional: slight delay between packets?
-          // await new Promise(r => setTimeout(r, 100))
+          } catch (e) {
+              throw e
+          }
         }
 
         ElMessage.success(t('store.fishControl.trackSuccess'))
@@ -491,22 +488,24 @@ export const useFishControlStore = defineStore(
         if ((connectionStatus.value as any) !== 'connected') return
       }
 
-      const id = currentFish.value.id
-      const content = `POS,${lon},${lat}`
-      const len = content.length
-      // +++AT*SENDIM,LEN,ID,ack,POS,LONGITUDE,LATITUDE
-      const payload = `+++AT*SENDIM,${len},${id},ack,${content}`
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res = await (window.api as any).fish.sendCommand(
+            currentFish.value.id,
+            'acoustic',
+            'POS',
+            [lon, lat]
+        )
 
-      const { satcomIp, satcomPort1 } = currentFish.value
-      if (!satcomIp || !satcomPort1) return
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const success = await (window.api as any).tcp.sendClient(satcomIp, satcomPort1, payload)
-      if (success) {
-        logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${payload}`)
-        ElMessage.success(t('screen.initialTargetSent'))
-      } else {
-        ElMessage.error(t('store.fishControl.sendFail'))
+        if (res.success) {
+            logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: POS ${lon},${lat}`)
+            ElMessage.success(t('screen.initialTargetSent'))
+        } else {
+            ElMessage.error(t('store.fishControl.sendFail'))
+        }
+      } catch (e) {
+          console.error(e)
+          ElMessage.error(t('store.fishControl.sendFail'))
       }
     }
 

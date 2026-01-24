@@ -7,6 +7,8 @@ const { t } = useI18n()
 
 interface AlertItem {
   id: number
+  fishId?: number
+  fishName?: string
   lon?: number
   lat?: number
   depth?: number
@@ -39,6 +41,15 @@ const loading = ref(false)
 // 历史记录列表
 const allItems = ref<AlertItem[]>([])
 
+// 机器鱼筛选
+interface Fish {
+  id: number
+  name: string
+  acousticId: string
+}
+const fishList = ref<Fish[]>([])
+const selectedFishId = ref<number | undefined>(undefined)
+
 // 本地时区格式化（YYYY-MM-DD HH:mm:ss）
 function formatDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
@@ -60,28 +71,35 @@ async function fetchData(): Promise<void> {
       page: page.value,
       pageSize: pageSize.value,
       startTime: activeRange.value.length === 2 ? formatDate(activeRange.value[0]) : undefined,
-      endTime: activeRange.value.length === 2 ? formatDate(activeRange.value[1]) : undefined
+      endTime: activeRange.value.length === 2 ? formatDate(activeRange.value[1]) : undefined,
+      fishId: selectedFishId.value
     }
 
     // 只获取历史记录
     const historyResult = await window.api.history.list(params)
 
     // 格式化历史记录
-    const historyItems: AlertItem[] = historyResult.items.map((item: any) => ({
-      id: item.id,
-      lon: item.lon,
-      lat: item.lat,
-      depth: item.depth,
-      height: item.height,
-      battery: item.battery,
-      signalStrength: item.signalStrength,
-      rollAngle: item.rollDeg,
-      pitchAngle: item.pitchDeg,
-      yawAngle: item.yawDeg,
-      time: formatDate(new Date(item.time)),
-      content: item.content,
-      rawLine: item.rawLine
-    }))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const historyItems: AlertItem[] = historyResult.items.map((item: any) => {
+      const foundFish = fishList.value.find((f) => f.id === item.fishId)
+      return {
+        id: item.id,
+        fishId: item.fishId,
+        fishName: foundFish ? foundFish.name : (item.fishId ? `Fish #${item.fishId}` : '-'),
+        lon: item.lon,
+        lat: item.lat,
+        depth: item.depth,
+        height: item.height,
+        battery: item.battery,
+        signalStrength: item.signalStrength,
+        rollAngle: item.rollDeg,
+        pitchAngle: item.pitchDeg,
+        yawAngle: item.yawDeg,
+        time: formatDate(new Date(item.time)),
+        content: item.content,
+        rawLine: item.rawLine
+      }
+    })
 
     // 按时间倒序排序
     allItems.value = historyItems.sort((a, b) => {
@@ -106,6 +124,13 @@ const currentPageData = computed((): AlertItem[] => {
 function resetQuery(): void {
   query.range = []
   activeRange.value = []
+  // selectedFishId.value = undefined
+  // Default to first fish if available
+  if (fishList.value.length > 0) {
+    selectedFishId.value = fishList.value[0].id
+  } else {
+    selectedFishId.value = undefined
+  }
   page.value = 1
   fetchData()
 }
@@ -189,7 +214,16 @@ function batteryClass(percent?: number): string {
 }
 
 // 组件挂载时获取数据
-onMounted(() => {
+onMounted(async () => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fishList.value = (await window.api.fish.findAll()) as any[]
+    if (fishList.value.length > 0) {
+      selectedFishId.value = fishList.value[0].id
+    }
+  } catch (e) {
+    console.error('Failed to load fish list', e)
+  }
   fetchData()
 })
 </script>
@@ -203,6 +237,16 @@ onMounted(() => {
 
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="88px">
+        <el-form-item label="机器鱼">
+          <el-select v-model="selectedFishId" placeholder="全部" clearable style="width: 160px">
+            <el-option
+              v-for="fish in fishList"
+              :key="fish.id"
+              :label="fish.name + (fish.acousticId ? ` (ID:${fish.acousticId})` : '')"
+              :value="fish.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('history.timeRange')">
           <el-date-picker v-model="query.range" type="daterange" range-separator="-" :start-placeholder="t('history.startDate')"
             :end-placeholder="t('history.endDate')" unlink-panels />
@@ -216,8 +260,7 @@ onMounted(() => {
 
     <el-card class="table-card" shadow="never">
       <el-table :data="currentPageData" border stripe style="width: 100%" v-loading="loading" height="560">
-
-        <el-table-column prop="id" :label="t('history.id')" />
+        <el-table-column prop="fishName" :label="t('fish.name')" min-width="120" />
         <el-table-column prop="lon" :label="t('history.lon')" />
         <el-table-column prop="lat" :label="t('history.lat')" />
         <el-table-column prop="depth" :label="t('history.depth')" />
@@ -251,6 +294,8 @@ onMounted(() => {
             <span class="time">{{ detailItem?.time }}</span>
           </div>
           <div class="meta-line">
+            <span class="meta-item">{{ t('fish.name') }}: {{ detailItem?.fishName ?? '-' }}</span>
+            <span class="sep">•</span>
             <span class="meta-item">{{ t('history.id') }}: {{ detailItem?.id }}</span>
             <span class="sep">•</span>
             <span class="meta-item">{{ t('history.lon') }}: {{ detailItem?.lon ?? '-' }}</span>

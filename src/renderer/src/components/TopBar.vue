@@ -3,13 +3,11 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { HomeFilled, SwitchButton } from '@element-plus/icons-vue'
 import { useAppStore } from '../store/app'
-import { useFishControlStore } from '../store/fishControl'
 import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const route = useRoute()
 const app = useAppStore()
-const fishStore = useFishControlStore()
 const { t, locale } = useI18n()
 
 function goHome(): void {
@@ -42,32 +40,6 @@ function exitApp(): void {
   <section v-if="route.name !== 'login'" class="global-topbar">
     <div class="brand-name">{{ t('topbar.brand') }}</div>
     <div class="right-actions">
-      <span v-if="fishStore.currentFish" class="current-device">
-        {{ t('topbar.currentDevice') }}{{ fishStore.currentFish.name }}
-        <span
-          v-if="fishStore.currentStatus?.statusText"
-          style="margin-left: 12px; color: #8ec5ff; font-weight: bold"
-        >
-          [{{ t('topbar.latestCommand') }}{{ t(fishStore.currentStatus.statusText) }}]
-        </span>
-        <span style="margin-left: 16px; font-size: 13px; display: inline-flex; align-items: center">
-          <span style="color: #a6b0c3">{{ t('topbar.satcomStatus') }}</span>
-          <span
-            :style="{
-              color:
-                fishStore.connectionStatus === 'connected'
-                  ? '#67c23a'
-                  : fishStore.connectionStatus === 'connecting'
-                    ? '#e6a23c'
-                    : '#f56c6c',
-              fontWeight: 'bold'
-            }"
-          >
-            {{ t(`topbar.${fishStore.connectionStatus}`) }}
-          </span>
-        </span>
-      </span>
-
       <el-dropdown trigger="click" @command="handleLanguage">
         <el-button circle plain>
           {{ locale === 'zh-CN' ? '中文' : 'En' }}
@@ -125,11 +97,5 @@ function exitApp(): void {
   display: flex;
   gap: 12px;
   align-items: center;
-}
-.current-device {
-  font-size: 14px;
-  color: #a6b0c3;
-  margin-right: 8px;
-  font-weight: 500;
 }
 </style>

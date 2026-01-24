@@ -23,11 +23,25 @@ interface TrackPoint {
 
 const appStore = useAppStore()
 const fishControlStore = useFishControlStore()
-const AK = 'iWyOxtxr32YCdQBu9yYeICmRKBb6Jm1h'
+const AK = 'a2HDfXdiPuz56AH2Ng3JtebA8r6NOkkK'
 // 使用项目静态资源作为标注图标
 const fishIconUrl = new URL('../../assets/images/fish.svg', import.meta.url).href
 
 // 最小类型定义，覆盖当前使用到的构造与方法，避免使用 any
+type BMapLabel = {
+  setContent: (content: string) => void
+  setStyle: (style: Record<string, string | number>) => void
+}
+
+type BMapMarker = {
+  setPosition: (point: unknown) => void
+  setIcon: (icon: unknown) => void
+  setZIndex: (index: number) => void
+  getLabel: () => BMapLabel | null
+  setLabel: (label: BMapLabel) => void
+  addEventListener: (event: string, handler: () => void) => void
+}
+
 type BMapLikeMap = {
   centerAndZoom: (point: unknown, zoom: number) => void
   enableScrollWheelZoom: (enable: boolean) => void
@@ -46,19 +60,60 @@ interface BMap2DApi {
   Point: new (lng: number, lat: number) => unknown
   NavigationControl: new () => unknown
   ScaleControl: new () => unknown
-  Marker: new (point: unknown, opts?: unknown) => unknown
+  Marker: new (point: unknown, opts?: unknown) => BMapMarker
   Icon: new (url: string, size?: unknown, opts?: unknown) => unknown
+  Label: new (content: string, opts?: unknown) => BMapLabel
   Size: new (w: number, h: number) => unknown
   Polyline: new (points: unknown[], opts?: unknown) => unknown
 }
 
-const robots = reactive<RobotStatus[]>([])
-const selectedId = computed(
-  () => Number(appStore.selectedRobotId) || (robots.length > 0 ? robots[0].id : 0)
-)
-const current = computed<RobotStatus | undefined>(() =>
+// 扩展 RobotStatus 以包含是否显示
+interface EnhancedRobotStatus extends RobotStatus {
+  showOnMap: boolean
+  lastUpdate: number
+  track?: TrackPoint[]
+}
+
+const toTrackPoints = (json: unknown): TrackPoint[] => {
+  if (!json) return []
+  let data = json
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data)
+    } catch {
+      return []
+    }
+  }
+  if (!Array.isArray(data)) return []
+  return (data as unknown[]).map((tp) => {
+    const o = tp as Record<string, unknown>
+    const lon = typeof o.lon === 'number' ? o.lon : Number(o.lon)
+    const lat = typeof o.lat === 'number' ? o.lat : Number(o.lat)
+    const altRaw = o.alt
+    const depthRaw = o.depth
+    const altNum = altRaw === null || altRaw === undefined ? null : Number(altRaw)
+    const depthNum = depthRaw === null || depthRaw === undefined ? null : Number(depthRaw)
+    return {
+      lon: Number.isFinite(lon) ? lon : 0,
+      lat: Number.isFinite(lat) ? lat : 0,
+      alt: altNum !== null && !Number.isFinite(altNum as number) ? null : altNum,
+      depth: depthNum !== null && !Number.isFinite(depthNum as number) ? null : depthNum
+    }
+  })
+}
+
+const robots = reactive<EnhancedRobotStatus[]>([])
+const selectedId = ref<number>(0)
+
+// 同步 selectedId 到 store (如果还需要 store)
+watch(selectedId, (val) => {
+  appStore.setSelectedRobotId(val)
+})
+
+const current = computed<EnhancedRobotStatus | undefined>(() =>
   robots.find((r) => r.id === selectedId.value)
 )
+
 // 为模板提供已解包的派生值，优先使用实时状态
 const currentLng = computed<number>(
   () => fishControlStore.currentStatus?.lng ?? current.value?.lng ?? 0
@@ -90,12 +145,12 @@ const currentAcoustic = computed<SignalLevel>(
 )
 let mapInstance: BMapLikeMap | null = null
 function getBMap(): BMap2DApi | undefined {
-  return (window as { BMap?: unknown }).BMap as BMap2DApi | undefined
+  const w = window as { BMap?: BMap2DApi }
+  if (w.BMap && w.BMap.Map && w.BMap.Point) {
+    return w.BMap
+  }
+  return undefined
 }
-
-// 记录每个设备的初始位置与初始深度，供“返航/初始定高”使用
-const homes: Record<number, { lng: number; lat: number }> = {}
-const initialDepths: Record<number, number> = {}
 
 const initialTargetDialogVisible = ref(false)
 const initialTargetLon = ref<number>(0)
@@ -103,7 +158,18 @@ const initialTargetLat = ref<number>(0)
 
 function openInitialTargetDialog(): void {
   initialTargetDialogVisible.value = true
-  // Optional: Reset to 0 or keep last value. Keeping last value is usually better UX.
+
+  // 从当前选中鱼获取初始目标点
+  const fish = fishControlStore.currentFish
+  if (fish) {
+    if (fish.initialLon !== undefined && fish.initialLon !== null) {
+      initialTargetLon.value = fish.initialLon
+    }
+    if (fish.initialLat !== undefined && fish.initialLat !== null) {
+      initialTargetLat.value = fish.initialLat
+    }
+  }
+
   if (initialTargetLon.value === 0 && initialTargetLat.value === 0) {
     initialTargetLon.value = 0
     initialTargetLat.value = 0
@@ -117,40 +183,300 @@ async function confirmInitialTarget(): Promise<void> {
   initialTargetDialogVisible.value = false
 }
 
-onMounted(async (): Promise<void> => {
-  // 从后端获取机器鱼列表
+// 标注集合
+const markers: Map<number, BMapMarker> = new Map()
+
+// 更新单个鱼的最新位置信息
+async function updateFishStatus(fish: any, status: EnhancedRobotStatus): Promise<void> {
   try {
-    const list = await window.api.fish.findAll()
-    if (list && list.length > 0) {
-      // 转换为 RobotStatus 格式
-      const statusList: RobotStatus[] = list.map((f) => ({
+    // 获取最新历史记录
+    const historyRes = await window.api.history.list({
+      // @ts-ignore: fishId added in d.ts
+      fishId: fish.id,
+      page: 1,
+      pageSize: 1
+    })
+    const latestHistory = historyRes.items[0]
+
+    // 比较时间
+    const fishTime = new Date(fish.updatedAt).getTime()
+    const historyTime = latestHistory ? new Date(latestHistory.time).getTime() : 0
+
+    // 默认使用 fish 表中的初始位置
+    let lng = fish.initialLon || 0
+    let lat = fish.initialLat || 0
+    let lastUpdate = fishTime
+
+    // 如果历史记录更新，则使用历史记录
+    if (historyTime > fishTime && latestHistory.lon && latestHistory.lat) {
+      lng = latestHistory.lon
+      lat = latestHistory.lat
+      lastUpdate = historyTime
+    } else if (fish.initialLon && fish.initialLat) {
+      // 显式使用 initial
+      lng = fish.initialLon
+      lat = fish.initialLat
+    }
+
+    // 更新状态
+    status.lng = lng
+    status.lat = lat
+    status.lastUpdate = lastUpdate
+    if (latestHistory) {
+      status.depth = latestHistory.depth ?? 0
+      status.altitude = latestHistory.height ?? 0
+      status.battery = latestHistory.battery ?? 0
+      status.yaw = latestHistory.yawDeg ?? 0
+      status.pitch = latestHistory.pitchDeg ?? 0
+      status.roll = latestHistory.rollDeg ?? 0
+    }
+  } catch (e) {
+    console.error(`Failed to update status for fish ${fish.id}`, e)
+  }
+}
+
+// 刷新所有鱼的状态和地图标注
+async function refreshAll(): Promise<void> {
+  const list = await window.api.fish.findAll()
+  // 同步 robots 列表
+  // 这里简化处理：直接重建 robots 列表，或者更新现有
+  // 为了保留响应性，我们尽量更新
+  const idMap = new Map(list.map(f => [f.id, f]))
+
+  // 移除不存在的
+  for (let i = robots.length - 1; i >= 0; i--) {
+    if (!idMap.has(robots[i].id)) {
+      robots.splice(i, 1)
+    }
+  }
+
+  // 添加/更新
+  for (const f of list) {
+    let r = robots.find(r => r.id === f.id)
+    if (!r) {
+      r = {
         id: f.id,
         name: f.name,
-        battery: 100, // 默认电量
+        battery: 0,
         depth: 0,
         altitude: 0,
         yaw: 0,
         pitch: 0,
         roll: 0,
-        lng: f.acousticLon || 0, // 使用声通基准或默认0
-        lat: f.acousticLat || 0,
-        acoustic: 'weak'
-      }))
-      robots.splice(0, robots.length, ...statusList)
+        lng: 0,
+        lat: 0,
+        acoustic: 'weak',
+        // @ts-ignore: showOnMap exists
+        showOnMap: f.showOnMap ?? true,
+        lastUpdate: 0,
+        // @ts-ignore: track exists
+        track: toTrackPoints(f.track)
+      }
+      robots.push(r)
+    } else {
+      r.name = f.name
+      // @ts-ignore: showOnMap exists
+      r.showOnMap = f.showOnMap ?? true
+      // @ts-ignore: track exists
+      r.track = toTrackPoints(f.track)
+    }
+    // 更新位置数据
+    await updateFishStatus(f, r)
+  }
 
-      // 初始化 homes 和 initialDepths
-      robots.forEach((r): void => {
-        homes[r.id] = { lng: r.lng, lat: r.lat }
-        initialDepths[r.id] = r.depth
+  // 绘制地图标注
+  renderMarkers()
+  renderTrajectory()
+}
+
+let currentPolyline: unknown = null
+
+function renderTrajectory(): void {
+  const BMap = getBMap()
+  if (!BMap || !mapInstance) return
+  const map = mapInstance
+
+  // 移除旧的轨迹线
+  if (currentPolyline) {
+    map.removeOverlay(currentPolyline)
+    currentPolyline = null
+  }
+
+  const r = robots.find((item) => item.id === selectedId.value)
+  if (!r || !r.track || r.track.length === 0) return
+
+  if (!r.showOnMap) return
+
+  const points = r.track.map((p) => new BMap.Point(p.lon, p.lat))
+  const polyline = new BMap.Polyline(points, {
+    strokeColor: 'red',
+    strokeWeight: 3,
+    strokeOpacity: 0.8
+  })
+
+  map.addOverlay(polyline)
+  currentPolyline = polyline
+}
+
+function renderMarkers(): void {
+  const BMap = getBMap()
+  if (!BMap || !mapInstance) return
+  const map = mapInstance
+
+  // 清理无效标注
+  const activeIds = new Set(robots.map(r => r.id))
+  for (const [id, marker] of markers.entries()) {
+    if (!activeIds.has(id)) {
+      map.removeOverlay(marker)
+      markers.delete(id)
+    }
+  }
+
+  robots.forEach(r => {
+    if (!r.showOnMap) {
+      if (markers.has(r.id)) {
+        map.removeOverlay(markers.get(r.id))
+        markers.delete(r.id)
+      }
+      return
+    }
+
+    const isSelected = r.id === selectedId.value
+    const point = new BMap.Point(r.lng, r.lat)
+    const zIndex = isSelected ? 999 : 100
+
+    // 图标样式
+    let icon
+    if (isSelected) {
+      // 绿色/选中：使用 fishIcon (大)
+      icon = new BMap.Icon(fishIconUrl, new BMap.Size(48, 48), {
+        imageSize: new BMap.Size(48, 48),
+        anchor: new BMap.Size(24, 24)
+      })
+    } else {
+      // 未选中：也使用 fishIcon (小)
+      icon = new BMap.Icon(fishIconUrl, new BMap.Size(32, 32), {
+        imageSize: new BMap.Size(32, 32),
+        anchor: new BMap.Size(16, 16)
+      })
+    }
+
+    let marker = markers.get(r.id)
+    if (marker) {
+      // 更新位置和图标
+      marker.setPosition(point)
+      marker.setIcon(icon)
+      marker.setZIndex(zIndex)
+      // 更新 Label
+      const label = marker.getLabel()
+      if (label) {
+        label.setContent(r.name)
+        label.setStyle(
+          isSelected
+            ? {
+                color: '#ffffff',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                border: '2px solid transparent',
+                borderRadius: '6px',
+                background:
+                  'linear-gradient(#1f2230, #1f2230) padding-box, linear-gradient(135deg, #00C6FB 0%, #005BEA 100%) border-box',
+                padding: '4px 8px',
+                boxShadow: '0 2px 10px rgba(0, 91, 234, 0.5)',
+                zIndex: '1000'
+              }
+            : {
+                color: '#eeeeee',
+                fontWeight: 'normal',
+                fontSize: '12px',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '4px',
+                background: 'rgba(0,0,0,0.6)',
+                padding: '2px 4px',
+                boxShadow: 'none',
+                zIndex: 'auto'
+              }
+        )
+      }
+    } else {
+      // 创建新标注
+      marker = new BMap.Marker(point, { icon })
+      marker.setZIndex(zIndex)
+
+      // 添加 Label
+      const label = new BMap.Label(r.name, {
+        offset: new BMap.Size(-20, -25)
+      })
+      label.setStyle(
+        isSelected
+          ? {
+              color: '#ffffff',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              border: '2px solid transparent',
+              borderRadius: '6px',
+              background:
+                'linear-gradient(#1f2230, #1f2230) padding-box, linear-gradient(135deg, #00C6FB 0%, #005BEA 100%) border-box',
+              padding: '4px 8px',
+              boxShadow: '0 2px 10px rgba(0, 91, 234, 0.5)',
+              zIndex: '1000'
+            }
+          : {
+              color: '#eeeeee',
+              fontWeight: 'normal',
+              fontSize: '12px',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '4px',
+              background: 'rgba(0,0,0,0.6)',
+              padding: '2px 4px',
+              boxShadow: 'none',
+              zIndex: 'auto'
+            }
+      )
+      marker.setLabel(label)
+
+      // 点击事件：选中
+      marker.addEventListener('click', () => {
+        selectedId.value = r.id
       })
 
-      // 如果没有选中任何机器鱼，默认选中第一个
-      if (!appStore.selectedRobotId) {
-        appStore.setSelectedRobotId(robots[0].id)
-      }
+      map.addOverlay(marker)
+      markers.set(r.id, marker)
     }
-  } catch (e) {
-    console.error('Failed to fetch fish list:', e)
+  })
+}
+
+// 监听选中变化
+watch(selectedId, (newId) => {
+  // 不再全局保存选中状态
+  // appStore.setSelectedRobotId(newId)
+
+  // 更新当前 FishControl Store
+  window.api.fish.findById(newId).then(fish => {
+    if (fish) fishControlStore.setCurrentFish(fish as any)
+  })
+
+  // 重绘 Marker 样式
+  renderMarkers()
+  renderTrajectory()
+
+  // 居中地图
+  const target = robots.find(r => r.id === newId)
+  if (target && mapInstance) {
+    const BMap = getBMap()
+    if (BMap) {
+      const point = new BMap.Point(target.lng, target.lat)
+      mapInstance.centerAndZoom(point, 14)
+    }
+  }
+})
+
+onMounted(async (): Promise<void> => {
+  await refreshAll()
+
+  // 默认选中第一个
+  if (robots.length > 0 && !selectedId.value) {
+    selectedId.value = robots[0].id
   }
 
   void init()
@@ -165,7 +491,7 @@ onMounted(() => {
   const handler = (
     _evt: unknown,
     payload: { time?: string; csq?: number; raw?: string; port?: string }
-  ) => {
+  ): void => {
     try {
       const timeStr = payload?.time ?? ''
       const csq = payload?.csq ?? ''
@@ -195,7 +521,7 @@ let animationFrameId: number | null = null
 const lastSentTime = ref(0)
 const JOYSTICK_THROTTLE = 1000 // 1秒防抖
 
-function updateGamepads() {
+function updateGamepads(): void {
   const gamepads = navigator.getGamepads()
   if (!gamepads) return
 
@@ -277,38 +603,31 @@ function updateGamepads() {
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
 function controlUp(): void {
   console.log('[tap] up')
-  ElMessage.success(t('screen.upSent'))
   void fishControlStore.sendCommand('up')
 }
 function controlDown(): void {
   console.log('[tap] down')
-  ElMessage.success(t('screen.downSent'))
   void fishControlStore.sendCommand('down')
 }
 function controlDive(): void {
   console.log('[tap] dive')
   // Store handles the serial logic and messages
-  ElMessage.success(t('screen.diveSent'))
   void fishControlStore.sendCommand('dive')
 }
 function controlSurf(): void {
   console.log('[tap] surf')
-  ElMessage.success(t('screen.surfSent'))
   void fishControlStore.sendCommand('surf')
 }
 function moveForward(): void {
   console.log('[tap] forward')
-  ElMessage.success(t('screen.forwardSent'))
   void fishControlStore.sendCommand('forward')
 }
 function moveLeft(): void {
   console.log('[tap] left')
-  ElMessage.success(t('screen.leftSent'))
   void fishControlStore.sendCommand('left')
 }
 function moveRight(): void {
   console.log('[tap] right')
-  ElMessage.success(t('screen.rightSent'))
   void fishControlStore.sendCommand('right')
 }
 
@@ -347,7 +666,6 @@ const returnHomeDebounced = debounce(returnHome, 500)
 const lightOn = ref(false)
 
 function enableManual(): void {
-  ElMessage.success(t('screen.manualSent'))
   void fishControlStore.sendCommand('manual')
 }
 
@@ -453,13 +771,6 @@ async function confirmNavigate(): Promise<void> {
   }
 
   try {
-    // 1. 更新鱼的轨迹信息
-    // 注意：这里我们只更新 track 字段，但 update 接口可能需要其他字段保持不变或者允许部分更新
-    // 假设 update 接口支持部分更新（Prisma 通常支持）
-    // 但我们的 preload/ipc 封装可能需要传递完整对象或者特定的结构
-    // 查看 preload 定义，update 接收的是可选字段，所以只传 track 是可以的
-
-    // 保留 6 位小数
     const cleanTrack = navigateTrack.value.map((p) => ({
       lon: Math.round(p.lon * 1e6) / 1e6,
       lat: Math.round(p.lat * 1e6) / 1e6,
@@ -471,9 +782,19 @@ async function confirmNavigate(): Promise<void> {
       track: cleanTrack
     })
 
+    // 更新本地 robots 数据，以便立即刷新地图轨迹
+    const r = robots.find((item) => item.id === currentFish.id)
+    if (r) {
+      r.track = cleanTrack.map((p) => ({
+        lon: p.lon,
+        lat: p.lat,
+        alt: p.alt ?? null,
+        depth: p.depth ?? null
+      }))
+      renderTrajectory()
+    }
+
     ElMessage.success(t('screen.trackSaved'))
-    // Start complex navigation flow (Navigate -> Wait -> Upload Trajectory)
-    // Map UI TrackPoint to Store TrackPoint
     const storeTrack = cleanTrack.map((p) => ({
       lon: p.lon,
       lat: p.lat,
@@ -481,8 +802,6 @@ async function confirmNavigate(): Promise<void> {
       depth: p.depth
     }))
 
-    // We don't await this because it's a long running process with its own UI feedback
-    // and we want to close the dialog immediately.
     void fishControlStore.sendTrajectory(storeTrack)
 
     navigateDialogVisible.value = false
@@ -494,25 +813,9 @@ async function confirmNavigate(): Promise<void> {
 
 function setLight(on: boolean): void {
   lightOn.value = on
-  ElMessage.success(on ? t('screen.lightOn') : t('screen.lightOff'))
   void fishControlStore.sendCommand(on ? 'lightOn' : 'lightOff')
 }
 function returnHome(): void {
-  // const BMap = getBMap()
-  // if (!BMap || !mapInstance) return
-  // const id = selectedId.value
-  // const home = homes[id]
-  // if (!home) return
-  // const point = new BMap.Point(home.lng, home.lat)
-  // mapInstance.centerAndZoom(point, 14)
-  // const target = robots.find((r) => r.id === id)
-  // if (target) {
-  //   target.lng = home.lng
-  //   target.lat = home.lat
-  //   ElMessage.success('已返航至初始位置')
-  // }
-  ElMessage.success(t('screen.returnSent'))
-
   void fishControlStore.sendCommand('return')
 }
 
@@ -535,13 +838,13 @@ onMounted(() => {
   const progressHandler = (
     _evt: unknown,
     payload: { imageId: string; current: number; total: number; filename: string }
-  ) => {
+  ): void => {
     if (payload.filename) {
       imageProgress[payload.filename] = { current: payload.current, total: payload.total }
     }
   }
 
-  const completeHandler = (_evt: unknown, payload: { imageId: string; filename: string }) => {
+  const completeHandler = (_evt: unknown, payload: { imageId: string; filename: string }): void => {
     if (payload.filename) {
       delete imageProgress[payload.filename]
       // 图片接收完成，刷新列表显示图片
@@ -589,10 +892,10 @@ async function fetchAlertsAndUpdate(): Promise<void> {
     const res = await (window as any).api?.alert?.list?.({
       page: 1,
       pageSize: 100,
-      fromSocket: true
+      fromSocket: true,
+      fishId: selectedId.value
     })
     const items = Array.isArray(res?.items) ? res.items : []
-    console.log('items', items)
     // 按照 createdAt 倒序排序
     items.sort(
       (a: AlertItem, b: AlertItem) =>
@@ -604,6 +907,11 @@ async function fetchAlertsAndUpdate(): Promise<void> {
     console.error('fetchAlertsAndUpdate failed:', e)
   }
 }
+
+// 监听 selectedId 变化，刷新报警
+watch(selectedId, () => {
+  fetchAlertsAndUpdate()
+})
 
 const router = useRouter()
 const alertImageDialogVisible = ref(false)
@@ -622,11 +930,6 @@ async function focusAlert(a: AlertItem): Promise<void> {
     currentAlertImageUrl.value = a.imageBase64
     alertImageDialogVisible.value = true
   }
-  // 如果没有base64但有imageUrl，也尝试显示
-  // else if (a.imgFile) {
-  //   currentAlertImageUrl.value = a.imgFile
-  //   alertImageDialogVisible.value = true
-  // }
   // 无图片数据时发送PICSTART命令
   else {
     // 提取图片文件名，从imageUrl或生成默认文件名
@@ -650,14 +953,12 @@ async function focusAlert(a: AlertItem): Promise<void> {
   }
 }
 
-function goHistory(): void {
-  // 跳转到历史页面（按路由名称）
-  router.push({ name: 'history' })
+function goAlerts(): void {
+  // 跳转到报警页面（按路由名称）
+  router.push({ name: 'alerts' })
 }
 
 // 路径折线与当前位置标注引用，便于更新与移除
-let routeOverlay: unknown | null = null
-let currentMarker: unknown | null = null
 let pollTimer: number | null = null
 let alertPollTimer: number | null = null
 // 持续按压动作的定时器集合（键：动作名；值：setInterval 返回的标识）
@@ -733,164 +1034,6 @@ function onVideoDialogClose(): void {
   videoDialogVisible.value = false
 }
 
-type RoutePoint = { lng: number; lat: number; altitude: number; depth: number }
-
-function setCurrentMarker(lng: number, lat: number, size = 56): void {
-  const BMap = getBMap()
-  if (!BMap || !mapInstance) return
-  const point = new BMap.Point(lng, lat)
-  if (currentMarker && typeof mapInstance.removeOverlay === 'function') {
-    mapInstance.removeOverlay(currentMarker)
-  }
-  const icon = new BMap.Icon(fishIconUrl, new BMap.Size(size, size), {
-    imageSize: new BMap.Size(size, size),
-    anchor: new BMap.Size(Math.round(size / 2), Math.round(size / 2))
-  })
-  currentMarker = new BMap.Marker(point, { icon })
-  mapInstance.addOverlay(currentMarker)
-  // 点击鱼标注，打开视频弹窗（默认单目）
-  try {
-    ; (
-      currentMarker as { addEventListener?: (type: string, handler: () => void) => void }
-    ).addEventListener?.('click', (): void => {
-      openVideo('microwaveMono')
-    })
-  } catch (e) {
-    console.warn('Bind marker click failed:', e)
-  }
-}
-
-function drawRoute(points: RoutePoint[]): void {
-  const BMap = getBMap()
-  if (!BMap || !mapInstance) return
-  const path = points.map((p: RoutePoint): unknown => new BMap.Point(p.lng, p.lat))
-  const polyline = new BMap.Polyline(path, {
-    strokeColor: 'red',
-    strokeWeight: 4,
-    strokeOpacity: 0.9
-  })
-  if (routeOverlay && typeof mapInstance.removeOverlay === 'function') {
-    mapInstance.removeOverlay(routeOverlay)
-  }
-  routeOverlay = polyline
-  mapInstance.addOverlay(polyline)
-}
-
-async function fetchFishData(
-  id: number,
-  _prevRoute: RoutePoint[]
-): Promise<{ info: RobotStatus; route: RoutePoint[]; alarm: AlertItem[] }> {
-  // 获取真实鱼数据
-  const fish = await window.api.fish.findById(Number(id))
-  if (!fish) {
-    throw new Error('Fish not found in database')
-  }
-  const base = robots.find((r) => r.id === id) ?? robots[0]
-
-  // Update store's current fish if changed, to enable real-time connection context
-  if (fishControlStore.currentFish?.id !== fish.id) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fishControlStore.setCurrentFish(fish as any)
-  }
-
-  // 优先使用实时状态（声通数据），否则使用数据库中的声通基准或内存中的最后状态
-  const store = fishControlStore.currentFish?.id === id ? fishControlStore.currentStatus : null
-  // 辅助函数：优先取实时值，其次取数据库值，最后取默认值
-  const val = (rt: number | undefined, db: number | null | undefined, def: number): number => {
-    if (rt !== undefined && rt !== null) return rt
-    if (db !== undefined && db !== null) return db
-    return def
-  }
-
-  const nextLng = val(store?.lng, fish.acousticLon, base?.lng || 0)
-  const nextLat = val(store?.lat, fish.acousticLat, base?.lat || 0)
-  const nextDepth = store?.depth ?? base?.depth ?? 0
-  const nextAltitude = store?.altitude ?? base?.altitude ?? 0
-  const nextYaw = store?.yaw ?? base?.yaw ?? 0
-  const nextPitch = store?.pitch ?? base?.pitch ?? 0
-  const nextRoll = store?.roll ?? base?.roll ?? 0
-  const nextBattery = store?.battery ?? base?.battery ?? 100
-  const nextAcoustic: SignalLevel = (store?.acoustic as SignalLevel) ?? base?.acoustic ?? 'weak'
-
-  const info: RobotStatus = {
-    id: fish.id,
-    name: fish.name,
-    lng: nextLng,
-    lat: nextLat,
-    depth: nextDepth,
-    altitude: nextAltitude,
-    yaw: nextYaw,
-    pitch: nextPitch,
-    roll: nextRoll,
-    battery: nextBattery,
-    acoustic: nextAcoustic
-  }
-
-  // 获取真实轨迹
-  let route: RoutePoint[] = []
-  if (Array.isArray(fish.track)) {
-    route = (fish.track as any[]).map((p) => ({
-      lng: Number(p.lon ?? p.lng ?? 0),
-      lat: Number(p.lat ?? 0),
-      altitude: Number(p.alt ?? p.altitude ?? 0),
-      depth: Number(p.depth ?? 0)
-    }))
-  }
-
-  // 报警：读取最近2小时的报警
-  const now = new Date()
-  const startTime = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString()
-  const endTime = now.toISOString()
-
-  let alarm: AlertItem[] = []
-  try {
-    const res = await window.api.alert.list({
-      page: 1,
-      pageSize: 50,
-      startTime,
-      endTime
-    })
-    alarm = res.items
-  } catch (e) {
-    console.error('Fetch alarms failed:', e)
-  }
-
-  return { info, route, alarm }
-}
-
-const routePoints = ref<RoutePoint[]>([])
-
-async function loadSelectedFishData(recenter = false): Promise<void> {
-  const BMap = getBMap()
-  if (!BMap || !mapInstance) return
-  if (robots.length === 0) return
-  const id = selectedId.value
-  const res = await fetchFishData(id, routePoints.value)
-  // 将 info 映射回当前选中机器人，驱动右侧基本信息展示
-  const target = robots.find((r) => r.id === id)
-  if (target) {
-    target.lng = res.info.lng
-    target.lat = res.info.lat
-    target.depth = res.info.depth
-    target.altitude = res.info.altitude
-    target.yaw = res.info.yaw
-    target.pitch = res.info.pitch
-    target.roll = res.info.roll
-    target.battery = res.info.battery
-    target.acoustic = res.info.acoustic
-  }
-
-  // 更新当前位置标注与轨迹折线
-  setCurrentMarker(res.info.lng, res.info.lat, 56)
-  routePoints.value = res.route
-  drawRoute(routePoints.value)
-
-  if (recenter) {
-    const point = new BMap.Point(res.info.lng, res.info.lat)
-    mapInstance.centerAndZoom(point, 14)
-  }
-}
-
 async function init(): Promise<void> {
   try {
     type GlobalCfg = { __MAP_MODE?: string }
@@ -916,7 +1059,7 @@ async function init(): Promise<void> {
       }
     }
 
-    const BMap = (window as { BMap?: unknown }).BMap as BMap2DApi | undefined
+    const BMap = getBMap()
     if (BMap) {
       // 确保 DOM 已渲染
       await new Promise((resolve) => setTimeout(resolve, 100))
@@ -928,6 +1071,7 @@ async function init(): Promise<void> {
       }
       const map = new BMap.Map(container)
       mapInstance = map
+
       const start = current.value || robots[0]
       if (start) {
         const center = new BMap.Point(start.lng, start.lat)
@@ -940,14 +1084,12 @@ async function init(): Promise<void> {
       map.addControl(new BMap.NavigationControl())
       map.addControl(new BMap.ScaleControl())
 
-      // 初始化加载选中鱼的数据并绘制
-      await loadSelectedFishData(true)
-
-      // 点击地图不产生任何效果（按照需求移除点击处理）
+      // 渲染初始 Marker
+      renderMarkers()
 
       // 轮询最新数据
       pollTimer = window.setInterval((): void => {
-        void loadSelectedFishData(false)
+        void refreshAll()
       }, 3000)
 
       // 拉取报警并启动轮询（30秒）
@@ -981,16 +1123,6 @@ onUnmounted((): void => {
     clearInterval(t)
   })
 })
-
-watch(selectedId, (): void => {
-  // 切换鱼时清空路径并移除旧折线，随后重新请求新鱼数据
-  routePoints.value = []
-  if (mapInstance && routeOverlay && typeof mapInstance.removeOverlay === 'function') {
-    mapInstance.removeOverlay(routeOverlay)
-    routeOverlay = null
-  }
-  void loadSelectedFishData(true)
-})
 </script>
 
 <template>
@@ -998,10 +1130,52 @@ watch(selectedId, (): void => {
     <div class="layout">
       <div class="map-panel">
         <div id="bmap-container" class="bmap"></div>
+
+        <!-- 头部下拉选择 -->
+        <div class="map-header-control">
+          <el-select v-model="selectedId" placeholder="选择机器鱼" style="width: 200px" size="large">
+            <el-option
+              v-for="r in robots"
+              :key="r.id"
+              :label="r.name"
+              :value="r.id"
+            />
+          </el-select>
+        </div>
+
+        <!-- 实时视频按钮 -->
+        <div class="map-video-btn" v-if="selectedId">
+          <el-button type="primary" size="large" circle @click="openVideo('microwaveMono')">
+            <el-icon><VideoCamera /></el-icon>
+          </el-button>
+        </div>
       </div>
       <div class="side-panel">
         <div class="panel-card">
-          <div class="section-title">{{ t('screen.basicInfo') }}</div>
+          <div class="section-header" style="display: flex; align-items: center; gap: 12px">
+            <el-select v-model="selectedId" placeholder="选择机器鱼" size="default" style="width: 160px">
+              <el-option v-for="r in robots" :key="r.id" :label="r.name" :value="r.id" />
+            </el-select>
+            <el-button
+              type="primary"
+              :disabled="!selectedId"
+              @click="openVideo('microwaveMono')"
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                width: auto;
+                background: linear-gradient(90deg, #00c6fb 0%, #005bea 100%);
+                border: none;
+                box-shadow: 0 4px 12px rgba(0, 91, 234, 0.4);
+                border-radius: 6px;
+                padding: 0 16px;
+              "
+            >
+              {{ t('screen.videoDialogTitle') }}
+            </el-button>
+          </div>
           <div class="status-grid">
             <div class="stat-card">
               <div class="stat-value">{{ Number(currentLng).toFixed(6) }}°</div>
@@ -1062,7 +1236,7 @@ watch(selectedId, (): void => {
         <div class="panel-card alerts-card">
           <div class="section-header">
             <div class="section-title">{{ t('screen.alertInfo') }}</div>
-            <button class="section-more" type="button" :title="t('screen.viewHistory')" @click="goHistory()">
+            <button class="section-more" type="button" :title="t('home.alerts')" @click="goAlerts()">
               ...
             </button>
           </div>
@@ -1102,46 +1276,46 @@ watch(selectedId, (): void => {
           <div class="actions-grid">
             <!-- 方向控制 -->
             <button class="action-btn primary" @click="moveForwardDebounced">
-              <span class="icon">↑</span><span class="text">{{ t('screen.forward') }}</span>
+              <span class="text">{{ t('screen.forward') }}</span>
             </button>
             <button class="action-btn primary" @click="moveLeftDebounced">
-              <span class="icon">←</span><span class="text">{{ t('screen.left') }}</span>
+              <span class="text">{{ t('screen.left') }}</span>
             </button>
             <button class="action-btn primary" @click="moveRightDebounced">
-              <span class="icon">→</span><span class="text">{{ t('screen.right') }}</span>
+              <span class="text">{{ t('screen.right') }}</span>
             </button>
             <!-- 垂直运动 -->
             <button class="action-btn accent" @click="controlUpDebounced">
-              <span class="icon">⤒</span><span class="text">{{ t('screen.up') }}</span>
+              <span class="text">{{ t('screen.up') }}</span>
             </button>
             <button class="action-btn accent" @click="controlDownDebounced">
-              <span class="icon">⤓</span><span class="text">{{ t('screen.down') }}</span>
+              <span class="text">{{ t('screen.down') }}</span>
             </button>
             <button class="action-btn accent" @click="controlDiveDebounced">
-              <span class="icon">⤓</span><span class="text">{{ t('screen.dive') }}</span>
+              <span class="text">{{ t('screen.dive') }}</span>
             </button>
             <!-- 模式/返航/上浮 -->
             <button class="action-btn warn" @click="enableManualDebounced">
-              <span class="icon">⚙️</span><span class="text">{{ t('screen.manual') }}</span>
+              <span class="text">{{ t('screen.manual') }}</span>
             </button>
             <button class="action-btn info" @click="returnHomeDebounced">
-              <span class="icon">🏠</span><span class="text">{{ t('screen.return') }}</span>
+              <span class="text">{{ t('screen.return') }}</span>
             </button>
             <button class="action-btn accent" @click="controlSurfDebounced">
-              <span class="icon">⤒</span><span class="text">{{ t('screen.surf') }}</span>
+              <span class="text">{{ t('screen.surf') }}</span>
             </button>
             <!-- 功耗与灯光 -->
             <button class="action-btn warn" @click="enableNavigateDebounced">
-              <span class="icon">🌙</span><span class="text">{{ t('screen.navigate') }}</span>
+              <span class="text">{{ t('screen.navigate') }}</span>
             </button>
             <button class="action-btn info" @click="setLightOnDebounced">
-              <span class="icon">💡</span><span class="text">{{ t('screen.lightOn') }}</span>
+              <span class="text">{{ t('screen.lightOn') }}</span>
             </button>
             <button class="action-btn info" @click="setLightOffDebounced">
-              <span class="icon">💡</span><span class="text">{{ t('screen.lightOff') }}</span>
+              <span class="text">{{ t('screen.lightOff') }}</span>
             </button>
             <button class="action-btn info" @click="openInitialTargetDialog">
-              <span class="icon">📍</span><span class="text">{{ t('screen.initialTarget') }}</span>
+              <span class="text">{{ t('screen.initialTarget') }}</span>
             </button>
           </div>
         </div>
@@ -1166,18 +1340,19 @@ watch(selectedId, (): void => {
         </el-button-group>
       </div>
       <div class="video-body">
-        <div :class="['video-container', { 'video-loading': videoLoading }]">
-          <el-loading v-loading="videoLoading" :text="t('screen.switchVideo')" background="rgba(0, 0, 0, 0.8)">
-            <template v-if="showVideoPlayer">
-              <VideoPlayerJSMpeg url="ws://localhost:8085/" />
-            </template>
-            <template v-else>
-              <div class="video-placeholder">
-                {{ t('screen.videoPlaceholder', { title: currentVideoTitle }) }}
-              </div>
-            </template>
-          </el-loading>
-        </div>
+        <div :class="['video-container', { 'video-loading': videoLoading }]"
+        v-loading="videoLoading"
+        :element-loading-text="t('screen.switchVideo')"
+        element-loading-background="rgba(0, 0, 0, 0.8)">
+        <template v-if="showVideoPlayer">
+          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
+        </template>
+        <template v-else>
+          <div class="video-placeholder">
+            {{ t('screen.videoPlaceholder', { title: currentVideoTitle }) }}
+          </div>
+        </template>
+      </div>
       </div>
     </el-dialog>
     <!-- 报警图片弹窗：有图则直接展示 -->

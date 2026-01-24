@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useFishControlStore } from '@renderer/store/fishControl'
 import { useI18n } from 'vue-i18n'
+import { isAbsolutePath } from '../../utils/path'
 
 const { t } = useI18n()
 
@@ -20,6 +21,21 @@ const dataFiles = ref<UFile[]>([])
 const alarmFiles = ref<UFile[]>([])
 const selectedAlarmFolder = ref<string>('')
 const fishControlStore = useFishControlStore()
+
+// Fish selection
+const fishList = ref<any[]>([])
+const selectedFishId = ref<number | undefined>(undefined)
+
+onMounted(async () => {
+  try {
+    fishList.value = await window.api.fish.findAll()
+    if (fishList.value.length > 0) {
+      selectedFishId.value = fishList.value[0].id
+    }
+  } catch (e) {
+    console.error('Failed to load fish list', e)
+  }
+})
 
 function clearVideo(): void {
   videoFiles.value = []
@@ -58,6 +74,10 @@ async function selectAlarmFolder(): Promise<void> {
 
 // Import alarm data from selected folder
 async function importAlarmData(): Promise<void> {
+  if (!selectedFishId.value) {
+    ElMessage.warning('请先选择机器鱼')
+    return
+  }
   if (!selectedAlarmFolder.value) {
     ElMessage.warning(t('upload.selectFolder'))
     return
@@ -65,7 +85,7 @@ async function importAlarmData(): Promise<void> {
 
   try {
     // @ts-ignore
-    const result = await window.api.alarm.importFolder(selectedAlarmFolder.value)
+    const result = await window.api.alarm.importFolder(selectedAlarmFolder.value, selectedFishId.value)
 
     if (result.ok > 0) {
       ElMessage.success(t('upload.importSuccess', { count: result.ok }))
@@ -85,12 +105,12 @@ async function importAlarmData(): Promise<void> {
   }
 }
 
-function isAbsolutePath(p: string): boolean {
-  return /^(?:[A-Za-z]:\\|\\\\)/.test(p) || p.startsWith('/')
-}
-
 // Save videos but auto-detect camera type from filename prefix (mcam=mono, bcam=stereo)
 async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'): Promise<void> {
+  if (!selectedFishId.value) {
+    ElMessage.warning('请先选择机器鱼')
+    return
+  }
   const files = videoFiles.value
   if (!files.length) {
     ElMessage.warning(t('upload.selectVideo'))
@@ -131,9 +151,24 @@ async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'):
         cameraType = 'stereo' // bcam 开头是双目
       }
 
+      let finalPath = p
+      let finalName = f.name
+
+      // Transcode MKV if needed
+      if (finalPath.toLowerCase().endsWith('.mkv')) {
+        // @ts-ignore
+        if ((window as any).api.media && (window as any).api.media.transcode) {
+          ElMessage.info(`正在转码: ${f.name}`)
+          // @ts-ignore
+          finalPath = await window.api.media.transcode(p)
+          finalName = finalName.replace(/\.mkv$/i, '.mp4')
+        }
+      }
+
       await window.api.video.create({
-        path: p,
-        name: f.name,
+        fishId: selectedFishId.value,
+        path: finalPath,
+        name: finalName,
         size: f.size,
         camera: cameraType,
         recordedAt: isoString
@@ -146,11 +181,11 @@ async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'):
   }
 
   if (ok > 0) {
-    ElMessage.success(t('upload.saveSuccess', { count: ok }))
+    ElMessage.success(t('upload.importSuccess', { count: ok }))
     clearVideo()
   }
   if (fail > 0) {
-    ElMessage.warning(t('upload.saveFail', { count: fail }))
+    ElMessage.warning(t('upload.importFail', { count: fail }))
   }
 }
 
@@ -174,6 +209,10 @@ async function chooseFiles(): Promise<void> {
 
 // Import all selected files sequentially and show aggregated results
 async function importSelectedFiles(): Promise<void> {
+  if (!selectedFishId.value) {
+    ElMessage.warning('请先选择机器鱼')
+    return
+  }
   if (!dataFiles.value.length) {
     ElMessage.warning(t('upload.selectFile'))
     return
@@ -194,7 +233,7 @@ async function importSelectedFiles(): Promise<void> {
     for (const f of dataFiles.value) {
       try {
         // @ts-ignore
-        const res = await window.api.history.importXlsx(f.path)
+        const res = await window.api.history.importXlsx(f.path, selectedFishId.value)
         if (res && (res as any).error) {
           results.push({ file: f.name, ok: false, error: (res as any).error })
         } else {
@@ -284,11 +323,25 @@ async function openWifiOff(): Promise<void> {
     </header>
 
     <el-card class="upload-card" shadow="hover">
-      <div class="actions">
-        <el-button type="primary" plain @click="openWinSCP">{{ t('upload.openWinSCP') }}</el-button>
-        <el-button type="success" plain @click="openWifi">{{ t('upload.openWifi') }}</el-button>
-        <el-button type="danger" plain @click="openWifiOff">{{ t('upload.closeWifi') }}</el-button>
+      <div class="top-bar">
+        <div class="fish-select">
+          <span>选择机器鱼：</span>
+          <el-select v-model="selectedFishId" placeholder="请选择机器鱼" style="width: 240px">
+            <el-option
+              v-for="fish in fishList"
+              :key="fish.id"
+              :label="fish.name + (fish.acousticId ? ` (ID:${fish.acousticId})` : '')"
+              :value="fish.id"
+            />
+          </el-select>
+        </div>
+        <div class="actions">
+          <el-button type="primary" plain @click="openWinSCP">{{ t('upload.openWinSCP') }}</el-button>
+          <el-button type="success" plain @click="openWifi">{{ t('upload.openWifi') }}</el-button>
+          <el-button type="danger" plain @click="openWifiOff">{{ t('upload.closeWifi') }}</el-button>
+        </div>
       </div>
+
       <el-tabs v-model="activeTab" class="upload-tabs">
         <el-tab-pane :label="t('upload.videoUpload')" name="video">
           <div class="upload-inline">
@@ -297,8 +350,8 @@ async function openWifiOff(): Promise<void> {
               <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center">
                 <el-button type="primary" @click="selectVideosAndSave">{{ t('upload.selectFile') }}</el-button>
 
-                <el-button type="primary" @click="() => saveVideosWithCamera('stereo')"
-                  >{{ t('upload.save') }}</el-button
+                <el-button type="primary" @click="() => saveVideosWithCamera('stereo')" :disabled="!videoFiles.length"
+                  >{{ t('upload.import') }}</el-button
                 >
                 <el-button text type="danger" @click="clearVideo">{{ t('upload.clear') }}</el-button>
               </div>
@@ -321,10 +374,10 @@ async function openWifiOff(): Promise<void> {
         <el-tab-pane :label="t('upload.dataUpload')" name="data">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">{{ t('upload.selectData') }}</div>
+              <div class="el-upload__text">{{ t('upload.selectData') }} (支持 .xlsx, .xls, .csv)</div>
               <div style="margin-top: 12px; display: flex; gap: 8px">
                 <el-button type="primary" @click="chooseFiles">{{ t('upload.selectFile') }}</el-button>
-                <el-button type="primary" @click="importSelectedFiles">{{ t('upload.import') }}</el-button>
+                <el-button type="primary" @click="importSelectedFiles" :disabled="!dataFiles.length">{{ t('upload.import') }}</el-button>
                 <el-button text type="danger" @click="clearData">{{ t('upload.clear') }}</el-button>
               </div>
               <div v-if="dataFiles.length" class="upload-list" style="margin-top: 12px">

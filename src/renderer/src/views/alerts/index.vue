@@ -22,6 +22,10 @@ const page = ref(1)
 const pageSize = ref(10)
 const loading = ref(false)
 
+// 机器鱼筛选
+const fishList = ref<any[]>([])
+const selectedFishId = ref<number | undefined>(undefined)
+
 function toFileUrl(p?: string | null): string | '' {
   if (!p) return ''
   const norm = p.replace(/\\/g, '/')
@@ -41,6 +45,9 @@ async function fetchAlerts(): Promise<void> {
     params.startTime = query.range[0].toISOString()
     params.endTime = query.range[1].toISOString()
   }
+  if (selectedFishId.value) {
+    params.fishId = selectedFishId.value
+  }
   // @ts-ignore
   const res = await window.api.alert.list(params)
   items.value = Array.isArray(res?.items) ? res.items : []
@@ -50,6 +57,15 @@ async function fetchAlerts(): Promise<void> {
 
 function resetQuery(): void {
   query.range = []
+  // selectedFishId.value = undefined
+  // Default to first fish if available
+  if (fishList.value.length > 0) {
+    selectedFishId.value = fishList.value[0].id
+  } else {
+    selectedFishId.value = undefined
+  }
+  page.value = 1
+  fetchAlerts()
 }
 async function applyQuery(): Promise<void> {
   page.value = 1
@@ -67,6 +83,15 @@ function onPageChange(p: number): void {
 }
 
 onMounted(async () => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fishList.value = (await window.api.fish.findAll()) as any[]
+    if (fishList.value.length > 0) {
+      selectedFishId.value = fishList.value[0].id
+    }
+  } catch (e) {
+    console.error('Failed to load fish list', e)
+  }
   await fetchAlerts()
 })
 
@@ -78,15 +103,6 @@ const videoError = ref<string>('')
 const monoType = ref<string>('video/mp4')
 const stereoType = ref<string>('video/mp4')
 
-function guessType(p: string): string {
-  const ext = (p.split('.').pop() || '').toLowerCase()
-  if (ext === 'mp4') return 'video/mp4'
-  if (ext === 'mkv') return 'video/x-matroska'
-  if (ext === 'avi') return 'video/x-msvideo'
-  if (ext === 'mov') return 'video/quicktime'
-  return 'video/mp4'
-}
-
 async function openVideo(item: any): Promise<void> {
   const moment = item?.title || '';
   if (!moment) return
@@ -94,8 +110,12 @@ async function openVideo(item: any): Promise<void> {
   const res = await window.api.video.findByMoment(moment)
   monoUrl.value = res?.mono?.path ? toVideoUrl(String(res.mono.path)) : ''
   stereoUrl.value = res?.stereo?.path ? toVideoUrl(String(res.stereo.path)) : ''
-  if (res?.mono?.path) monoType.value = guessType(String(res.mono.path))
-  if (res?.stereo?.path) stereoType.value = guessType(String(res.stereo.path))
+  if (res?.mono?.path) {
+    monoType.value = 'video/mp4' // 假设已转码或兼容
+  }
+  if (res?.stereo?.path) {
+    stereoType.value = 'video/mp4'
+  }
   activeTab.value = monoUrl.value ? 'mono' : (stereoUrl.value ? 'stereo' : 'mono')
   videoError.value = ''
   videoDialogVisible.value = true
@@ -116,6 +136,16 @@ function onVideoError(_e: Event): void {
 
     <el-card class="toolbar" shadow="hover">
       <el-form inline label-width="88px">
+        <el-form-item label="机器鱼">
+          <el-select v-model="selectedFishId" placeholder="全部" clearable style="width: 160px">
+            <el-option
+              v-for="fish in fishList"
+              :key="fish.id"
+              :label="fish.name + (fish.acousticId ? ` (ID:${fish.acousticId})` : '')"
+              :value="fish.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('history.timeRange')">
           <el-date-picker v-model="query.range" type="daterange" range-separator="-" :start-placeholder="t('history.startDate')"
             :end-placeholder="t('history.endDate')" unlink-panels />
@@ -170,13 +200,6 @@ function onVideoError(_e: Event): void {
               <span class="info-label">{{ t('history.lon') }}/{{ t('history.lat') }}：</span>
               <span class="info-value">{{ item.lat?.toFixed(4) }}, {{ item.lon?.toFixed(4) }}</span>
             </div>
-            <!-- <div class="info-item" v-if="item.message">
-              <el-icon class="info-icon">
-                <InfoFilled />
-              </el-icon>
-          <span class="info-label">内容：</span>
-              <span class="info-value">{{ item.message }}</span>
-            </div> -->
             <div style="margin-top:8px;">
               <el-button type="primary" size="small" @click="openVideo(item)">{{ t('alerts.viewVideo') }}</el-button>
             </div>

@@ -22,7 +22,7 @@ declare global {
       }
       alarm: {
         listFiles(folderPath: string): Promise<Array<{ name: string; size: number }>>
-        importFolder(folderPath: string): Promise<{ ok: number; fail: number; updated: number }>
+        importFolder(folderPath: string, fishId?: number): Promise<{ ok: number; fail: number; updated: number }>
       }
       systemLog: {
         create(data: { content: string; type: string; time?: string }): Promise<any>
@@ -41,6 +41,7 @@ declare global {
           pageSize?: number
           startTime?: string
           endTime?: string
+          fishId?: number
         }): Promise<any>
       }
       video: {
@@ -52,7 +53,7 @@ declare global {
           recordedAt?: string | Date | null
           endedAt?: string | Date | null
         }): Promise<any>
-        list(params?: { page?: number; pageSize?: number; keyword?: string }): Promise<any>
+        list(params?: { page?: number; pageSize?: number; keyword?: string; fishId?: number }): Promise<any>
         findByMoment(moment: string): Promise<{ mono: any | null; stereo: any | null }>
         get(id: number): Promise<any>
         delete(id: number): Promise<any>
@@ -72,7 +73,7 @@ declare global {
           pitchDeg?: number | null
           rollDeg?: number | null
         }): Promise<any>
-        importXlsx(filePath: string): Promise<any>
+        importXlsx(filePath: string, fishId?: number): Promise<any>
         list(params?: {
           page?: number
           pageSize?: number
@@ -90,18 +91,25 @@ declare global {
         }): Promise<Fish[]>
         create(data: {
           name: string
+          acousticId?: string
+          fishCode?: string | null
+          showOnMap?: boolean
+          initialLon?: number | null
+          initialLat?: number | null
           ip?: string | null
           port?: number | null
           rtspUrl?: string | null
           rtsp2?: string | null
+          starlinkRtspMono?: string | null
+          starlinkRtspStereo?: string | null
           type?: string
           status?: 'running' | 'stopped'
           // 新增：卫通与微波通信参数
           satcomIp?: string | null
           satcomPort1?: number | null
           satcomPort2?: number | null
-          microwaveIp?: string | null
-          microwavePort?: number | null
+          serialPortPath?: string | null
+          serialBaudRate?: number | null
           acousticLon?: number | null
           acousticLat?: number | null
           // 控制命令与描述
@@ -119,6 +127,7 @@ declare global {
           lightOnCommand?: string | null
           lightOffCommand?: string | null
           wifiCommand?: string | null
+          wifiOffCommand?: string | null
           description?: string | null
           track?: Prisma.InputJsonValue | null
         }): Promise<Fish>
@@ -126,18 +135,25 @@ declare global {
           id: number,
           data: {
             name?: string
+            acousticId?: string
+            fishCode?: string | null
+            showOnMap?: boolean
+            initialLon?: number | null
+            initialLat?: number | null
             ip?: string | null
             port?: number | null
             rtspUrl?: string | null
             rtsp2?: string | null
+            starlinkRtspMono?: string | null
+            starlinkRtspStereo?: string | null
             type?: string
             status?: 'running' | 'stopped'
             // 新增：卫通与微波通信参数
             satcomIp?: string | null
             satcomPort1?: number | null
             satcomPort2?: number | null
-            microwaveIp?: string | null
-            microwavePort?: number | null
+            serialPortPath?: string | null
+            serialBaudRate?: number | null
             acousticLon?: number | null
             acousticLat?: number | null
             // 控制命令与描述
@@ -210,6 +226,9 @@ declare global {
         close(): Promise<boolean>
         write(text: string): Promise<boolean>
         onData(handler: (payload: { line: string; parsed: null | { kind: 'SURF'; time: string; csq: number } }) => void): () => void
+      }
+      media: {
+        transcode(filePath: string): Promise<string>
       }
     }
   }

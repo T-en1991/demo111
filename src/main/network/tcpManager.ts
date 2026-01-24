@@ -3,6 +3,7 @@ import logger from '../logger'
 import { fishService, alertService } from '../database'
 import { EventEmitter } from 'events'
 import { logSystemEvent, LogType } from '../utils/systemLogger'
+import { ProtocolParser } from '../protocol/ProtocolParser'
 
 export const tcpClientEvents = new EventEmitter()
 
@@ -127,17 +128,13 @@ export function startListenerForFish(fishId: number, ip: string, port: number): 
         try {
           logger.info(`[TCP] Fish ${fishId} received ${data.length} bytes from ${remote}`)
 
-          // Try interpret as UTF-8 text
-
           let asText = ''
           try {
             asText = data.toString('utf8')
-            // try parse JSON
           } catch {
-            // not JSON or not text
+            // not text
           }
 
-          // Build alert payload
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const alertData: any = {
             title: `Alarm from fish ${fishId}`,
@@ -148,87 +145,93 @@ export function startListenerForFish(fishId: number, ip: string, port: number): 
             status: 'active' as 'active' | 'resolved' | 'acknowledged'
           }
 
-          // Not JSON: check for known alarm text formats:
-          // 1) ID=<device_id>;C=<channel_id>;IMG=<filename>;POS=<lat>,<lon>
-          // 2) +++AT*SENDIM,33,2,ack,ALARM-OK,<filename>
           const txt = asText ? asText.trim() : ''
-          const idFormat = /ID=([^;]+);C=([^;]+);IMG=([^;]+);POS=([^,]+),([^;\s]+)/i
-          const sendimFormat = /\+\+\+AT\*SENDIM,[^,]*,[^,]*,[^,]*,ALARM-OK,([^,\r\n\s]+)/i
-          const mId = idFormat.exec(txt)
-          const mSendim = mId ? null : sendimFormat.exec(txt)
-          let parsedFilename: string | null = null
-          let parsedLat: number | null = null
-          let parsedLon: number | null = null
-          if (mId) {
-            const deviceId = mId[1]
-            const channel = mId[2]
-            const filename = mId[3]
-            const latStr = mId[4]
-            const lonStr = mId[5]
+          const event = ProtocolParser.parseAcoustic(txt)
 
-            parsedFilename = filename
-            parsedLat = Number.isFinite(Number(latStr)) ? parseFloat(latStr) : null
-            parsedLon = Number.isFinite(Number(lonStr)) ? parseFloat(lonStr) : null
+          if (event) {
+              if (event.type === 'ALARM') {
+                // payload: ...ID=01;C=01;IMG=filename...
+                // Need to extract filename/pos from payload
+                // payload string is like: "786623,-19,265,0.0012,ID=01;C=01;IMG=fm_20260121_101154.jpg;POS=32.0000,135.0000"
+                const payload = event.payload
+                const filenameMatch = payload.match(/IMG=([^;]+)/)
+                const posMatch = payload.match(/POS=([^,]+),([^;\s]+)/)
 
-            alertData.title = `Alarm from device ${deviceId}`
-            alertData.type = 'alarm'
-            alertData.source = `${socket.remoteAddress}:${socket.remotePort}`
-            alertData.message = `device=${deviceId};channel=${channel};img=${filename};pos=${latStr},${lonStr}`
-            alertData.level = channel || ''
+                alertData.title = `Alarm from device (Protocol)`
+                alertData.type = 'alarm'
+                alertData.message = payload
 
-            // send ACK back to sender (keep existing behavior)
-            try {
-              const ack = `+++AT*SENDIM,33,2,ack,ALARM-OK,${filename}\r\n`
-              socket.write(ack)
-              logger.info(
-                `[TCP] Sent ACK to ${socket.remoteAddress}:${socket.remotePort} -> ${ack.trim()}`
-              )
-            } catch (ackErr) {
-              logger.error('[TCP] Failed to send ACK:', ackErr)
-            }
-          } else if (mSendim) {
-            // Received a SENDIM-style message (probably an ACK or image-notify). Extract filename.
-            const filename = mSendim[1]
-            parsedFilename = filename
+                let parsedFilename: string | null = null
+                let parsedLat: number | null = null
+                let parsedLon: number | null = null
 
-            alertData.title = `Alarm (SENDIM) received`
-            alertData.type = 'alarm'
-            alertData.source = `${socket.remoteAddress}:${socket.remotePort}`
-            alertData.message = `sendim=${filename}`
-            alertData.level = ''
-            // No further ACK necessary — this message already looks like an ACK/notification
+                if (filenameMatch) parsedFilename = filenameMatch[1]
+                if (posMatch) {
+                    parsedLat = parseFloat(posMatch[1])
+                    parsedLon = parseFloat(posMatch[2])
+                }
+
+                // Persist
+                 try {
+                    await alertService.create({
+                      title: alertData.title,
+                      message: alertData.message,
+                      level: alertData.level,
+                      type: alertData.type,
+                      source: alertData.source,
+                      status: alertData.status,
+                      fishId: fishId,
+                      imgFile: parsedFilename,
+                      lat: parsedLat,
+                      lon: parsedLon
+                    })
+                    logger.info(`[TCP] Alert created for fish ${fishId}`)
+                  } catch (dbErr) {
+                    logger.error('[TCP] Failed to create alert in DB:', dbErr)
+                  }
+
+              } else {
+                  // Other events like CMD_ACK, NAV_SUCCESS
+                  alertData.title = `Event: ${event.type}`
+                  alertData.message = event.raw
+                  // Persist as info
+                  try {
+                    await alertService.create({
+                        title: alertData.title,
+                        message: alertData.message,
+                        level: 'info',
+                        type: 'event',
+                        source: alertData.source,
+                        status: 'acknowledged',
+                        fishId: fishId
+                    })
+                  } catch (e) {
+                      logger.error('[TCP] Failed to save event:', e)
+                  }
+              }
           } else {
-            // Fallback: use text if printable, otherwise base64
-            const printable = asText && /[\x20-\x7E\r\n\t]/.test(asText)
-            if (printable && asText.length > 0) {
-              alertData.message = asText.length > 2000 ? asText.slice(0, 2000) + '...' : asText
-            } else {
-              // binary, store base64 summary
-              const b64 = data.toString('base64')
-              alertData.message = b64.length > 2000 ? b64.slice(0, 2000) + '...' : b64
-            }
-          }
-
-          // Optionally include fishId in message/type
-          alertData.type = alertData.type || `fish-${fishId}`
-
-          // Persist alert to DB
-          try {
-            await alertService.create({
-              title: alertData.title,
-              message: alertData.message,
-              level: alertData.level,
-              type: alertData.type,
-              source: alertData.source,
-              status: alertData.status,
-              fishId: fishId,
-              imgFile: parsedFilename,
-              lat: parsedLat,
-              lon: parsedLon
-            })
-            logger.info(`[TCP] Alert created for fish ${fishId}`)
-          } catch (dbErr) {
-            logger.error('[TCP] Failed to create alert in DB:', dbErr)
+              // Fallback for unparsed data
+              const printable = asText && /[\x20-\x7E\r\n\t]/.test(asText)
+              if (printable && asText.length > 0) {
+                alertData.message = asText.length > 2000 ? asText.slice(0, 2000) + '...' : asText
+              } else {
+                const b64 = data.toString('base64')
+                alertData.message = b64.length > 2000 ? b64.slice(0, 2000) + '...' : b64
+              }
+              // Save generic message
+               try {
+                await alertService.create({
+                  title: 'Raw Data Received',
+                  message: alertData.message,
+                  level: 'info',
+                  type: 'raw',
+                  source: alertData.source,
+                  status: 'acknowledged',
+                  fishId: fishId
+                })
+              } catch (dbErr) {
+                logger.error('[TCP] Failed to create raw alert in DB:', dbErr)
+              }
           }
         } catch (err) {
           logger.error('[TCP] Error handling data:', err)

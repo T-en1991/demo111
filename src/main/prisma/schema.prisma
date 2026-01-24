@@ -22,6 +22,8 @@ model User {
 
 model Fish {
   id        Int        @id @default(autoincrement())
+  acousticId  String     @unique @default("") // Renamed from deviceId
+  fishCode      String?    // Renamed from code (Business ID)
   name      String
   type      String     @default("default")
   ip        String?
@@ -34,12 +36,21 @@ model Fish {
   satcomIp       String?
   satcomPort1    Int?
   satcomPort2    Int?
-  microwaveIp    String?
-  microwavePort  Int?
+  serialPortPath    String? // Renamed from microwaveIp
+  serialBaudRate  Int? // Renamed from microwavePort
   // 声通定位基准
   acousticLon    Float?
   acousticLat    Float?
+
+  // Display & Navigation
+  showOnMap      Boolean    @default(true)
+  initialLon     Float?
+  initialLat     Float?
+
   alerts    Alert[]
+  history   History[]
+  videos    Video[]
+
   status    FishStatus @default(running)
   // 控制命令（可选）
   ascendCommand   String?
@@ -91,6 +102,8 @@ model Alert {
 
 model History {
   id             Int       @id @default(autoincrement())
+  fishId         Int?
+  fish           Fish?     @relation(fields: [fishId], references: [id], onDelete: SetNull)
   lon            Float?
   lat            Float?
   depth          Float?
@@ -113,6 +126,8 @@ model History {
 
 model Video {
   id         Int       @id @default(autoincrement())
+  fishId     Int?
+  fish       Fish?     @relation(fields: [fishId], references: [id], onDelete: SetNull)
   path       String
   name       String
   size       Int?

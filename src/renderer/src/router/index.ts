@@ -13,6 +13,10 @@ import { useAppStore } from '../store/app'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
+    redirect: { name: 'screen' }
+  },
+  {
+    path: '/home',
     name: 'home',
     component: Home
   },

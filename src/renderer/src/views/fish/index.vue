@@ -11,6 +11,11 @@ const fishControlStore = useFishControlStore()
 
 interface Fish {
   id: number
+  acousticId: string // Renamed from deviceId
+  fishCode?: string // Renamed from code
+  showOnMap: boolean
+  initialLon?: number
+  initialLat?: number
   name: string
   ip?: string
   port?: number
@@ -43,8 +48,8 @@ interface Fish {
   acousticLon?: number
   acousticLat?: number
   // 持久化的串口选择（用于 SURF 自动监听）
-  microwaveIp?: string
-  microwavePort?: number
+  serialPortPath?: string
+  serialBaudRate?: number
   starlinkRtspMono?: string
   starlinkRtspStereo?: string
 }
@@ -52,11 +57,16 @@ interface Fish {
 // 渲染层用于断言后端返回的 Fish 形状（包含新增命令字段与 track）
 type FishFromBackend = {
   id: number
+  acousticId: string
+  fishCode: string | null // Renamed from code
+  showOnMap: boolean
+  initialLon: number | null
+  initialLat: number | null
   name: string
   ip: string | null
   port: number | null
-  rtspUrl?: string | null
-  rtsp2?: string | null
+  rtspUrl: string | null
+  rtsp2: string | null
   createdAt: string | Date
   updatedAt: string | Date
   type?: string
@@ -86,8 +96,8 @@ type FishFromBackend = {
   acousticLat?: number | null
   track?: unknown
   // 后端持久化的串口字段
-  microwaveIp?: string | null
-  microwavePort?: number | null
+  serialPortPath?: string | null // Renamed from microwaveIp
+  serialBaudRate?: number | null // Renamed from microwavePort
   starlinkRtspMono?: string | null
   starlinkRtspStereo?: string | null
 }
@@ -103,6 +113,11 @@ interface TrackPoint {
 // 前端表单专用类型（仅在 UI 层使用，不持久化到后端）
 interface FishForm {
   id: number
+  acousticId: string
+  fishCode: string
+  showOnMap: boolean
+  initialLon: number
+  initialLat: number
   name: string
   ip?: string
   port?: number
@@ -116,7 +131,7 @@ interface FishForm {
   satcomPort2: number
   acousticLon: number
   acousticLat: number
-  microwavePort: number
+  serialBaudRate: number
   cmdUp: string
   cmdDown: string
   cmdSurf: string
@@ -209,6 +224,11 @@ async function loadFish(): Promise<void> {
       const extra = parseExtraDesc(f.description ?? undefined)
       return {
         id: f.id,
+        acousticId: f.acousticId ?? '',
+        fishCode: f.fishCode ?? '',
+        showOnMap: f.showOnMap ?? true,
+        initialLon: f.initialLon ?? undefined,
+        initialLat: f.initialLat ?? undefined,
         name: f.name,
         ip: f.ip ?? undefined,
         port: f.port ?? undefined,
@@ -242,8 +262,8 @@ async function loadFish(): Promise<void> {
         acousticLon: f.acousticLon ?? undefined,
         acousticLat: f.acousticLat ?? undefined,
         // 持久化串口
-        microwaveIp: f.microwaveIp ?? undefined,
-        microwavePort: f.microwavePort ?? undefined,
+        serialPortPath: f.serialPortPath ?? undefined,
+        serialBaudRate: f.serialBaudRate ?? undefined,
         starlinkRtspMono: f.starlinkRtspMono ?? undefined,
         starlinkRtspStereo: f.starlinkRtspStereo ?? undefined
       }
@@ -278,6 +298,11 @@ const isEdit = ref(false)
 const saving = ref(false)
 const form = reactive<FishForm>({
   id: 0,
+  acousticId: '',
+  fishCode: '',
+  showOnMap: true,
+  initialLon: 0,
+  initialLat: 0,
   name: '',
   ip: '',
   port: 9200,
@@ -290,7 +315,7 @@ const form = reactive<FishForm>({
   satcomPort2: 9201,
   acousticLon: 0,
   acousticLat: 0,
-  microwavePort: 9600,
+  serialBaudRate: 9600,
   cmdUp: '',
   cmdDown: '',
   cmdSurf: '',
@@ -308,10 +333,44 @@ const form = reactive<FishForm>({
   track: []
 })
 
+// 辅助函数：生成命令字符串
+// 格式：+++AT*SENDIM,<长度>,<目标ID>,ack,<指令内容>
+function generateCmd(action: string, targetId: string | number): string {
+  if (!targetId) return ''
+  return `+++AT*SENDIM,${action.length},${targetId},ack,${action}`
+}
+
+// 监听 acousticId 变化自动生成命令
+watch(
+  () => form.acousticId,
+  (newId) => {
+    // 根据 ID 自动生成命令
+    const id = newId
+    form.cmdUp = generateCmd('UP', id)
+    form.cmdDown = generateCmd('DOWN', id)
+    form.cmdSurf = generateCmd('SURF', id)
+    form.cmdForward = generateCmd('FORWARD', id)
+    form.cmdLeft = generateCmd('LEFT', id)
+    form.cmdRight = generateCmd('RIGHT', id)
+    form.cmdManual = generateCmd('MAN', id)
+    form.cmdReturn = generateCmd('RETURN', id)
+    form.cmdNavigate = generateCmd('NAVIGATE', id)
+    form.cmdLightOn = generateCmd('LIGHTON', id)
+    form.cmdLightOff = generateCmd('LIGHTOFF', id)
+    form.cmdWifi = generateCmd('WIFI', id)
+    form.cmdWifiOff = generateCmd('WIFIOFF', id)
+  }
+)
+
 function openCreate(): void {
   isEdit.value = false
   Object.assign(form, {
     id: 0,
+    acousticId: '',
+    fishCode: '',
+    showOnMap: true,
+    initialLon: 0,
+    initialLat: 0,
     name: '',
     ip: '',
     port: 9200,
@@ -324,20 +383,20 @@ function openCreate(): void {
     satcomPort2: 9201,
     acousticLon: 0,
     acousticLat: 0,
-    microwavePort: 9600,
-    cmdUp: '+++AT*SENDIM,2,2,ack,UP',
-    cmdDown: '+++AT*SENDIM,4,2,ack,DOWN',
-    cmdSurf: '+++AT*SENDIM,4,2,ack,SURF',
-    cmdForward: '+++AT*SENDIM,7,2,ack,FORWARD',
-    cmdLeft: '+++AT*SENDIM,4,2,ack,LEFT',
-    cmdRight: '+++AT*SENDIM,5,2,ack,RIGHT',
-    cmdManual: '+++AT*SENDIM,3,2,ack,MAN',
-    cmdReturn: '+++AT*SENDIM,6,2,ack,RETURN',
-    cmdNavigate: '+++AT*SENDIM,8,2,ack,NAVIGATE',
-    cmdLightOn: '+++AT*SENDIM,7,2,ack,LIGHTON',
-    cmdLightOff: '+++AT*SENDIM,8,2,ack,LIGHTOFF',
-    cmdWifi: '+++AT*SENDIM,4,2,ack,WIFI',
-    cmdWifiOff: '+++AT*SENDIM,7,2,ack,WIFIOFF',
+    serialBaudRate: 9600,
+    cmdUp: '',
+    cmdDown: '',
+    cmdSurf: '',
+    cmdForward: '',
+    cmdLeft: '',
+    cmdRight: '',
+    cmdManual: '',
+    cmdReturn: '',
+    cmdNavigate: '',
+    cmdLightOn: '',
+    cmdLightOff: '',
+    cmdWifi: '',
+    cmdWifiOff: '',
     description: '',
     track: []
   })
@@ -351,6 +410,11 @@ function openEdit(row: Fish): void {
   isEdit.value = true
   Object.assign(form, {
     id: row.id,
+    acousticId: row.acousticId ?? 0,
+    fishCode: row.fishCode ?? '',
+    showOnMap: row.showOnMap ?? true,
+    initialLon: row.initialLon ?? 0,
+    initialLat: row.initialLat ?? 0,
     name: row.name,
     ip: row.ip ?? '',
     port: row.port ?? 9200,
@@ -363,7 +427,7 @@ function openEdit(row: Fish): void {
     satcomPort2: row.satcomPort2 ?? 0,
     acousticLon: row.acousticLon ?? 0,
     acousticLat: row.acousticLat ?? 0,
-    microwavePort: row.microwavePort ?? 9600,
+    serialBaudRate: row.serialBaudRate ?? 9600,
     // 从后端读取的命令与描述
     cmdUp: row.upCommand ?? '',
     cmdDown: row.downCommand ?? '',
@@ -381,8 +445,8 @@ function openEdit(row: Fish): void {
     description: row.description ?? '',
     track: (row.track ?? []).map((p) => ({ ...p }))
   })
-  // 串口：使用后端持久化字段 microwaveIp 作为默认选择
-  selectedCom.value = row.microwaveIp ?? ''
+  // 串口：使用后端持久化字段 serialPortPath 作为默认选择
+  selectedCom.value = row.serialPortPath ?? ''
   loadSerialPorts()
   dialogVisible.value = true
 }
@@ -458,18 +522,25 @@ async function save(): Promise<void> {
       // 更新机器鱼
       await window.api.fish.update(form.id, {
         name: form.name.trim(),
+        acousticId: form.acousticId,
+        fishCode: form.fishCode,
+        showOnMap: form.showOnMap,
+        initialLon: form.initialLon || null,
+        initialLat: form.initialLat || null,
         ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
         port: form.port && form.port > 0 ? form.port : undefined,
         rtspUrl: form.rtspUrl || null,
         rtsp2: form.rtsp2 || null,
+        starlinkRtspMono: form.starlinkRtspMono || null,
+        starlinkRtspStereo: form.starlinkRtspStereo || null,
         // 新增字段直接写入后端
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
         acousticLon: form.acousticLon || null,
         acousticLat: form.acousticLat || null,
-        microwaveIp: selectedCom.value || null,
-        microwavePort: form.microwavePort || 9600,
+        serialPortPath: selectedCom.value || null,
+        serialBaudRate: form.serialBaudRate || 9600,
         upCommand: form.cmdUp || null,
 
         downCommand: form.cmdDown || null,
@@ -494,24 +565,31 @@ async function save(): Promise<void> {
             depth: p.depth
           }))
           : []
-      } as any)
+      })
       ElMessage.success(t('fish.saveSuccess'))
     } else {
       // 创建机器鱼
       const res = await window.api.fish.create({
         name: form.name.trim(),
+        acousticId: form.acousticId,
+        fishCode: form.fishCode,
+        showOnMap: form.showOnMap,
+        initialLon: form.initialLon || null,
+        initialLat: form.initialLat || null,
         ip: form.ip && form.ip.trim() ? form.ip.trim() : undefined,
         port: form.port && form.port > 0 ? form.port : undefined,
         rtspUrl: form.rtspUrl || null,
         rtsp2: form.rtsp2 || null,
+        starlinkRtspMono: form.starlinkRtspMono || null,
+        starlinkRtspStereo: form.starlinkRtspStereo || null,
         // 新增字段直接写入后端
         satcomIp: form.satcomIp || null,
         satcomPort1: form.satcomPort1 || null,
         satcomPort2: form.satcomPort2 || null,
         acousticLon: form.acousticLon || null,
         acousticLat: form.acousticLat || null,
-        microwaveIp: selectedCom.value || null,
-        microwavePort: form.microwavePort || 9600,
+        serialPortPath: selectedCom.value || null,
+        serialBaudRate: form.serialBaudRate || 9600,
         upCommand: form.cmdUp || null,
         downCommand: form.cmdDown || null,
         surfCommand: form.cmdSurf || null,
@@ -535,7 +613,7 @@ async function save(): Promise<void> {
             depth: p.depth
           }))
           : []
-      } as any)
+      })
       const resAny = res as unknown as { error?: string }
       if (resAny && resAny.error) {
         throw new Error(resAny.error)
@@ -628,14 +706,20 @@ function formatDate(input?: string | Date | null): string {
 
     <el-card v-loading="loading" class="table-card" shadow="never">
       <el-table :data="allFish" border stripe style="width: 100%" height="560">
-        <el-table-column type="index" label="#" width="60" />
-        <el-table-column prop="id" :label="t('history.id')" width="80" />
+        <el-table-column prop="fishCode" label="鱼ID" min-width="100" />
+        <el-table-column prop="acousticId" label="声通鱼端ID" min-width="120" />
         <el-table-column prop="name" :label="t('fish.name')" min-width="160" />
-        <el-table-column prop="createdAt" :label="t('fish.createdAt')" width="140">
+        <el-table-column prop="showOnMap" label="地图显示" min-width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.showOnMap ? 'success' : 'info'">{{ row.showOnMap ? '显示' : '隐藏' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" :label="t('fish.createdAt')" min-width="160">
           <template #default="{ row }">
             {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
+        <el-table-column prop="description" :label="t('fish.description')" min-width="200" show-overflow-tooltip />
         <el-table-column :label="t('common.operation')" width="200" fixed="right">
           <template #default="{ row }">
             <el-button size="small" type="primary" plain @click="openEdit(row)">{{ t('common.edit') }}</el-button>
@@ -647,15 +731,44 @@ function formatDate(input?: string | Date | null): string {
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? t('fish.editTitle') : t('fish.addTitle')" width="60%" class="fish-dialog">
       <el-form label-width="180px">
-        <!-- 第一行：名称 -->
+        <!-- 第一行：名称与ID -->
         <el-row :gutter="12">
-          <el-col :span="24">
+          <el-col :span="8">
             <el-form-item :label="t('fish.name')">
               <el-input v-model="form.name" :placeholder="t('fish.placeholderName')" />
             </el-form-item>
           </el-col>
+          <el-col :span="8">
+            <el-form-item label="鱼ID">
+              <el-input v-model="form.fishCode" placeholder="请输入鱼ID" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="声通鱼端ID">
+              <el-input v-model="form.acousticId" placeholder="请输入声通鱼端ID" style="width: 100%" />
+            </el-form-item>
+          </el-col>
         </el-row>
-        <!-- 第二行：声通IP、声通端口1、声通端口2 -->
+        <!-- 第二行：地图显示与初始位置 -->
+        <el-row :gutter="12">
+          <el-col :span="8">
+            <el-form-item label="地图显示">
+              <el-switch v-model="form.showOnMap" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="初始经度">
+              <el-input-number v-model="form.initialLon" :precision="7" :step="0.0000001" controls-position="right" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="初始纬度">
+              <el-input-number v-model="form.initialLat" :precision="7" :step="0.0000001" controls-position="right" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- 声通IP、声通端口1、声通端口2 -->
         <el-row :gutter="12">
           <el-col :span="8">
             <el-form-item :label="t('fish.satcomIp')">
@@ -679,7 +792,7 @@ function formatDate(input?: string | Date | null): string {
           </el-select>
         </el-form-item>
         <el-form-item :label="t('fish.baudRate')">
-          <el-input-number v-model="form.microwavePort" :min="1200" :max="921600" />
+          <el-input-number v-model="form.serialBaudRate" :min="1200" :max="921600" />
         </el-form-item>
         <el-row :gutter="12">
           <el-col :span="12">
@@ -695,45 +808,7 @@ function formatDate(input?: string | Date | null): string {
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item :label="t('fish.cmdUp')">
-          <el-input v-model="form.cmdUp" :placeholder="t('fish.cmdUp')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdDown')">
-          <el-input v-model="form.cmdDown" :placeholder="t('fish.cmdDown')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdSurf')">
-          <el-input v-model="form.cmdSurf" :placeholder="t('fish.cmdSurf')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdForward')">
-          <el-input v-model="form.cmdForward" :placeholder="t('fish.cmdForward')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdLeft')">
-          <el-input v-model="form.cmdLeft" :placeholder="t('fish.cmdLeft')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdRight')">
-          <el-input v-model="form.cmdRight" :placeholder="t('fish.cmdRight')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdManual')">
-          <el-input v-model="form.cmdManual" :placeholder="t('fish.cmdManual')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdReturn')">
-          <el-input v-model="form.cmdReturn" :placeholder="t('fish.cmdReturn')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdNavigate')">
-          <el-input v-model="form.cmdNavigate" :placeholder="t('fish.cmdNavigate')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdLightOn')">
-          <el-input v-model="form.cmdLightOn" :placeholder="t('fish.cmdLightOn')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdLightOff')">
-          <el-input v-model="form.cmdLightOff" :placeholder="t('fish.cmdLightOff')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdWifi')">
-          <el-input v-model="form.cmdWifi" :placeholder="t('fish.cmdWifi')" />
-        </el-form-item>
-        <el-form-item :label="t('fish.cmdWifiOff')">
-          <el-input v-model="form.cmdWifiOff" :placeholder="t('fish.cmdWifiOff')" />
-        </el-form-item>
+
         <el-form-item :label="t('fish.track')">
           <div style="width: 100%">
             <div style="margin-bottom: 8px">

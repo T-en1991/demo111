@@ -4,6 +4,9 @@ import { DelimiterParser } from '@serialport/parser-delimiter'
 import logger from '../logger'
 import { logSystemEvent, LogType } from '../utils/systemLogger'
 import { fishService, alertService, imageFrameService } from '../database'
+import { ProtocolParser } from '../protocol/ProtocolParser'
+import { getMainWindow } from '../windows/mainWindow'
+
 let port: SerialPort | null = null
 let parser: DelimiterParser | null = null
 
@@ -62,38 +65,8 @@ async function handleCompleteImageData(
   }
 }
 
-// 解析图片帧
-function parseImageFrame(line: string): { type: 'header' | 'data' | 'both' | null; data?: any } {
-  // 支持两种格式：
-  // 1) 头行 + 下一行纯Base64
-  // 2) 单行：头 + Base64 同行
-  const m = line.match(
-    /^I\s+([A-F0-9]+)\s+(\d+)\/(\d+)\s*(?:CRC=([A-F0-9]+)\s+)?(?:NAME=([\w\d_\.]+))?(?:\s+([A-Za-z0-9+\/=]+))?$/
-  )
-  if (m) {
-    const hasInlineData = !!m[6]
-    return {
-      type: hasInlineData ? 'both' : 'header',
-      data: {
-        id: m[1],
-        current: parseInt(m[2]),
-        total: parseInt(m[3]),
-        crc: m[4] || '',
-        filename: m[5] || '',
-        inline: hasInlineData ? m[6] : undefined
-      }
-    }
-  }
-  if (/^[A-Za-z0-9+\/=]+$/.test(line)) {
-    return { type: 'data', data: line }
-  }
-  return { type: null }
-}
-
 function getWindow(): BrowserWindow | null {
   try {
-    // Prefer ES import path used elsewhere (avoid require where possible)
-    const { getMainWindow } = require('../windows/mainWindow')
     return typeof getMainWindow === 'function' ? getMainWindow() : null
   } catch {
     return null
@@ -112,10 +85,28 @@ function sendToRenderer(channel: string, payload: unknown): void {
     for (const w of wins) {
       try {
         w.webContents.send(channel, payload)
-      } catch {}
+      } catch {
+          // ignore
+      }
     }
   } catch {
     // swallow to avoid crashing background handlers
+  }
+}
+
+export async function writeToSerial(text: string): Promise<boolean> {
+  try {
+    if (!port) throw new Error('serial not open')
+    const data = text.endsWith('\r\n') ? text : text + '\r\n'
+    await new Promise<void>((resolve, reject) =>
+      port!.write(data, (err) => (err ? reject(err) : resolve()))
+    )
+    logSystemEvent(LogType.SEND, `[Serial ${port.path}] Sent: ${text}`)
+    return true
+  } catch (e) {
+    logger.error('writeToSerial failed', e)
+    logSystemEvent(LogType.SEND, `[Serial] Failed to send: ${text}`)
+    return false
   }
 }
 
@@ -146,17 +137,13 @@ export function registerSerialIpc(): void {
   })
 
   ipcMain.handle('serial:open', async (_evt, cfg: { path: string; baudRate?: number }) => {
-    // Manual open (same logic as auto, but manual trigger)
-    // For simplicity, we can rely on startSerialAutoListener logic if we extract common parts,
-    // but here we just implement basic open.
-    // NOTE: The previous code had specific logic. To keep it robust we should probably reuse the listener logic.
-    // But since user only asked to change the storage logic, I'll update the listener logic here.
-
     try {
       if (port) {
         try {
           port.close()
-        } catch {}
+        } catch {
+            // ignore
+        }
         port = null
       }
       port = new SerialPort({ path: cfg.path, baudRate: cfg.baudRate ?? 115200 })
@@ -207,99 +194,104 @@ export function registerSerialIpc(): void {
 }
 
 // Extract data handler to reuse in both manual open and auto listener
-function setupDataHandler(parser: DelimiterParser, path: string) {
+function setupDataHandler(parser: DelimiterParser, path: string): void {
   let currentHeader:
     | { id: string; current: number; total: number; crc: string; filename: string }
     | undefined
 
   parser.on('data', async (chunk: Buffer) => {
     const line = chunk.toString('utf8').replace(/\r$/, '')
-    console.log('Received line:', line, new Date().toLocaleString())
-    // if (line.startsWith('CSQ_')) return
+    // console.log('Received line:', line, new Date().toLocaleString())
     logSystemEvent(LogType.RECEIVE, `[Serial ${path}] ${line}`)
     sendToRenderer('serial:data', { line, parsed: null })
 
-    const frameParseResult = parseImageFrame(line)
+    const event = ProtocolParser.parseIridium(line)
 
-    if (frameParseResult.type === 'header') {
-      const { id, current, total, crc, filename } = frameParseResult.data
-      logger.info(
-        `Received image header: id=${id}, current=${current}/${total}, crc=${crc}, filename=${filename}`
-      )
-      currentHeader = frameParseResult.data
+    if (!event) return
 
-      // Notify renderer of progress start/update
-      sendToRenderer('serial:image-progress', { imageId: id, current, total, filename })
-    } else if (frameParseResult.type === 'both') {
-      const { id, current, total, crc, filename, inline } = frameParseResult.data
-      logger.info(`Received image inline frame: id=${id}, frame=${current}/${total}`)
-      currentHeader = frameParseResult.data
-      try {
-        await imageFrameService.create({
-          imageId: id,
-          current,
-          total,
-          data: inline,
-          crc,
-          filename
-        })
-        const count = await imageFrameService.countFrames(id)
-        sendToRenderer('serial:image-progress', { imageId: id, collected: count, total, filename })
-        if (count >= total) {
-          logger.info(`Image ${id}: All frames received (inline), processing...`)
-          await handleCompleteImageData(id, filename)
-        }
-      } catch (err) {
-        logger.error('Failed to save inline image frame:', err)
-      }
-    } else if (frameParseResult.type === 'data') {
-      if (currentHeader) {
-        const { id, current, total, crc, filename } = currentHeader
-        logger.info(`Received image data frame: id=${id}, frame=${current}/${total}`)
+    if (event.type === 'SURF') {
+      sendToRenderer('serial:surf', {
+        time: event.timestamp,
+        csq: event.csq,
+        raw: line,
+        port: path
+      })
+      logSystemEvent(LogType.RECEIVE, `[Serial ${path}] ,time: ${event.timestamp}, CSQ: ${event.csq}`)
+    } else if (event.type === 'IMAGE_CHUNK') {
+      const data = event.data
+      if (!data) return
 
-        try {
-          // Save to DB
-          await imageFrameService.create({
-            imageId: id,
-            current: current,
-            total: total,
-            data: frameParseResult.data,
-            crc,
-            filename
-          })
+      if (data.isHeader) {
+        // Header or Both
+        const { id, current, total, crc, filename, inline } = data
+        currentHeader = { id, current, total, crc, filename }
 
-          // Check progress
-          const count = await imageFrameService.countFrames(id)
-          sendToRenderer('serial:image-progress', {
-            imageId: id,
-            collected: count,
-            total,
-            filename
-          })
-
-          if (count >= total) {
-            logger.info(`Image ${id}: All frames received, processing...`)
-            await handleCompleteImageData(id, filename)
-          }
-        } catch (err) {
-          logger.error('Failed to save image frame:', err)
+        if (inline) {
+            // Both header and data in one line
+             logger.info(`Received image inline frame: id=${id}, frame=${current}/${total}`)
+             try {
+                await imageFrameService.create({
+                  imageId: id,
+                  current,
+                  total,
+                  data: inline,
+                  crc,
+                  filename
+                })
+                const count = await imageFrameService.countFrames(id)
+                sendToRenderer('serial:image-progress', { imageId: id, collected: count, total, filename })
+                if (count >= total) {
+                  logger.info(`Image ${id}: All frames received (inline), processing...`)
+                  await handleCompleteImageData(id, filename)
+                }
+             } catch (err) {
+                logger.error('Failed to save inline image frame:', err)
+             }
+        } else {
+            // Header only
+            logger.info(
+                `Received image header: id=${id}, current=${current}/${total}, crc=${crc}, filename=${filename}`
+            )
+            // Notify renderer of progress start/update
+            sendToRenderer('serial:image-progress', { imageId: id, current, total, filename })
         }
       } else {
-        logger.warn(
-          `Received image data frame but no matching header found: ${line.substring(0, 20)}...`
-        )
-      }
-    }
-    // 处理SURF命令
-    else {
-      const m = line.match(/^SURF\s+(\d{4}-\d{2}-\d{2}_\d{2}:\d{2}:\d{2})\s+CSQ=(\d+)/)
-      const parsed = m ? { kind: 'SURF', time: m[1], csq: Number(m[2]) } : null
-      if (parsed && parsed.kind === 'SURF') {
-        sendToRenderer('serial:surf', { time: parsed.time, csq: parsed.csq, raw: line, port: path })
-        logSystemEvent(
-          LogType.RECEIVE,
-          `[Serial ${path}] ,time: ${parsed.time}, CSQ: ${parsed.csq}`
-        )
+        // Data only
+        if (currentHeader) {
+            const { id, current, total, crc, filename } = currentHeader
+            logger.info(`Received image data frame: id=${id}, frame=${current}/${total}`)
+            try {
+              // Save to DB
+              await imageFrameService.create({
+                imageId: id,
+                current: current,
+                total: total,
+                data: data.content,
+                crc,
+                filename
+              })
+
+              // Check progress
+              const count = await imageFrameService.countFrames(id)
+              sendToRenderer('serial:image-progress', {
+                imageId: id,
+                collected: count,
+                total,
+                filename
+              })
+
+              if (count >= total) {
+                logger.info(`Image ${id}: All frames received, processing...`)
+                await handleCompleteImageData(id, filename)
+              }
+            } catch (err) {
+              logger.error('Failed to save image frame:', err)
+            }
+        } else {
+             logger.warn(
+              `Received image data frame but no matching header found: ${line.substring(0, 20)}...`
+            )
+        }
       }
     }
   })
@@ -310,19 +302,33 @@ function setupDataHandler(parser: DelimiterParser, path: string) {
   })
 }
 
-// 在应用启动后自动监听：读取配置了 microwaveIp 的鱼，自动打开对应串口并监听 SURF
+// 在应用启动后自动监听：读取配置了 serialPortPath 的鱼，自动打开对应串口并监听 SURF
 export async function startSerialAutoListener(): Promise<void> {
   try {
     const fishes = await fishService.findAll()
-    const target = fishes.find((f) => f.microwaveIp && typeof f.microwaveIp === 'string')
-    if (!target || !target.microwaveIp) return
-    const path = target.microwaveIp as string
-    const baudRate = target.microwavePort ?? 9600
+    // 兼容旧字段 microwaveIp (如果 Prisma 类型未更新)
+    const target = fishes.find((f) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fAny = f as any
+        return (fAny.serialPortPath || fAny.microwaveIp)
+    })
+
+    if (!target) return
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fAny = target as any
+    const path = (fAny.serialPortPath || fAny.microwaveIp) as string
+    const baudRate = (fAny.serialBaudRate || fAny.microwavePort) ?? 9600
+
+    if (!path) return
+
     // 若已有端口则先关闭
     if (port) {
       try {
         port.close()
-      } catch {}
+      } catch {
+          // ignore
+      }
       port = null
     }
     port = new SerialPort({ path, baudRate })

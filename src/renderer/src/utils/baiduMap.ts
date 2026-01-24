@@ -2,7 +2,8 @@ let bmapPromise: Promise<void> | null = null
 
 export function loadBMapGL(ak: string): Promise<void> {
   // 改为仅加载 2D API，确保地图可靠显示
-  if (typeof window !== 'undefined' && 'BMap' in window && (window as { BMap?: unknown }).BMap) {
+  const w = window as { BMap?: { Map?: unknown } }
+  if (typeof window !== 'undefined' && w.BMap && w.BMap.Map) {
     return Promise.resolve()
   }
   if (bmapPromise) return bmapPromise
@@ -16,11 +17,7 @@ export function loadBMapGL(ak: string): Promise<void> {
       if (isCleaned) return
       isCleaned = true
       delete (window as { __on_bmap_init?: () => void }).__on_bmap_init
-      // 移除脚本标签，防止污染
-      const s = document.getElementById('bmap-script-2d')
-      if (s && s.parentNode) {
-        s.parentNode.removeChild(s)
-      }
+      // 不要移除脚本标签，否则可能导致地图无法正常加载资源
     }
 
     const onFail = (err: Error | Event): void => {
@@ -40,15 +37,15 @@ export function loadBMapGL(ak: string): Promise<void> {
     script2d.id = 'bmap-script-2d'
     // 使用 2D API v2.0，稳定性更好，添加 s=1 强制 https
     script2d.src = `https://api.map.baidu.com/api?v=2.0&ak=${ak}&callback=${callbackName}&s=1`
-    
+
     script2d.addEventListener('error', onFail)
     document.head.appendChild(script2d)
 
     const start = Date.now()
     const pollReady: () => void = () => {
-      const ready =
-        typeof window !== 'undefined' && 'BMap' in window && (window as { BMap?: unknown }).BMap
-      
+      const w = window as { BMap?: { Map?: unknown } }
+      const ready = typeof window !== 'undefined' && w.BMap && w.BMap.Map
+
       if (ready) {
         // 即使 BMap 存在，也稍微延时确保内部初始化完成
         onSuccess()
@@ -58,7 +55,7 @@ export function loadBMapGL(ak: string): Promise<void> {
         onFail(new Error('Baidu Map 2D API not initialized within timeout'))
       }
     }
-    
+
     pollReady()
   })
 

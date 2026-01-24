@@ -16,6 +16,9 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const keyword = ref('')
+const selectedFishId = ref<number | undefined>(undefined)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const fishList = ref<any[]>([])
 const items = ref<VideoItem[]>([])
 const playerVisible = ref(false)
 const activeUrl = ref('')
@@ -32,7 +35,8 @@ async function fetchList(): Promise<void> {
     const res = await window.api.video.list({
       page: page.value,
       pageSize: pageSize.value,
-      keyword: keyword.value.trim() || undefined
+      keyword: keyword.value.trim() || undefined,
+      fishId: selectedFishId.value
     })
     items.value = res.items
     total.value = res.total
@@ -62,7 +66,13 @@ function closePlayer(): void {
   activeUrl.value = ''
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fishList.value = (await window.api.fish.findAll()) as any[]
+  } catch (e) {
+    console.error('Failed to load fish list', e)
+  }
   fetchList()
 })
 </script>
@@ -70,6 +80,20 @@ onMounted(() => {
 <template>
   <div class="video-history">
     <div class="toolbar" style="margin-bottom: 10px; display: flex; gap: 8px">
+      <el-select
+        v-model="selectedFishId"
+        placeholder="选择机器鱼"
+        clearable
+        style="width: 180px"
+        @change="fetchList"
+      >
+        <el-option
+          v-for="fish in fishList"
+          :key="fish.id"
+          :label="fish.name"
+          :value="fish.id"
+        />
+      </el-select>
       <el-input v-model="keyword" placeholder="按名称搜索" clearable style="max-width: 260px" />
       <el-button
         type="primary"
@@ -85,6 +109,7 @@ onMounted(() => {
         @click="
           () => {
             keyword = '' as any
+            selectedFishId = undefined
             page = 1 as any
             fetchList()
           }

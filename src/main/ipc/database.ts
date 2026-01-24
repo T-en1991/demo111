@@ -51,6 +51,11 @@ export function registerDatabaseIpc(): void {
       _,
       data: {
         name: string
+        acousticId?: string
+        fishCode?: string | null
+        showOnMap?: boolean
+        initialLon?: number | null
+        initialLat?: number | null
         ip?: string | null
         port?: number | null
         rtspUrl?: string | null
@@ -60,8 +65,8 @@ export function registerDatabaseIpc(): void {
         satcomIp?: string | null
         satcomPort1?: number | null
         satcomPort2?: number | null
-        microwaveIp?: string | null
-        microwavePort?: number | null
+        serialPortPath?: string | null
+        serialBaudRate?: number | null
         acousticLon?: number | null
         acousticLat?: number | null
         type?: string
@@ -104,6 +109,11 @@ export function registerDatabaseIpc(): void {
       id: number,
       data: {
         name?: string
+        acousticId?: string
+        fishCode?: string | null
+        showOnMap?: boolean
+        initialLon?: number | null
+        initialLat?: number | null
         ip?: string | null
         port?: number | null
         rtspUrl?: string | null
@@ -113,8 +123,8 @@ export function registerDatabaseIpc(): void {
         satcomIp?: string | null
         satcomPort1?: number | null
         satcomPort2?: number | null
-        microwaveIp?: string | null
-        microwavePort?: number | null
+        serialPortPath?: string | null
+        serialBaudRate?: number | null
         acousticLon?: number | null
         acousticLat?: number | null
         type?: string
@@ -184,6 +194,7 @@ export function registerDatabaseIpc(): void {
     async (
       _,
       data: {
+        fishId?: number | null
         time: string
         content?: string
         rawLine?: string | null
@@ -196,6 +207,9 @@ export function registerDatabaseIpc(): void {
         rollDeg?: number | null
         pitchDeg?: number | null
         yawDeg?: number | null
+        axMs2?: number | null
+        ayMs2?: number | null
+        azMs2?: number | null
       }
     ) => {
       try {
@@ -213,6 +227,7 @@ export function registerDatabaseIpc(): void {
     async (
       _,
       data: {
+        fishId?: number | null
         path: string
         name: string
         size?: number | null
@@ -241,7 +256,7 @@ export function registerDatabaseIpc(): void {
 
   ipcMain.handle(
     'video:list',
-    async (_, params: { page?: number; pageSize?: number; keyword?: string }) => {
+    async (_, params: { page?: number; pageSize?: number; keyword?: string; fishId?: number }) => {
       try {
         return await videoService.list(params || {})
       } catch (error) {
@@ -269,9 +284,9 @@ export function registerDatabaseIpc(): void {
     }
   })
 
-  ipcMain.handle('history:importXlsx', async (_, filePath: string) => {
+  ipcMain.handle('history:importXlsx', async (_, filePath: string, fishId?: number) => {
     try {
-      return await importService.importHistoryFromXlsx(String(filePath))
+      return await importService.importHistoryFromXlsx(String(filePath), fishId)
     } catch (error) {
       console.error('Error importing history from xlsx:', error)
       // Return structured error so renderer can present a clear message
@@ -285,6 +300,7 @@ export function registerDatabaseIpc(): void {
     pageSize?: number
     startTime?: string
     endTime?: string
+    fishId?: number
   } = {}) => {
     try {
       return await historyService.list(params)
@@ -301,6 +317,7 @@ export function registerDatabaseIpc(): void {
     startTime?: string
     endTime?: string
     fromSocket?: boolean
+    fishId?: number
   } = {}) => {
     try {
       return await alertService.list(params)
