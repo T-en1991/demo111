@@ -603,32 +603,84 @@ function updateGamepads(): void {
 // 控制台交互（示例逻辑，可替换为与设备通讯的指令）·
 function controlUp(): void {
   console.log('[tap] up')
+  showCommandToast('up')
   void fishControlStore.sendCommand('up')
 }
 function controlDown(): void {
   console.log('[tap] down')
+  showCommandToast('down')
   void fishControlStore.sendCommand('down')
 }
 function controlDive(): void {
   console.log('[tap] dive')
   // Store handles the serial logic and messages
+  showCommandToast('dive')
   void fishControlStore.sendCommand('dive')
 }
 function controlSurf(): void {
   console.log('[tap] surf')
+  showCommandToast('surf')
   void fishControlStore.sendCommand('surf')
 }
 function moveForward(): void {
   console.log('[tap] forward')
+  showCommandToast('forward')
   void fishControlStore.sendCommand('forward')
 }
 function moveLeft(): void {
   console.log('[tap] left')
+  showCommandToast('left')
   void fishControlStore.sendCommand('left')
 }
 function moveRight(): void {
   console.log('[tap] right')
+  showCommandToast('right')
   void fishControlStore.sendCommand('right')
+}
+
+// 辅助函数：显示即将发送的命令
+function showCommandToast(cmdType: string): void {
+  const fish = fishControlStore.currentFish
+  if (!fish) return
+
+  let cmdStr = ''
+  // 简单映射，仅为了显示提示，不涉及实际发送逻辑（实际逻辑在 store/main process）
+  // 注意：这里仅尽可能匹配 store 中的逻辑来展示
+  // 如果是 'dive' (Iridium DONE)，其他默认 Acoustic
+  if (cmdType === 'dive') {
+    cmdStr = 'DONE' // Iridium command
+  } else {
+    // Acoustic
+    // 尝试从 fish 对象中获取自定义命令，如果存在
+    switch (cmdType) {
+      case 'forward': cmdStr = fish.forwardCommand || 'FORWARD'; break
+      case 'left': cmdStr = fish.leftCommand || 'LEFT'; break
+      case 'right': cmdStr = fish.rightCommand || 'RIGHT'; break
+      case 'up': cmdStr = fish.upCommand || 'UP'; break
+      case 'down': cmdStr = fish.downCommand || 'DOWN'; break
+      case 'surf': cmdStr = fish.surfCommand || 'SURF'; break
+      case 'manual': cmdStr = fish.manualCommand || 'MAN'; break
+      case 'return': cmdStr = fish.returnCommand || 'RETURN'; break
+      case 'navigate': cmdStr = fish.navigateCommand || 'NAVIGATE'; break
+      case 'lightOn': cmdStr = fish.lightOnCommand || 'LIGHTON'; break
+      case 'lightOff': cmdStr = fish.lightOffCommand || 'LIGHTOFF'; break
+      case 'wifi': cmdStr = fish.wifiCommand || 'WIFI'; break
+      case 'wifiOff': cmdStr = fish.wifiOffCommand || 'WIFIOFF'; break
+      case 'ascend': cmdStr = fish.ascendCommand || 'UP'; break
+      case 'descend': cmdStr = fish.descendCommand || 'DOWN'; break
+      default: cmdStr = cmdType.toUpperCase(); break
+    }
+
+    // 如果是 Acoustic 且是默认简写，尝试构建完整 AT 指令格式用于展示 (模拟 CommandGenerator.buildAcoustic)
+    // 格式: +++AT*SENDIM,<len>,<targetId>,ack,<content>
+    // 这里仅做展示，简化处理
+    if (!cmdStr.startsWith('+++AT')) {
+       const targetId = fish.acousticId || '02'
+       cmdStr = `+++AT*SENDIM,${cmdStr.length},${targetId},ack,${cmdStr}`
+    }
+  }
+
+  ElMessage.info(`Sending: ${cmdStr}`)
 }
 
 // 防抖：用于非连续性操作避免短时间内重复触发
@@ -666,6 +718,7 @@ const returnHomeDebounced = debounce(returnHome, 500)
 const lightOn = ref(false)
 
 function enableManual(): void {
+  showCommandToast('manual')
   void fishControlStore.sendCommand('manual')
 }
 
