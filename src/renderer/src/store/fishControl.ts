@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { realtimeDataParser, type FishTelemetry } from '../utils/realtimeDataParser'
 import { FISH_STATUS_CONFIG } from '../config'
@@ -48,71 +48,261 @@ export interface TrackPoint {
   depth: number | null
 }
 
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
+
 export const useFishControlStore = defineStore(
   'fishControl',
   () => {
-    const currentFish = ref<Fish | null>(null)
-    const currentStatus = ref<FishTelemetry | null>(null)
-    const connectionStatus = ref<'disconnected' | 'connecting' | 'connected' | 'error'>(
-      'disconnected'
-    )
-    const logs = ref<string[]>([])
+    // --- State ---
+    const activeFishId = ref<number | null>(null)
+    const fishMap = ref<Map<number, Fish>>(new Map()) // Cache of fish configs
+    const fishStates = ref<Map<number, FishTelemetry>>(new Map())
+    const connectionStates = ref<Map<number, ConnectionStatus>>(new Map())
+    const fishLogs = ref<Map<number, string[]>>(new Map())
     const lastSurfAt = ref<string | null>(null)
 
-    let cleanupListeners: (() => void)[] = []
+    // --- Getters (Backward Compatibility) ---
+    const currentFish = computed({
+      get: () => {
+        if (!activeFishId.value) return null
 
-    function setCurrentFish(fish: Fish): void {
-      // If switching fish, disconnect previous?
-      // For now, just update the reference.
-      // Realistically we might want to maintain connections to multiple fish,
-      // but the UI seems to focus on one "Screen" view.
-      currentFish.value = fish
-      currentStatus.value = null // Reset status when switching fish
-      connectionStatus.value = 'disconnected' // Reset status display, though actual socket might be open.
-      // We should probably check if there is an active connection for this fish?
-      // The main process knows. But we don't have a "checkStatus" API yet.
-      // We can assume disconnected or try to connect.
-    }
-
-    async function disconnect(): Promise<void> {
-      if (!currentFish.value) return
-      const { satcomIp, satcomPort1 } = currentFish.value
-
-      if (satcomIp) {
-        if (satcomPort1) {
-          await (window.api as any).tcp.disconnect(satcomIp, satcomPort1)
+        // Pinia persistence deserializes Map as plain object/array if not handled.
+        // We need to check if fishMap.value is a real Map.
+        if (fishMap.value instanceof Map) {
+            return fishMap.value.get(activeFishId.value) || null
+        } else {
+            // Fallback for SSR/Hydration mismatch where it might be an object
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const mapAny = fishMap.value as any
+            // If it's an array of tuples (Map JSON format), or object
+            if (Array.isArray(mapAny)) {
+                const found = mapAny.find(pair => pair[0] === activeFishId.value)
+                return found ? found[1] : null
+            } else if (typeof mapAny === 'object') {
+                return mapAny[activeFishId.value] || null
+            }
+        }
+        return null
+      },
+      set: (fish: Fish | null) => {
+        if (fish) {
+          setCurrentFish(fish)
+        } else {
+          activeFishId.value = null
         }
       }
-      connectionStatus.value = 'disconnected'
+    })
+
+    const currentStatus = computed({
+      get: () => (activeFishId.value ? fishStates.value.get(activeFishId.value) || null : null),
+      set: (status: FishTelemetry | null) => {
+        if (activeFishId.value && status) {
+          fishStates.value.set(activeFishId.value, status)
+        }
+      }
+    })
+
+    const connectionStatus = computed({
+      get: () =>
+        activeFishId.value
+          ? connectionStates.value.get(activeFishId.value) || 'disconnected'
+          : 'disconnected',
+      set: (status: ConnectionStatus) => {
+        if (activeFishId.value) {
+          connectionStates.value.set(activeFishId.value, status)
+        }
+      }
+    })
+
+    const logs = computed({
+      get: () => (activeFishId.value ? fishLogs.value.get(activeFishId.value) || [] : []),
+      set: (newLogs: string[]) => {
+        if (activeFishId.value) {
+          fishLogs.value.set(activeFishId.value, newLogs)
+        }
+      }
+    })
+
+    let cleanupListeners: (() => void)[] = []
+    let reconnectTimers = new Map<number, number>()
+
+    // --- Actions ---
+
+    function setAllFish(list: Fish[]): void {
+      // Ensure fishMap is a Map
+      if (!(fishMap.value instanceof Map)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const raw = fishMap.value as any
+          const map = new Map<number, Fish>()
+          if (Array.isArray(raw)) {
+              raw.forEach(pair => map.set(pair[0], pair[1]))
+          } else if (typeof raw === 'object') {
+              Object.keys(raw).forEach(key => map.set(Number(key), raw[key]))
+          }
+          fishMap.value = map
+      }
+
+      // Update cache
+      list.forEach(fish => {
+          fishMap.value.set(fish.id, fish)
+
+          // Init state placeholders
+          if (!fishStates.value.has(fish.id)) {
+              if (!connectionStates.value.has(fish.id)) {
+                  connectionStates.value.set(fish.id, 'disconnected')
+              }
+              fishLogs.value.set(fish.id, [])
+          }
+      })
+    }
+
+    function setCurrentFish(fish: Fish): void {
+      // Ensure fishMap is a Map
+      if (!(fishMap.value instanceof Map)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const raw = fishMap.value as any
+          const map = new Map<number, Fish>()
+          if (Array.isArray(raw)) {
+              raw.forEach(pair => map.set(pair[0], pair[1]))
+          } else if (typeof raw === 'object') {
+              Object.keys(raw).forEach(key => map.set(Number(key), raw[key]))
+          }
+          fishMap.value = map
+      }
+
+      // Update cache
+      fishMap.value.set(fish.id, fish)
+      activeFishId.value = fish.id
+
+      // Initialize state if not exists
+      if (!fishStates.value.has(fish.id)) {
+        // connectionStates.value.set(fish.id, 'disconnected') // Don't reset if already exists
+        if (!connectionStates.value.has(fish.id)) {
+          connectionStates.value.set(fish.id, 'disconnected')
+        }
+        fishLogs.value.set(fish.id, [])
+      }
+
+      // Auto-connect if new fish and not connected
+      // But we don't want to auto-connect every time we click?
+      // Maybe only if we explicitly want to?
+      // For now, keep the previous behavior: switch -> auto connect if configured
+      if (fish.satcomIp && fish.satcomPort1) {
+        const status = connectionStates.value.get(fish.id)
+        if (status !== 'connected' && status !== 'connecting') {
+          console.log('[Store] Auto-connecting to fish:', fish.name)
+          void connect(fish.id)
+        }
+      }
+    }
+
+    function getConnectionStatus(fishId: number): ConnectionStatus {
+      return connectionStates.value.get(fishId) || 'disconnected'
+    }
+
+    function addLog(fishId: number, message: string): void {
+      const logs = fishLogs.value.get(fishId) || []
+      logs.push(message)
+      if (logs.length > 1000) logs.shift() // Limit logs
+      fishLogs.value.set(fishId, logs)
     }
 
     function clearLogs(): void {
-      logs.value = []
+      if (activeFishId.value) {
+        fishLogs.value.set(activeFishId.value, [])
+      }
     }
 
-    async function connect(): Promise<void> {
-      if (!currentFish.value?.satcomIp || !currentFish.value?.satcomPort1) {
-        ElMessage.warning(t('store.fishControl.noIpPort'))
+    async function disconnect(fishId?: number): Promise<void> {
+      const targetId = fishId || activeFishId.value
+      if (!targetId) return
+
+      stopReconnect(targetId)
+
+      const fish = fishMap.value.get(targetId)
+      if (!fish) return
+
+      const { satcomIp, satcomPort1 } = fish
+      if (satcomIp && satcomPort1) {
+        await (window.api as any).tcp.disconnect(satcomIp, satcomPort1)
+      }
+      connectionStates.value.set(targetId, 'disconnected')
+    }
+
+    // Auto Reconnect Logic
+    function startReconnect(fishId: number): void {
+      if (reconnectTimers.has(fishId)) return
+
+      console.log(`[Store] Starting auto-reconnect for fish ${fishId}...`)
+      const timer = window.setInterval(async () => {
+        const status = connectionStates.value.get(fishId)
+        if (status === 'connected') {
+          stopReconnect(fishId)
+          return
+        }
+        // Check if fish config still exists
+        if (!fishMap.value.has(fishId)) {
+          stopReconnect(fishId)
+          return
+        }
+
+        console.log(`[Store] Auto-reconnecting fish ${fishId}...`)
+        await connect(fishId)
+      }, 5000)
+
+      reconnectTimers.set(fishId, timer)
+    }
+
+    function stopReconnect(fishId: number): void {
+      const timer = reconnectTimers.get(fishId)
+      if (timer) {
+        clearInterval(timer)
+        reconnectTimers.delete(fishId)
+        console.log(`[Store] Auto-reconnect stopped for fish ${fishId}`)
+      }
+    }
+
+    async function connect(fishId?: number): Promise<void> {
+      // Ensure global listeners are active
+      initListeners()
+
+      const targetId = fishId || activeFishId.value
+      if (!targetId) return
+
+      const fish = fishMap.value.get(targetId)
+      if (!fish) return
+
+      if (!fish.satcomIp || !fish.satcomPort1) {
+        if (targetId === activeFishId.value) {
+          ElMessage.warning(t('store.fishControl.noIpPort'))
+        }
         return
       }
 
-      if (connectionStatus.value === 'connected') return
+      if (connectionStates.value.get(targetId) === 'connected') return
 
-      connectionStatus.value = 'connecting'
-      const { satcomIp, satcomPort1 } = currentFish.value
+      connectionStates.value.set(targetId, 'connecting')
+      const { satcomIp, satcomPort1 } = fish
 
-      let connected1 = false
+      let connected = false
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (window.api as any).tcp.connect(satcomIp, satcomPort1)
+      if (res) connected = true
 
-      // Connect Port 1
-      if (satcomPort1) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const res = await window.api.tcp.connect(satcomIp, satcomPort1)
-        if (res) connected1 = true
-      }
+      if (!connected) {
+        connectionStates.value.set(targetId, 'error')
+        // 静默处理连接失败，因为后续会触发自动重连，避免弹出大量错误框
+        // 只有当手动连接且失败时才提示？但这里无法区分手动还是自动调用
+        // 或者我们可以只在 logs 中记录
 
-      if (!connected1) {
-        connectionStatus.value = 'error'
-        ElMessage.error(t('store.fishControl.connectFail'))
+        // ElMessage.error(t('store.fishControl.connectFail'))
+        addLog(targetId, `[${new Date().toLocaleTimeString()}] Connection failed`)
+
+        // Trigger auto-reconnect
+        startReconnect(targetId)
+      } else {
+        // We set it to connected here, but initListeners also handles it via 'status' event
+        // connectionStates.value.set(targetId, 'connected')
       }
     }
 
@@ -135,8 +325,8 @@ export const useFishControlStore = defineStore(
         | 'wifiOff'
         | 'dive'
     ): Promise<void> {
-      console.log('currentFish', currentFish.value)
-      if (!currentFish.value) {
+      const fish = currentFish.value
+      if (!fish) {
         ElMessage.warning(t('store.fishControl.noFish'))
         return
       }
@@ -187,9 +377,6 @@ export const useFishControlStore = defineStore(
           case 'lightOff':
             command = 'LIGHTOFF'
             break
-          // Ascend/Descend seem duplicates of Up/Down in this context or specific?
-          // Based on index.vue, they map to specific fields.
-          // If the backend handles 'UP'/'DOWN', we use those.
           case 'ascend':
             command = 'UP'
             break
@@ -211,25 +398,19 @@ export const useFishControlStore = defineStore(
       // Ensure connection if acoustic
       if (protocol === 'acoustic') {
         if (connectionStatus.value !== 'connected') {
-          await connect()
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          if ((connectionStatus.value as any) !== 'connected') return
+          await connect(fish.id)
+          if (connectionStatus.value !== 'connected') return
         }
       }
 
       try {
-        const res = await window.api.fish.sendCommand(
-          currentFish.value.id,
-          protocol,
-          command,
-          params
-        )
+        const res = await window.api.fish.sendCommand(fish.id, protocol, command, params)
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = res as any // The result from sendCommand is { success: boolean, command?: string, error?: string } but maybe not fully typed in window.api yet if we didn't update types well enough or if invoke returns any
+        const result = res as any
 
         if (result.success) {
-          logs.value.push(`[${new Date().toLocaleTimeString()}] SEND(${protocol}): ${command}`)
+          addLog(fish.id, `[${new Date().toLocaleTimeString()}] SEND(${protocol}): ${command}`)
           ElMessage.success(t('store.fishControl.sendSuccess'))
         } else {
           console.error('Send failed:', result.error)
@@ -241,6 +422,45 @@ export const useFishControlStore = defineStore(
         console.error(e)
         ElMessage.error(t('store.fishControl.sendFail'))
       }
+    }
+
+    // Helper to find fish by IP/Port OR Acoustic ID
+    function findFishBySource(ip: string, port: number, rawData?: string): Fish | undefined {
+      // 1. Try to extract ID from raw data
+      if (rawData) {
+        const atMatch = rawData.match(/\+\+\+AT:(\d+):RECVIM,\s*(\d+),(\d+),(\d+),ack,(.*)/i)
+        if (atMatch) {
+            const srcId = atMatch[3] // This should be the Fish ID
+            for (const fish of fishMap.value.values()) {
+                if (String(fish.acousticId) === String(srcId) ||
+                    String(fish.acousticId) === String(Number(srcId))) {
+                    return fish
+                }
+            }
+        }
+
+        const statMatch = rawData.match(/^STAT,ID=(\w+),/i)
+        if (statMatch) {
+            const id = statMatch[1]
+            for (const fish of fishMap.value.values()) {
+                if (String(fish.acousticId) === String(id) ||
+                    String(fish.acousticId) === String(Number(id))) {
+                    return fish
+                }
+            }
+        }
+      }
+
+      // 2. Fallback to IP/Port
+      // Note: If multiple fish share the same IP/Port, this returns the first one found.
+      // This is acceptable for status updates that don't have ID,
+      // but ideally all data should have ID if multiplexing is used.
+      for (const fish of fishMap.value.values()) {
+        if (fish.satcomIp === ip && fish.satcomPort1 === port) {
+          return fish
+        }
+      }
+      return undefined
     }
 
     const listeners = ref<((data: string) => boolean)[]>([])
@@ -266,17 +486,10 @@ export const useFishControlStore = defineStore(
       })
     }
 
-    // TrackPoint definition moved to top-level export
-
     async function enterNavigationMode(): Promise<boolean> {
       if (!currentFish.value) return false
-
-      // 1. Send Navigate Command
       ElMessage.info(t('store.fishControl.sendingNav'))
-
       await sendCommand('navigate')
-
-      // 2. Wait for NAVIGATE-SUCCESS
       try {
         ElMessage.info(t('store.fishControl.waitingNav'))
         await waitFor((data) => data.includes('NAVIGATE-SUCCESS'), 10000)
@@ -290,17 +503,15 @@ export const useFishControlStore = defineStore(
 
     async function sendTrajectory(track: TrackPoint[]): Promise<void> {
       if (!currentFish.value) return
+      const fish = currentFish.value
 
-      // 3. Send Trajectory Points
       try {
         ElMessage.info(t('store.fishControl.startTrack'))
-        // Group points by 2
         const packets: TrackPoint[][] = []
         for (let i = 0; i < track.length; i += 2) {
           if (i + 1 < track.length) {
             packets.push([track[i], track[i + 1]])
           } else {
-            // Last single point, duplicate it
             packets.push([track[i], track[i]])
           }
         }
@@ -310,152 +521,178 @@ export const useFishControlStore = defineStore(
           const seq = isLast ? 'PE' : `P${i + 1}`
           const points = packets[i]
 
-          // Format payload: seq,lat1,lon1,D1,A1|lat2,lon2,D2,A2
-          // lat/lon * 10000, depth/alt * 100
           const fmt = (p: TrackPoint): string => {
-            const lat = Math.round(p.lat * 10000)
-            const lon = Math.round(p.lon * 10000)
+            const lat = Math.round(p.lat * 1000000)
+            const lon = Math.round(p.lon * 1000000)
             const depth = p.depth !== null ? Math.round(p.depth * 100) : 0
             const alt = p.alt !== null ? Math.round(p.alt * 100) : 0
-            // Use 0 for whichever is not set (XOR logic handled in UI, here we trust input)
+            // 纬度在前，经度在后
             return `${lat},${lon},${depth},${alt}`
           }
 
+          // Format: Pn,lat1,lon1,d,a|lat2,lon2,d,a
+          // But wait, the user example is: P1,31251134,121489134,2510,0|31252134,121486134,2510,0
+          // The prefix P1 is sent as the 'command' argument to sendCommand, which puts it in the payload?
+          // Let's check sendCommand implementation in tcp.ts / CommandGenerator.
+          // If we pass 'seq' as command, it becomes: ...ack,P1,payloadData
+          // But user wants: P1,point1|point2
+          // So payloadData should be just "point1|point2" if sendCommand prepends seq?
+          // Wait, look at previous code:
+          // sendCommand(id, 'acoustic', seq, [payloadData])
+          // -> CommandGenerator.buildAcoustic(targetId, seq, [payloadData])
+          // -> ...ack,seq,payloadData
+          // So if seq='P1', payload="p1|p2", result is ...ack,P1,p1|p2
+          // This matches user requirement: "P1,312511,1214891,2510,0|..."
+
           const payloadData = `${fmt(points[0])}|${fmt(points[1])}`
 
-          // Send via IPC
-          // We use 'acoustic' protocol.
           try {
-             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-             const res = await (window.api as any).fish.sendCommand(
-                currentFish.value.id,
-                'acoustic',
-                seq,
-                [payloadData]
-             )
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const res = await (window.api as any).fish.sendCommand(
+              fish.id,
+              'acoustic',
+              seq,
+              [payloadData]
+            )
 
-             if (!res.success) {
-                 throw new Error(res.error || 'Send failed')
-             }
+            if (!res.success) {
+              throw new Error(res.error || 'Send failed')
+            }
 
-             logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: ${seq} ${payloadData}`)
-             console.log('Sending trajectory packet:', seq, payloadData)
+            addLog(fish.id, `[${new Date().toLocaleTimeString()}] SEND: ${seq} ${payloadData}`)
+            console.log('Sending trajectory packet:', seq, payloadData)
 
-             // Wait for CMD-OK,seq
-             const expect = `CMD-OK,${seq}`
-             await waitFor((data) => data.includes(expect), 5000)
-
+            // Expect: CMD-OK, P1 (allow spaces)
+            await waitFor((data) => {
+                const s = data.toString()
+                return s.includes('CMD-OK') && s.includes(seq)
+            }, 5000)
           } catch (e) {
-              throw e
+            throw e
           }
         }
 
         ElMessage.success(t('store.fishControl.trackSuccess'))
       } catch (e) {
         console.error(e)
-        ElMessage.error(t('store.fishControl.trackFail', { msg: e instanceof Error ? e.message : 'Unknown error' }))
+        ElMessage.error(
+          t('store.fishControl.trackFail', {
+            msg: e instanceof Error ? e.message : 'Unknown error'
+          })
+        )
       }
     }
 
     function initListeners(): void {
-      // Clear previous listeners
-      cleanupListeners.forEach((fn) => fn())
-      cleanupListeners = []
+      // Avoid duplicate init
+      if (cleanupListeners.length > 0) return
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const onStatus = (window.api as any).tcp.onStatus(({ ip, port, status }) => {
-        if (!currentFish.value?.satcomIp) return
+        // TCP status update (connected/disconnected) affects ALL fish sharing this IP/Port
+        for (const fish of fishMap.value.values()) {
+            if (fish.satcomIp === ip && fish.satcomPort1 === port) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                connectionStates.value.set(fish.id, status as any)
+                console.log(`[Store] Connection status for ${fish.name} (${fish.id}): ${status}`)
 
-        if (currentFish.value.satcomIp === ip) {
-          if (currentFish.value.satcomPort1 === port) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            connectionStatus.value = status as any
-          }
-          // We could handle port2 status logging if needed
+                if (status === 'connected') {
+                    stopReconnect(fish.id)
+                }
+            }
         }
       })
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const onData = (window.api as any).tcp.onData(({ ip, port, data }) => {
-        const fish = currentFish.value
-        if (fish && fish.satcomIp === ip && fish.satcomPort1 === port) {
-          // Trigger temporary listeners
+        const fish = findFishBySource(ip, port, data)
+        if (fish) {
+          // Force connected state
+          if (connectionStates.value.get(fish.id) !== 'connected') {
+            connectionStates.value.set(fish.id, 'connected')
+            stopReconnect(fish.id)
+          }
+
+          // Global temporary listeners (for waitFor)
+          // Note: waitFor logic might need to be fish-aware if we want strictness,
+          // but for now we assume command responses come to the active fish or we just check content.
           for (let i = listeners.value.length - 1; i >= 0; i--) {
             const handler = listeners.value[i]
             if (handler(data)) {
-              // If handler returns true, it's done and removed by the handler wrapper in waitFor
-              // but we splice it there based on reference.
-              // Actually the splice logic in waitFor might race if we iterate here.
-              // Better to let the wrapper handle removal from array reference.
-              // But here we need to know if we should continue?
-              // Usually one data packet might satisfy multiple waiters? Probably not.
-              // Let's assume one match is enough.
+              // handler returned true, remove it?
+              // Logic handled in waitFor
             }
           }
 
           const now = new Date()
           const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`
-          console.log(`[${timeStr}] 监听到的内容:`, data)
+          console.log(`[${timeStr}] Data from ${fish.name}:`, data)
 
-          // 使用新的解析器处理数据
           realtimeDataParser.process(data, {
             fish,
             ip,
             port,
             updateStatus: (status: FishTelemetry) => {
-              // 合并现有状态（保留之前的 statusText 等）
-              currentStatus.value = {
-                ...currentStatus.value,
+              const prev = fishStates.value.get(fish.id) || {}
+              fishStates.value.set(fish.id, {
+                ...prev,
                 ...status
-              } as FishTelemetry
+              } as FishTelemetry)
             }
           })
 
-          // 匹配 TCP 状态关键字
+          // Status Keywords
           const dataStr = data.toString()
           for (const config of FISH_STATUS_CONFIG) {
             if (dataStr.includes(config.keyword)) {
-              console.log(`[TCP] 匹配到状态: ${config.label}`)
-              // 更新状态文本
-              if (!currentStatus.value) {
-                currentStatus.value = {
-                  yaw: 0,
-                  pitch: 0,
-                  roll: 0,
-                  depth: 0,
-                  altitude: 0,
-                  battery: 0,
-                  acoustic: 'weak',
-                  lng: 0,
-                  lat: 0,
-                  lastUpdated: Date.now()
-                }
+              const current = fishStates.value.get(fish.id) || {
+                yaw: 0,
+                pitch: 0,
+                roll: 0,
+                depth: 0,
+                altitude: 0,
+                battery: 0,
+                acoustic: 'weak',
+                lng: 0,
+                lat: 0,
+                lastUpdated: Date.now()
               }
-              currentStatus.value.statusText = config.label
-              currentStatus.value.runStatus = config.status
-              currentStatus.value.lastUpdated = Date.now()
+              current.statusText = config.label
+              current.runStatus = config.status
+              current.lastUpdated = Date.now()
+              fishStates.value.set(fish.id, current)
               break
             }
           }
 
-          logs.value.push(`[${new Date().toLocaleTimeString()}] RECV: ${data}`)
+          addLog(fish.id, `[${new Date().toLocaleTimeString()}] RECV: ${data}`)
         }
       })
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const onError = (window.api as any).tcp.onError(({ ip, port, error }) => {
-        if (currentFish.value?.satcomIp === ip) {
-          if (currentFish.value?.satcomPort1 === port) {
-            connectionStatus.value = 'error'
-            logs.value.push(`[${new Date().toLocaleTimeString()}] ERROR: ${error}`)
-            ElMessage.error(t('store.fishControl.connectError', { error }))
-          }
+        // TCP Error affects ALL fish sharing this IP/Port
+        for (const fish of fishMap.value.values()) {
+            if (fish.satcomIp === ip && fish.satcomPort1 === port) {
+                connectionStates.value.set(fish.id, 'error')
+
+                // 仅记录日志，不再弹窗提示，避免重连过程中刷屏
+                addLog(fish.id, `[${new Date().toLocaleTimeString()}] Connection error: ${error}`)
+
+                /*
+                if (fish.id === activeFishId.value) {
+                   ElMessage.error(t('store.fishControl.connectError', { error }))
+                }
+                */
+
+                startReconnect(fish.id)
+            }
         }
       })
 
       cleanupListeners.push(onStatus, onData, onError)
 
-      // 监听串口 SURF 上浮事件，更新状态与记录
+      // Serial listeners (global for now, but should ideally be mapped to fish via serial port path)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ipc = (window as any).electron?.ipcRenderer
       if (ipc && typeof ipc.on === 'function') {
@@ -464,17 +701,33 @@ export const useFishControlStore = defineStore(
           payload: { time: string; csq: number; raw: string; port: string }
         ) => {
           lastSurfAt.value = payload.time.replace('_', ' ')
-          logs.value.push(
-            `[${new Date().toLocaleTimeString()}] SURF: time=${payload.time} CSQ=${payload.csq} (${payload.port})`
-          )
-          ElMessage.success(t('store.fishControl.surfSuccess', { time: payload.time, csq: payload.csq }))
+          // Log to active fish? Or all?
+          // Since serial is global/ambiguous without port mapping, maybe just active?
+          if (activeFishId.value) {
+             addLog(activeFishId.value, `[${new Date().toLocaleTimeString()}] SURF: time=${payload.time} CSQ=${payload.csq} (${payload.port})`)
+             ElMessage.success(t('store.fishControl.surfSuccess', { time: payload.time, csq: payload.csq }))
+          }
         }
         ipc.on('serial:surf', handler)
+
+        // Listen for TCP alert toasts (NAV_SUCCESS, MANUAL-SUCCESS, etc.)
+        const toastHandler = (_evt: any, payload: { title: string; message: string; type: 'success' | 'warning' | 'error' }) => {
+            ElMessage({
+                message: payload.title, // Display title as main message
+                type: payload.type || 'success',
+                duration: 3000,
+                showClose: true
+            })
+            // Optionally log to current fish console if we can determine ID,
+            // but backend already logs to DB/SystemLog, so maybe redundant here unless we parse ID from message.
+        }
+        ipc.on('tcp:alert-toast', toastHandler)
+
         cleanupListeners.push(() => {
           ipc.removeListener('serial:surf', handler)
+          ipc.removeListener('tcp:alert-toast', toastHandler)
         })
       }
-      // 如果未检测到 ipcRenderer，可忽略监听，避免报错
     }
 
     async function sendInitialTarget(lon: string, lat: string): Promise<void> {
@@ -482,23 +735,24 @@ export const useFishControlStore = defineStore(
         ElMessage.warning(t('store.fishControl.noFish'))
         return
       }
+      const fishId = currentFish.value.id
+
       if (connectionStatus.value !== 'connected') {
-        await connect()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((connectionStatus.value as any) !== 'connected') return
+        await connect(fishId)
+        if (connectionStatus.value !== 'connected') return
       }
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const res = await (window.api as any).fish.sendCommand(
-            currentFish.value.id,
+            fishId,
             'acoustic',
             'POS',
             [lon, lat]
         )
 
         if (res.success) {
-            logs.value.push(`[${new Date().toLocaleTimeString()}] SEND: POS ${lon},${lat}`)
+            addLog(fishId, `[${new Date().toLocaleTimeString()}] SEND: POS ${lon},${lat}`)
             ElMessage.success(t('screen.initialTargetSent'))
         } else {
             ElMessage.error(t('store.fishControl.sendFail'))
@@ -510,11 +764,22 @@ export const useFishControlStore = defineStore(
     }
 
     return {
+      // State Refs (exposed for debugging/advanced usage if needed)
+      activeFishId,
+      fishMap,
+      fishStates,
+      connectionStates,
+      fishLogs,
+
+      // Getters (Computed)
       currentFish,
       currentStatus,
       connectionStatus,
       logs,
       lastSurfAt,
+
+      // Actions
+      setAllFish,
       setCurrentFish,
       connect,
       disconnect,
@@ -523,14 +788,29 @@ export const useFishControlStore = defineStore(
       sendTrajectory,
       initListeners,
       clearLogs,
-      sendInitialTarget
+      sendInitialTarget,
+      getConnectionStatus
     }
   },
   {
     persist: {
       key: 'fish-control',
-      pick: ['currentFish'],
-      storage: localStorage
+      pick: ['activeFishId', 'fishMap'], // Persist active ID and cache
+      storage: localStorage,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      afterRestore: (ctx: any) => {
+        // Convert plain object back to Map if needed
+        if (ctx.store.fishMap && !(ctx.store.fishMap instanceof Map)) {
+            // pinia-plugin-persistedstate usually restores as object for Maps if not configured with custom serializer
+            // Let's assume it restored as an Object { "1": {...}, "2": {...} }
+            const raw = ctx.store.fishMap
+            const map = new Map<number, Fish>()
+            Object.keys(raw).forEach(key => {
+                map.set(Number(key), raw[key])
+            })
+            ctx.store.fishMap = map
+        }
+      }
     }
   }
 )

@@ -28,11 +28,12 @@ export function registerCommandIpc(): void {
         const targetId = fish.acousticId || 2
         cmdStr = CommandGenerator.buildAcoustic(targetId, command as AcousticCommandType, params)
 
-        const ip = fish.ip
-        const port = fish.port
+        // 使用 satcomIp/satcomPort1 而不是 ip/port
+        const ip = fish.satcomIp
+        const port = fish.satcomPort1
 
         if (!ip || !port) {
-            throw new Error('Fish IP/Port not configured for Acoustic communication')
+            throw new Error('Fish IP/Port (satcomIp/satcomPort1) not configured for Acoustic communication')
         }
 
         success = await sendClient(ip, port, cmdStr)

@@ -2,10 +2,12 @@
 import { reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '../../store/app'
+import { useFishControlStore } from '../../store/fishControl'
 import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
 const appStore = useAppStore()
+const fishControlStore = useFishControlStore()
 const { t } = useI18n()
 
 const VALID_USERNAME = 'admin_123'
@@ -34,6 +36,24 @@ function submit(): void {
     const ok = form.username === VALID_USERNAME && form.password === VALID_PASSWORD
     if (ok) {
       appStore.login()
+      // 登录后自动加载机器鱼并连接
+      // 使用 await 确保 fishControlStore 更新完毕
+      window.api.fish.findAll().then(async (list) => {
+        if (list && list.length > 0) {
+          // 1. 加载所有鱼到 Store (修复多鱼不显示问题)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          fishControlStore.setAllFish(list as any[])
+
+          // 2. 设置当前选中的鱼（默认第一条）
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const firstFish = list[0] as any
+          fishControlStore.setCurrentFish(firstFish)
+
+          console.log('[Login] Auto connecting to fish:', firstFish.name)
+          // 注意：setAllFish 内部并没有自动连接所有鱼，如果需要全部自动连接，可以在这里遍历调用 connect
+          // 目前只保留对当前选中鱼的自动连接尝试（在 setCurrentFish 中触发）
+        }
+      })
       router.push({ name: 'screen' })
     } else {
       error.value = t('login.error')

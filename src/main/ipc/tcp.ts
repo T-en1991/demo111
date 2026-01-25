@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { sendRaw, sendAndReceive, connectClient, disconnectClient, sendClient, tcpClientEvents } from '../network/tcpManager'
 import logger from '../logger'
 import { getMainWindow } from '../windows/mainWindow'
-import { alertService } from '../database'
+import { alertService, fishService } from '../database'
 import { logSystemEvent, LogType } from '../utils/systemLogger'
 import { ProtocolParser } from '../protocol/ProtocolParser'
 import { CommandGenerator } from '../protocol/CommandGenerator'
@@ -24,68 +24,119 @@ export function registerTcpIpc(): void {
       if (!txt) return
 
       const event = ProtocolParser.parseAcoustic(txt)
-      if (event && event.type === 'ALARM') {
-          // payload: ...ID=01;C=01;IMG=filename...
-          // Need to extract filename/pos from payload
-          const payloadStr = event.payload
-          const idMatch = payloadStr.match(/ID=([^;]+)/)
-          const cMatch = payloadStr.match(/C=([^;]+)/)
-          const imgMatch = payloadStr.match(/IMG=([^;]+)/)
-          const posMatch = payloadStr.match(/POS=([^,]+),([^;|\s]+)/)
-
-          const id = idMatch ? idMatch[1] : undefined
-          const c = cMatch ? cMatch[1] : undefined
-          const img = imgMatch ? imgMatch[1] : undefined
-
-          let lat: number | null = null
-          let lon: number | null = null
-
-          if (posMatch) {
-              lat = parseFloat(posMatch[1])
-              lon = parseFloat(posMatch[2])
-          }
-
+      if (event) {
           void (async () => {
             try {
-              // Create Alert
-               const createdAlert = await alertService.create({
-                  title: `Alarm from socket ${ip}:${port}`,
-                  message: payloadStr,
-                  level: c || '',
-                  type: 'alarm',
-                  source: `${ip}:${port}`,
-                  status: 'active',
-                  fishId: null,
-                  imgFile: img ?? null,
-                  lat: lat ?? null,
-                  lon: lon ?? null,
-                  fromSocket: true,
-                  imageBase64: null
-                })
-                logger.info('Alert created successfully:', createdAlert.id)
-                logSystemEvent(LogType.RECEIVE, `[TCP ${ip}:${port}] ALARM ${txt}`)
+                // 根据声通ID (srcId) 查找对应的鱼
+                let fishId: number | null = null
+                if (event.srcId) {
+                    const fish = await fishService.findByAcousticId(event.srcId)
+                    if (fish) fishId = fish.id
+                }
 
-                // Send ACK
-                if (img) {
-                    const targetId = id || 2
-                    // Build ACK: +++AT*SENDIM,<len>,<dest>,ack,ALARM-OK,filename
-                    const ackMessage = CommandGenerator.buildAcoustic(targetId, AcousticCommandType.ALARM_OK, [img])
+                if (event.type === 'ALARM') {
+                  // payload: ...ID=01;C=01;IMG=filename...
+                  // Need to extract filename/pos from payload
+                  const payloadStr = event.payload || ''
+                  // const idMatch = payloadStr.match(/ID=([^;]+)/) // unused
+                  const cMatch = payloadStr.match(/C=([^;]+)/)
+                  const imgMatch = payloadStr.match(/IMG=([^;]+)/)
+                  const posMatch = payloadStr.match(/POS=([^,]+),([^;|\s]+)/)
 
-                    const sent = await sendClient(ip, port, ackMessage)
-                    if (sent) {
-                        logger.info(`[TCP] Sent ACK to ${ip}:${port}: ${ackMessage}`)
-                        logSystemEvent(LogType.SEND, `[TCP ${ip}:${port}] ACK ${ackMessage}`)
-                    } else {
-                        logger.error(`[TCP] Failed to send ACK to ${ip}:${port}`)
+                  // const id = idMatch ? idMatch[1] : undefined // This is fishCode, usually matches acousticId logic but not always
+                  const c = cMatch ? cMatch[1] : undefined
+                  const img = imgMatch ? imgMatch[1] : undefined
+
+                  let lat: number | null = null
+                  let lon: number | null = null
+
+                  if (posMatch) {
+                      lat = parseFloat(posMatch[1])
+                      lon = parseFloat(posMatch[2])
+                  }
+
+                  // Create Alert
+                  const createdAlert = await alertService.create({
+                      title: `Alarm from fish ${event.srcId}`,
+                      message: payloadStr,
+                      level: c || '',
+                      type: 'alarm',
+                      source: `Acoustic:${event.srcId}`,
+                      status: 'active',
+                      fishId: fishId, // Linked to DB ID
+                      imgFile: img ?? null,
+                      lat: lat ?? null,
+                      lon: lon ?? null,
+                      fromSocket: true,
+                      imageBase64: null
+                  })
+                  logger.info('Alert created successfully:', createdAlert.id)
+                  logSystemEvent(LogType.RECEIVE, `[TCP ${ip}:${port}] ALARM from ${event.srcId}: ${txt}`)
+
+                  // Send ACK
+                  if (img) {
+                      const targetId = event.srcId || '2'
+                      // Build ACK: +++AT*SENDIM,<len>,<dest>,ack,ALARM-OK,filename
+                      const ackMessage = CommandGenerator.buildAcoustic(targetId, AcousticCommandType.ALARM_OK, [img])
+
+                      const sent = await sendClient(ip, port, ackMessage)
+                      if (sent) {
+                          logger.info(`[TCP] Sent ACK to ${ip}:${port}: ${ackMessage}`)
+                          logSystemEvent(LogType.SEND, `[TCP ${ip}:${port}] ACK ${ackMessage}`)
+                      } else {
+                          logger.error(`[TCP] Failed to send ACK to ${ip}:${port}`)
+                      }
+                  }
+                } else if (event.type === 'STATUS') {
+                    // STAT,ID=xx... message
+                    // Do nothing here, as it's handled by frontend realtime parser via tcp:data
+                    // Just log for debug if needed, but avoid spamming system logs
+                    // logger.debug(`[TCP] STATUS received from ${event.srcId}`)
+                } else {
+                    // Other events: NAV_SUCCESS, MANUAL-SUCCESS, etc.
+                    // Log as INFO alert or System Event
+                    const titleMap: Record<string, string> = {
+                        'NAV_SUCCESS': 'Navigation Mode Entered',
+                        'MAN_SUCCESS': 'Manual Mode Entered',
+                        'WIFI_SUCCESS': 'Wi-Fi Enabled',
+                        'WIFI_OFF_SUCCESS': 'Wi-Fi Disabled',
+                        'RETURN_SUCCESS': 'Return Mode Entered',
+                        'CMD_ACK': 'Command Acknowledged'
                     }
+
+                    const title = titleMap[event.type] || `Event: ${event.type}`
+
+                     // Send Toast to Renderer
+                     const win = getMainWindow()
+                     if (win) {
+                        logger.info(`[TCP] Sending toast to renderer: ${title}`)
+                        win.webContents.send('tcp:alert-toast', {
+                            title: title,
+                            message: event.raw,
+                            type: 'success'
+                        })
+                     } else {
+                        logger.warn(`[TCP] Cannot send toast: mainWindow not found`)
+                     }
+
+                     await alertService.create({
+                         title: title,
+                        message: event.raw,
+                        level: 'info',
+                        type: 'event',
+                        source: `Acoustic:${event.srcId}`,
+                        status: 'acknowledged',
+                        fishId: fishId
+                    })
+                    logSystemEvent(LogType.RECEIVE, `[TCP ${ip}:${port}] ${event.type} from ${event.srcId}`)
                 }
             } catch (e) {
-                logger.error('Persist alarm/ack failed:', e)
+                logger.error('Process acoustic event failed:', e)
             }
           })()
       }
     } catch (e) {
-      logger.error('Alarm parse failed:', e)
+      logger.error('Protocol parse failed:', e)
     }
   })
 

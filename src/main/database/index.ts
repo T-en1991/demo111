@@ -891,6 +891,22 @@ export const fishService = {
     })
   },
 
+  // 根据声通ID查找机器鱼
+  async findByAcousticId(acousticId: string): Promise<Fish | null> {
+    // 尝试直接匹配，或者去掉前导零匹配（视具体需求）
+    // 这里假设数据库中存的是 "1" 或 "01"，传入的可能是 "1" 或 "01"
+    // 最稳妥是用 OR 查询
+    return prisma.fish.findFirst({
+      where: {
+        OR: [
+            { acousticId: acousticId },
+            { acousticId: String(Number(acousticId)) },
+            { acousticId: acousticId.padStart(2, '0') }
+        ]
+      }
+    })
+  },
+
   // 根据状态获取机器鱼
   async findByStatus(status: 'running' | 'stopped'): Promise<Fish[]> {
     return prisma.fish.findMany({

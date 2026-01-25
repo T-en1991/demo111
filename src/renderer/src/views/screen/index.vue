@@ -105,6 +105,8 @@ const toTrackPoints = (json: unknown): TrackPoint[] => {
 const robots = reactive<EnhancedRobotStatus[]>([])
 const selectedId = ref<number>(0)
 
+const currentFish = computed(() => fishControlStore.currentFish)
+
 // 同步 selectedId 到 store (如果还需要 store)
 watch(selectedId, (val) => {
   appStore.setSelectedRobotId(val)
@@ -437,7 +439,11 @@ function renderMarkers(): void {
 
       // 点击事件：选中
       marker.addEventListener('click', () => {
-        selectedId.value = r.id
+        // 切换选中鱼
+        const fish = fishControlStore.fishMap.get(r.id)
+        if (fish) {
+            fishControlStore.setCurrentFish(fish)
+        }
       })
 
       map.addOverlay(marker)
@@ -446,15 +452,22 @@ function renderMarkers(): void {
   })
 }
 
-// 监听选中变化
-watch(selectedId, (newId) => {
-  // 不再全局保存选中状态
-  // appStore.setSelectedRobotId(newId)
+// 监听全局选中变化
+watch(() => fishControlStore.activeFishId, (newId) => {
+    if (newId && newId !== selectedId.value) {
+        selectedId.value = newId
+    }
+}, { immediate: true })
 
-  // 更新当前 FishControl Store
-  window.api.fish.findById(newId).then(fish => {
-    if (fish) fishControlStore.setCurrentFish(fish as any)
-  })
+// 监听选中变化（保留本地逻辑，但不需要重复调用 setCurrentFish，因为如果是由地图点击触发，已经切换了）
+watch(selectedId, (newId) => {
+  // 如果当前 Store 中的 activeId 不是 newId，则同步
+  if (fishControlStore.activeFishId !== newId) {
+      window.api.fish.findById(newId).then(fish => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (fish) fishControlStore.setCurrentFish(fish as any)
+      })
+  }
 
   // 重绘 Marker 样式
   renderMarkers()
@@ -1184,17 +1197,8 @@ onUnmounted((): void => {
       <div class="map-panel">
         <div id="bmap-container" class="bmap"></div>
 
-        <!-- 头部下拉选择 -->
-        <div class="map-header-control">
-          <el-select v-model="selectedId" placeholder="选择机器鱼" style="width: 200px" size="large">
-            <el-option
-              v-for="r in robots"
-              :key="r.id"
-              :label="r.name"
-              :value="r.id"
-            />
-          </el-select>
-        </div>
+        <!-- 头部下拉选择（已移除，改由 TopBar 控制） -->
+        <!-- <div class="map-header-control"> ... </div> -->
 
         <!-- 实时视频按钮 -->
         <div class="map-video-btn" v-if="selectedId">
@@ -1205,10 +1209,8 @@ onUnmounted((): void => {
       </div>
       <div class="side-panel">
         <div class="panel-card">
-          <div class="section-header" style="display: flex; align-items: center; gap: 12px">
-            <el-select v-model="selectedId" placeholder="选择机器鱼" size="default" style="width: 160px">
-              <el-option v-for="r in robots" :key="r.id" :label="r.name" :value="r.id" />
-            </el-select>
+          <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+            <span class="section-title">{{ currentFish?.name || t('screen.basicInfo') }}</span>
             <el-button
               type="primary"
               :disabled="!selectedId"
@@ -1444,13 +1446,13 @@ onUnmounted((): void => {
         <el-table :data="navigateTrack" border stripe style="width: 100%" size="small" max-height="400">
           <el-table-column :label="t('history.lon')">
             <template #default="{ $index }">
-              <el-input-number v-model="navigateTrack[$index].lon" :min="-180" :max="180" :step="0.0001" :precision="4"
+              <el-input-number v-model="navigateTrack[$index].lon" :min="-180" :max="180" :step="0.000001" :precision="6"
                 controls-position="right" style="width: 100%" />
             </template>
           </el-table-column>
           <el-table-column :label="t('history.lat')">
             <template #default="{ $index }">
-              <el-input-number v-model="navigateTrack[$index].lat" :min="-90" :max="90" :step="0.0001" :precision="4"
+              <el-input-number v-model="navigateTrack[$index].lat" :min="-90" :max="90" :step="0.000001" :precision="6"
                 controls-position="right" style="width: 100%" />
             </template>
           </el-table-column>

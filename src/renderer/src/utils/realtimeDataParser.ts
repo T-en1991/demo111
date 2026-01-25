@@ -225,20 +225,22 @@ export class StatDataStrategy implements DataParseStrategy {
       // 2. 等待 2000ms，以确保如果 USBL 数据稍晚到达也能被捕获（整合数据）
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // 格式: STAT,yaw,pitch,roll,lon,lat,depth,height,signalStrength,battery,time
-      // 示例: STAT,0.00,0.00,0.00,0.000000,0.000000,0.00,0.00,323,-1,2025-12-13 14:55:32
+      // 格式: STAT,ID=xx,yaw,pitch,roll,lon,lat,depth,height,battery,signalStrength,time
+      // 示例: STAT,ID=01,125.25,0.15,-0.38,121.490000,31.288889,0.01,0.00,00,326,2025-10-3117:59:26
       const parts = data.split(',')
-      if (parts.length >= 11) {
-        const yawDeg = parseFloat(parts[1])
-        const pitchDeg = parseFloat(parts[2])
-        const rollDeg = parseFloat(parts[3])
-        let lon = parseFloat(parts[4])
-        let lat = parseFloat(parts[5])
-        const depth = parseFloat(parts[6])
-        const height = parseFloat(parts[7])
-        const signalStrength = parseFloat(parts[8])
+      if (parts.length >= 12) {
+        // parts[0] is STAT
+        // parts[1] is ID=01
+        const yawDeg = parseFloat(parts[2])
+        const pitchDeg = parseFloat(parts[3])
+        const rollDeg = parseFloat(parts[4])
+        let lon = parseFloat(parts[5])
+        let lat = parseFloat(parts[6])
+        const depth = parseFloat(parts[7])
+        const height = parseFloat(parts[8])
         const battery = parseFloat(parts[9])
-        const timeStr = parts[10]
+        const signalStrength = parseFloat(parts[10])
+        const timeStr = parts[11]
 
         let usblRawLine: string | null = null
 

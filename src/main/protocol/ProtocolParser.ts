@@ -3,7 +3,8 @@ import { AcousticEvent, IridiumEvent } from './types'
 export class ProtocolParser {
   // 声通正则: +++AT:98:RECVIM,58,2,1,ack,786623,-19,265,0.0012,ID=01;C=01;IMG=...
   // 或者 +++AT:51:RECVIM, 11,2,1,ack, 307243, -22, 190,0.0607, CMD-OK, SURF
-  private static ACOUSTIC_REGEX = /\+\+\+AT:(\d+):RECVIM,\s*(\d+),(\d+),(\d+),ack,(.*)/i
+  // 允许逗号前后有空格
+  private static ACOUSTIC_REGEX = /\+\+\+AT:(\d+):RECVIM,\s*(\d+),\s*(\d+),\s*(\d+),\s*ack,(.*)/i
 
   // 透传正则: STAT,ID=01,125.25...
   private static STAT_REGEX = /^STAT,ID=(\w+),(.*)/i
@@ -25,8 +26,8 @@ export class ProtocolParser {
     if (atMatch) {
       // const rssiPrefix = atMatch[1]
       // const len = atMatch[2]
-      // const src = atMatch[3] // 2 (通常是上位机?)
-      const dest = atMatch[4] // 1 (通常是鱼?)
+      const src = atMatch[3] // 2 (这是发送方 ID，即鱼的 acousticId)
+      // const dest = atMatch[4] // 1 (这是接收方 ID，即上位机)
       const contentRaw = atMatch[5].trim()
 
       // 解析 contentRaw: timestamp, rssi, val2, val3, PAYLOAD
@@ -41,28 +42,29 @@ export class ProtocolParser {
       const payloadStr = parts.slice(4).join(',') // 简单处理
 
       if (payloadStr.includes('ID=') && payloadStr.includes('IMG=')) {
-         return { type: 'ALARM', raw: data, srcId: dest, payload: payloadStr }
+         return { type: 'ALARM', raw: data, srcId: src, payload: payloadStr }
       }
       if (payloadStr.includes('CMD-OK')) {
-        return { type: 'CMD_ACK', raw: data, srcId: dest, payload: payloadStr }
+        return { type: 'CMD_ACK', raw: data, srcId: src, payload: payloadStr }
       }
       if (payloadStr.includes('NAVIGATE-SUCCESS')) {
-        return { type: 'NAV_SUCCESS', raw: data, srcId: dest }
+        return { type: 'NAV_SUCCESS', raw: data, srcId: src }
       }
       if (payloadStr.includes('MANUAL-SUCCESS')) {
-        return { type: 'MAN_SUCCESS', raw: data, srcId: dest }
+        return { type: 'MAN_SUCCESS', raw: data, srcId: src }
+      }
+      // Reorder: Check WIFIOFF first to avoid partial match issues (though strictly strings are different)
+      if (payloadStr.includes('WIFIOFF-SUCCESS')) {
+        return { type: 'WIFI_OFF_SUCCESS', raw: data, srcId: src }
       }
       if (payloadStr.includes('WIFI-SUCCESS')) {
-        return { type: 'WIFI_SUCCESS', raw: data, srcId: dest }
-      }
-      if (payloadStr.includes('WIFIOFF-SUCCESS')) {
-        return { type: 'WIFI_OFF_SUCCESS', raw: data, srcId: dest }
+        return { type: 'WIFI_SUCCESS', raw: data, srcId: src }
       }
       if (payloadStr.includes('RETURN-SUCCESS')) {
-        return { type: 'RETURN_SUCCESS', raw: data, srcId: dest }
+        return { type: 'RETURN_SUCCESS', raw: data, srcId: src }
       }
 
-      return { type: 'UNKNOWN', raw: data, srcId: dest, payload: payloadStr }
+      return { type: 'UNKNOWN', raw: data, srcId: src, payload: payloadStr }
     }
 
     // 2. 尝试匹配 STAT 透传

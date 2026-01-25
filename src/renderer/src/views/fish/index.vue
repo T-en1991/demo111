@@ -269,6 +269,12 @@ async function loadFish(): Promise<void> {
       }
     })
     allFish.value = normalized
+
+    // 同步更新 Store 中的鱼列表
+    if (allFish.value.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fishControlStore.setAllFish(allFish.value as any[])
+    }
   } catch (error) {
     console.error('加载机器鱼失败:', error)
     ElMessage.error(t('history.fetchFail'))
@@ -628,7 +634,25 @@ async function save(): Promise<void> {
     if (isEdit.value && fishControlStore.currentFish?.id === form.id) {
       const updatedFish = allFish.value.find((f) => f.id === form.id)
       if (updatedFish) {
-        fishControlStore.setCurrentFish(updatedFish as unknown as StoreFish)
+        const oldFish = fishControlStore.currentFish
+        const newFish = updatedFish as unknown as StoreFish
+
+        const ipChanged = oldFish.satcomIp !== newFish.satcomIp
+        const portChanged = oldFish.satcomPort1 !== newFish.satcomPort1
+
+        fishControlStore.setCurrentFish(newFish)
+
+        if (ipChanged || portChanged) {
+          ElMessage.info(t('screen.reconnecting'))
+          // 手动断开旧连接，避免 store.disconnect() 清除 currentFish
+          if (oldFish.satcomIp && oldFish.satcomPort1) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            void (window.api as any).tcp.disconnect(oldFish.satcomIp, oldFish.satcomPort1)
+          }
+          setTimeout(() => {
+            void fishControlStore.connect()
+          }, 500)
+        }
       }
     }
 
@@ -817,17 +841,17 @@ function formatDate(input?: string | Date | null): string {
             <el-table :data="form.track" border stripe style="width: 100%" size="small">
               <el-table-column :label="t('history.lon')">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.0001"
-                    :precision="4" controls-position="right" />
+                  <el-input-number v-model="form.track[$index].lon" :min="-180" :max="180" :step="0.000001"
+                    :precision="6" controls-position="right" />
                 </template>
               </el-table-column>
               <el-table-column :label="t('history.lat')">
                 <template #default="{ $index }">
-                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.0001" :precision="4"
-                    controls-position="right" />
+                  <el-input-number v-model="form.track[$index].lat" :min="-90" :max="90" :step="0.000001"
+                    :precision="6" controls-position="right" />
                 </template>
               </el-table-column>
-              <el-table-column :label="t('history.height')">
+              <el-table-column :label="t('history.alt')">
                 <template #default="{ $index }">
                   <el-input-number v-model="form.track[$index].alt" :min="0" :step="0.01" :precision="2" controls-position="right" />
                 </template>
