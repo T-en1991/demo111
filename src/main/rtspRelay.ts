@@ -2,6 +2,7 @@
 // Electron 主进程：RTSP 转 WebSocket 推流服务
 import { spawn } from 'child_process'
 import { WebSocketServer, WebSocket } from 'ws'
+import ffmpegPath from 'ffmpeg-static'
 
 // 管理多个RTSP中继实例
 const relays = new Map<number, WebSocketServer>()
@@ -11,7 +12,7 @@ export interface RtspRelayOptions {
   wsPort?: number
 }
 
-export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOptions) {
+export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOptions): Promise<void> {
   // 检查是否提供了rtspUrl
   if (!rtspUrl) {
     console.warn('No RTSP URL provided, skipping RTSP relay startup')
@@ -84,7 +85,9 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
       console.error('FFmpeg spawn error:', err)
       try {
         ws.close()
-      } catch {}
+      } catch (e) {
+        console.error('Error closing WebSocket:', e)
+      }
     })
     child.on('close', (code) => {
       console.log('ffmpeg process closed, code', code)
@@ -102,7 +105,7 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
   console.log(`RTSP relay started. RTSP: ${finalRtspUrl} => ws://localhost:${wsPort}/`)
 }
 
-export function stopRtspRelay(wsPort?: number) {
+export function stopRtspRelay(wsPort?: number): void {
   if (wsPort && relays.has(wsPort)) {
     // 关闭特定端口的服务器
     const wss = relays.get(wsPort)!
