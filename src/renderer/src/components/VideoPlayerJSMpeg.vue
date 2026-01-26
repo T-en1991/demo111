@@ -40,7 +40,7 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 // @ts-ignore: No types for @cycjimmy/jsmpeg-player, safe to ignore for runtime import
 import JSMpeg from '@cycjimmy/jsmpeg-player'
 
@@ -94,24 +94,41 @@ function syncProgress(): void {
 
 
 onMounted(() => {
-  if (videoContainer.value) {
-    player = new JSMpeg.VideoElement(videoContainer.value, props.url, {
-      autoplay: true,
-      audio: true,
-      loop: true,
-      control: true
-    })
-    // Set initial volume
-    setTimeout(() => {
-      if (player && player.player) {
-        player.player.volume = volume.value
-        syncProgress()
-      }
-    }, 500)
-    // Poll progress
-    progressTimer = setInterval(syncProgress, 500)
+  if (videoContainer.value && props.url) {
+    initPlayer()
   }
 })
+
+// 监听 url 变化，重新初始化播放器
+watch(() => props.url, (newUrl) => {
+  if (newUrl) {
+    if (player && player.destroy) {
+      player.destroy()
+    }
+    initPlayer()
+  }
+})
+
+function initPlayer(): void {
+  if (!videoContainer.value || !props.url) return
+
+  player = new JSMpeg.VideoElement(videoContainer.value, props.url, {
+    autoplay: true,
+    audio: true,
+    loop: true,
+    control: true
+  })
+  // Set initial volume
+  setTimeout(() => {
+    if (player && player.player) {
+      player.player.volume = volume.value
+      syncProgress()
+    }
+  }, 500)
+  // Poll progress
+  if (progressTimer) clearInterval(progressTimer)
+  progressTimer = setInterval(syncProgress, 500)
+}
 
 onBeforeUnmount(() => {
   if (progressTimer) clearInterval(progressTimer)

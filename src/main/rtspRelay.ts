@@ -27,7 +27,7 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
     console.log('WebSocket client connected')
     //const ffmpegCmd = resolveFfmpegPath()
     const ffmpegBin = ffmpegPath ? ffmpegPath.replace('app.asar', 'app.asar.unpacked') : 'ffmpeg'
-    
+//'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
     console.log(`Using FFmpeg binary at: ${ffmpegBin}`)
 
     const child = spawn(

@@ -1035,6 +1035,7 @@ type VideoMode = 'microwaveMono' | 'microwaveStereo' | 'starlinkMono' | 'starlin
 const videoDialogVisible = ref(false)
 const videoMode = ref<VideoMode>('microwaveMono')
 const videoLoading = ref(false)
+const videoUrl = ref('')
 
 // 切换视频流的封装逻辑
 async function switchVideoStream(mode: VideoMode): Promise<void> {
@@ -1053,6 +1054,9 @@ async function switchVideoStream(mode: VideoMode): Promise<void> {
     )
 
     if (result.success) {
+      if (result.wsPort) {
+        videoUrl.value = `ws://localhost:${result.wsPort}/`
+      }
       console.log(`已切换到${mode}视频流`)
     } else {
       console.error('切换RTSP流类型失败:', result.message)
