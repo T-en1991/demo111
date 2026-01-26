@@ -39,6 +39,9 @@ export function registerRtspIpc(): void {
         if (!fish) {
           throw new Error(`未找到ID为 ${fishId} 的机器鱼配置`)
         }
+        
+        logger.info(`查找到机器鱼配置: ID=${fish.id}, Name=${fish.name}, RTSP=${fish.rtspUrl}, RTSP2=${fish.rtsp2}`)
+
         // 根据流类型选择对应的RTSP URL
         let actualRtspUrl: string
         switch (selectedStreamType) {
@@ -59,6 +62,9 @@ export function registerRtspIpc(): void {
             actualRtspUrl = fish.rtspUrl || 'rtsp://localhost:8554/live'
             break
         }
+
+        logger.info(`最终选用的RTSP URL: ${actualRtspUrl} (类型: ${selectedStreamType})`)
+
 
         logger.info(`尝试启动RTSP流: ${actualRtspUrl} (类型: ${selectedStreamType}) 到端口 ${wsPort}`)
         await startRtspRelay({ rtspUrl: actualRtspUrl, wsPort })

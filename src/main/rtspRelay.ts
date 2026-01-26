@@ -26,8 +26,12 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket client connected')
     //const ffmpegCmd = resolveFfmpegPath()
+    const ffmpegBin = ffmpegPath ? ffmpegPath.replace('app.asar', 'app.asar.unpacked') : 'ffmpeg'
+    
+    console.log(`Using FFmpeg binary at: ${ffmpegBin}`)
+
     const child = spawn(
-      process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+      ffmpegBin,
       [
         '-rtsp_transport',
         'tcp',
@@ -59,14 +63,21 @@ export async function startRtspRelay({ rtspUrl, wsPort = 8085 }: RtspRelayOption
         '30',
         'pipe:1'
       ],
-      { stdio: ['ignore', 'pipe', 'ignore'] }
+      { stdio: ['ignore', 'pipe', 'pipe'] }
     )
     const out = child.stdout
+    const err = child.stderr
+
     if (out) {
       out.on('data', (data) => {
         if (ws.readyState === ws.OPEN) {
           ws.send(data)
         }
+      })
+    }
+    if (err) {
+      err.on('data', (data) => {
+        console.error(`[FFmpeg stderr] ${data.toString()}`)
       })
     }
     child.on('error', (err) => {
