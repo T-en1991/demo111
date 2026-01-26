@@ -34,12 +34,11 @@ export function registerRtspIpc(): void {
         const selectedStreamType = streamType || 'microwaveMono'
 
         // 从数据库获取机器鱼配置
-        const fishs = await fishService.findAll()
+        const fish = await fishService.findById(fishId)
 
-        if (fishs.length == 0) {
+        if (!fish) {
           throw new Error(`未找到ID为 ${fishId} 的机器鱼配置`)
         }
-        const fish = fishs[0]
         // 根据流类型选择对应的RTSP URL
         let actualRtspUrl: string
         switch (selectedStreamType) {

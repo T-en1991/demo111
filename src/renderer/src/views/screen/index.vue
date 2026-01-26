@@ -1400,7 +1400,7 @@ onUnmounted((): void => {
         :element-loading-text="t('screen.switchVideo')"
         element-loading-background="rgba(0, 0, 0, 0.8)">
         <template v-if="showVideoPlayer">
-          <VideoPlayerJSMpeg url="ws://localhost:8085/" />
+          <VideoPlayerJSMpeg :url="videoUrl" />
         </template>
         <template v-else>
           <div class="video-placeholder">
