@@ -33,7 +33,9 @@ export class CommandGenerator {
     cmd: IridiumCommandType,
     params: string[] = []
   ): string {
-    const id = String(targetId).padStart(2, '0') // 假设 ID 是两位数，如 01
+    // 假设 targetId 是 fishCode (e.g. 01) 或者 acousticId
+    // 用户示例: ID=01
+    const id = String(targetId).padStart(2, '0')
     
     if (cmd === IridiumCommandType.PIC_START) {
       // PICSTART ID=01 filename

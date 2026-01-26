@@ -41,10 +41,11 @@ export interface AcousticEvent {
 }
 
 export interface IridiumEvent {
-  type: 'SURF' | 'IMAGE_CHUNK' | 'UNKNOWN'
+  type: 'SURF' | 'IMAGE_CHUNK' | 'PIC_START' | 'UNKNOWN'
   raw: string
   id?: string
   timestamp?: string
   csq?: number
   data?: any
+  filename?: string
 }

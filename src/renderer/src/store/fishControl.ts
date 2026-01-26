@@ -234,7 +234,9 @@ export const useFishControlStore = defineStore(
       if (reconnectTimers.has(fishId)) return
 
       console.log(`[Store] Starting auto-reconnect for fish ${fishId}...`)
-      const timer = window.setInterval(async () => {
+
+      // Define the reconnect task
+      const reconnectTask = async () => {
         const status = connectionStates.value.get(fishId)
         if (status === 'connected') {
           stopReconnect(fishId)
@@ -248,9 +250,15 @@ export const useFishControlStore = defineStore(
 
         console.log(`[Store] Auto-reconnecting fish ${fishId}...`)
         await connect(fishId)
-      }, 5000)
+      }
 
+      // Start interval
+      const timer = window.setInterval(reconnectTask, 5000)
       reconnectTimers.set(fishId, timer)
+
+      // Trigger immediately for better UI feedback
+      // We use void to not await it here, preventing blocking
+      void reconnectTask()
     }
 
     function stopReconnect(fishId: number): void {
@@ -566,7 +574,7 @@ export const useFishControlStore = defineStore(
             await waitFor((data) => {
                 const s = data.toString()
                 return s.includes('CMD-OK') && s.includes(seq)
-            }, 5000)
+            }, 15000)
           } catch (e) {
             throw e
           }
@@ -591,13 +599,40 @@ export const useFishControlStore = defineStore(
       const onStatus = (window.api as any).tcp.onStatus(({ ip, port, status }) => {
         // TCP status update (connected/disconnected) affects ALL fish sharing this IP/Port
         for (const fish of fishMap.value.values()) {
-            if (fish.satcomIp === ip && fish.satcomPort1 === port) {
+            // Use loose comparison or string conversion to be safe
+            if (String(fish.satcomIp) === String(ip) && Number(fish.satcomPort1) === Number(port)) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                connectionStates.value.set(fish.id, status as any)
-                console.log(`[Store] Connection status for ${fish.name} (${fish.id}): ${status}`)
+                const newStatus = status as any
+                // Only update if changed to avoid redundant triggers, OR force if it's connected
+                // (to ensure UI sync)
+                const oldStatus = connectionStates.value.get(fish.id)
 
-                if (status === 'connected') {
+                if (oldStatus !== newStatus) {
+                    connectionStates.value.set(fish.id, newStatus)
+                    console.log(`[Store] Connection status updated for ${fish.name} (${fish.id}): ${oldStatus} -> ${newStatus}`)
+                }
+
+                if (newStatus === 'connected') {
+                    // Ensure we stop reconnecting if we are now connected
                     stopReconnect(fish.id)
+                    // Force set again to be sure (in case oldStatus === newStatus but we want to confirm)
+                    if (oldStatus !== 'connected') {
+                         connectionStates.value.set(fish.id, 'connected')
+                    }
+                } else if (newStatus === 'disconnected') {
+                    // Check if this was an unexpected disconnection
+                    // If the previous state was 'connected' or 'connecting', it implies we wanted to be connected.
+                    // User manual disconnect sets state to 'disconnected' BEFORE calling backend disconnect?
+                    // Let's check the disconnect action: it sets 'disconnected' AFTER calling backend.
+                    // So if we receive 'disconnected' event, and our local state is still 'connected',
+                    // it means the backend/network dropped connection unexpectedly.
+                    const currentState = connectionStates.value.get(fish.id)
+                    if (currentState === 'connected' || currentState === 'connecting') {
+                        console.log(`[Store] Unexpected disconnection for ${fish.name}, triggering reconnect...`)
+                        // Update state to reflect reality
+                        connectionStates.value.set(fish.id, 'disconnected')
+                        startReconnect(fish.id)
+                    }
                 }
             }
         }

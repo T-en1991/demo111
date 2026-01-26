@@ -15,6 +15,9 @@ export class ProtocolParser {
   // 铱星图片分片头: I A4C1 1/19 CRC=... NAME=...
   private static IRIDIUM_CHUNK_HEADER_REGEX = /^I\s+([A-F0-9]+)\s+(\d+)\/(\d+)\s*(?:CRC=([A-F0-9]+)\s+)?(?:NAME=([\w\d_.]+))?(?:\s+([A-Za-z0-9+/=]+))?$/
 
+  // PICSTART ID=01 filename
+  private static PICSTART_REGEX = /^PICSTART\s+ID=(\w+)\s+(.*)$/i
+
   // 纯 Base64 数据行
   private static BASE64_REGEX = /^[A-Za-z0-9+/=]+$/
 
@@ -96,7 +99,18 @@ export class ProtocolParser {
       }
     }
 
-    // 2. Image Chunk Header
+    // 2. PICSTART
+    const picStartMatch = data.match(this.PICSTART_REGEX)
+    if (picStartMatch) {
+        return {
+            type: 'PIC_START',
+            raw: data,
+            id: picStartMatch[1],
+            filename: picStartMatch[2].trim()
+        }
+    }
+
+    // 3. Image Chunk Header
     const chunkMatch = data.match(this.IRIDIUM_CHUNK_HEADER_REGEX)
     if (chunkMatch) {
         const hasInlineData = !!chunkMatch[6]
