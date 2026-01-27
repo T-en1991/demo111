@@ -24,7 +24,9 @@ export default {
     volume: 'Volume',
     language: 'Language',
     connect: 'Connect',
-    disconnect: 'Disconnect'
+    disconnect: 'Disconnect',
+    show: 'Show',
+    hide: 'Hide'
   },
   home: {
     title: 'OceanFish Console',

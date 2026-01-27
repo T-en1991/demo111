@@ -24,7 +24,9 @@ export default {
     volume: '音量',
     language: '语言',
     connect: '连接',
-    disconnect: '断开'
+    disconnect: '断开',
+    show: '显示',
+    hide: '隐藏'
   },
   home: {
     title: 'OceanFish 控制台',

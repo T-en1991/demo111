@@ -123,8 +123,8 @@ export const useFishControlStore = defineStore(
       }
     })
 
-    let cleanupListeners: (() => void)[] = []
-    let reconnectTimers = new Map<number, number>()
+    const cleanupListeners: (() => void)[] = []
+    const reconnectTimers = new Map<number, number>()
 
     // --- Actions ---
 
@@ -311,6 +311,10 @@ export const useFishControlStore = defineStore(
       } else {
         // We set it to connected here, but initListeners also handles it via 'status' event
         // connectionStates.value.set(targetId, 'connected')
+        // Force set to connected to ensure UI updates immediately,
+        // even if the backend doesn't emit a status change event (e.g. already connected)
+        connectionStates.value.set(targetId, 'connected')
+        stopReconnect(targetId)
       }
     }
 

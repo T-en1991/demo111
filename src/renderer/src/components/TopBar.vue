@@ -27,23 +27,23 @@ const allFishStatus = computed(() => {
   if (fishControlStore.fishMap instanceof Map) {
       for (const fish of fishControlStore.fishMap.values()) {
           const status = fishControlStore.connectionStates.get(fish.id) || 'disconnected'
-          let statusText = t('common.disconnected')
+          let statusText = t('topbar.disconnected')
           let type = 'info'
           let icon = Connection
 
           switch (status) {
             case 'connected':
-              statusText = t('common.connected')
+              statusText = t('topbar.connected')
               type = 'success'
               icon = Link
               break
             case 'connecting':
-              statusText = t('common.connecting')
+              statusText = t('topbar.connecting')
               type = 'warning'
               icon = Connection // Loading handled by class
               break
             case 'error':
-              statusText = t('common.error')
+              statusText = t('topbar.error')
               type = 'danger'
               icon = Connection
               break
@@ -79,7 +79,7 @@ const currentFishStatus = computed(() => {
   if (fishControlStore.currentFish) {
       // If not in allFishStatus list for some reason, construct it
       return {
-          text: t('common.disconnected'),
+          text: t('topbar.disconnected'),
           name: fishControlStore.currentFish.name,
           status: 'disconnected'
       }
@@ -224,7 +224,7 @@ function exitApp(): void {
                         {{ t('common.connect') }}
                     </el-button>
                     <!-- Connected state: show text -->
-                    <span v-else class="text-connected">{{ t('common.connected') }}</span>
+                    <span v-else class="text-connected">{{ item.statusText }}</span>
                 </div>
             </div>
             <div v-if="allFishStatus.length === 0" class="empty-tip">
