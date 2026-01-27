@@ -41,9 +41,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 // @ts-ignore: No types for @cycjimmy/jsmpeg-player, safe to ignore for runtime import
 import JSMpeg from '@cycjimmy/jsmpeg-player'
 
+const { t } = useI18n()
 const props = defineProps<{ url: string }>()
 const videoContainer = ref<HTMLElement | null>(null)
 let player: any = null

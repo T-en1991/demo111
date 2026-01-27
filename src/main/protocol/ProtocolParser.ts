@@ -1,4 +1,5 @@
 import { AcousticEvent, IridiumEvent } from './types'
+import logger from '../logger'
 
 export class ProtocolParser {
   // 声通正则: +++AT:98:RECVIM,58,2,1,ack,786623,-19,265,0.0012,ID=01;C=01;IMG=...
@@ -44,8 +45,14 @@ export class ProtocolParser {
       // 真正的 payload 从第 4 个逗号后开始，或者我们看关键字
       const payloadStr = parts.slice(4).join(',') // 简单处理
 
-      if (payloadStr.includes('ID=') && payloadStr.includes('IMG=')) {
+      if (payloadStr.includes('ID=') && payloadStr.includes('IMG=') && payloadStr.includes('POS=')) {
          return { type: 'ALARM', raw: data, srcId: src, payload: payloadStr }
+      }
+      if (payloadStr.includes('IMG=')) {
+          const missing: string[] = []
+          if (!payloadStr.includes('ID=')) missing.push('ID=')
+          if (!payloadStr.includes('POS=')) missing.push('POS=')
+          logger.warn(`[ProtocolParser] Potential ALARM rejected. Missing: ${missing.join(', ')}. Payload: ${payloadStr}`)
       }
       if (payloadStr.includes('CMD-OK')) {
         return { type: 'CMD_ACK', raw: data, srcId: src, payload: payloadStr }

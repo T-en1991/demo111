@@ -125,7 +125,19 @@ export function registerTcpIpc(): void {
                   // const idMatch = payloadStr.match(/ID=([^;]+)/) // unused
                   const cMatch = payloadStr.match(/C=([^;]+)/)
                   const imgMatch = payloadStr.match(/IMG=([^;]+)/)
-                  const posMatch = payloadStr.match(/POS=([^,]+),([^;|\s]+)/)
+                  // Improved POS regex: allow spaces, handle signs/decimals
+                  const posMatch = payloadStr.match(/POS=\s*([-+]?[\d.]+)\s*,\s*([-+]?[\d.]+)/)
+
+                  logger.info(`[TCP] Processing ALARM: payload=${payloadStr}`)
+
+                  if (!imgMatch) {
+                      logger.warn(`[TCP] ALARM ignored: IMG missing in payload`)
+                      return
+                  }
+                  if (!posMatch) {
+                      logger.warn(`[TCP] ALARM ignored: POS missing or invalid format`)
+                      return
+                  }
 
                   // const id = idMatch ? idMatch[1] : undefined // This is fishCode, usually matches acousticId logic but not always
                   const c = cMatch ? cMatch[1] : undefined
@@ -203,6 +215,12 @@ export function registerTcpIpc(): void {
                         logger.warn(`[TCP] Cannot send toast: mainWindow not found`)
                      }
 
+                     // Skip persisting CMD_ACK and UNKNOWN to avoid cluttering the alerts table
+                     if (event.type === 'CMD_ACK' || event.type === 'UNKNOWN') {
+                        return
+                     }
+
+                     // Persist as info
                      await alertService.create({
                          title: title,
                         message: event.raw,

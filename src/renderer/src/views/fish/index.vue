@@ -730,12 +730,12 @@ function formatDate(input?: string | Date | null): string {
 
     <el-card v-loading="loading" class="table-card" shadow="never">
       <el-table :data="allFish" border stripe style="width: 100%" height="560">
-        <el-table-column prop="fishCode" label="鱼ID" min-width="100" />
-        <el-table-column prop="acousticId" label="声通鱼端ID" min-width="120" />
+        <el-table-column prop="fishCode" :label="t('fish.id')" min-width="100" />
+        <el-table-column prop="acousticId" :label="t('fish.acousticId')" min-width="120" />
         <el-table-column prop="name" :label="t('fish.name')" min-width="160" />
-        <el-table-column prop="showOnMap" label="地图显示" min-width="100">
+        <el-table-column prop="showOnMap" :label="t('fish.showOnMap')" min-width="100">
           <template #default="{ row }">
-            <el-tag :type="row.showOnMap ? 'success' : 'info'">{{ row.showOnMap ? '显示' : '隐藏' }}</el-tag>
+            <el-tag :type="row.showOnMap ? 'success' : 'info'">{{ row.showOnMap ? t('common.show') : t('common.hide') }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" :label="t('fish.createdAt')" min-width="160">
@@ -763,30 +763,30 @@ function formatDate(input?: string | Date | null): string {
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="鱼ID">
-              <el-input v-model="form.fishCode" placeholder="请输入鱼ID" style="width: 100%" />
+            <el-form-item :label="t('fish.id')">
+              <el-input v-model="form.fishCode" :placeholder="t('fish.placeholderId')" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="声通鱼端ID">
-              <el-input v-model="form.acousticId" placeholder="请输入声通鱼端ID" style="width: 100%" />
+            <el-form-item :label="t('fish.acousticId')">
+              <el-input v-model="form.acousticId" :placeholder="t('fish.placeholderAcousticId')" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
         <!-- 第二行：地图显示与初始位置 -->
         <el-row :gutter="12">
           <el-col :span="8">
-            <el-form-item label="地图显示">
+            <el-form-item :label="t('fish.showOnMap')">
               <el-switch v-model="form.showOnMap" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="初始经度">
+            <el-form-item :label="t('fish.initialLon')">
               <el-input-number v-model="form.initialLon" :precision="7" :step="0.0000001" controls-position="right" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="初始纬度">
+            <el-form-item :label="t('fish.initialLat')">
               <el-input-number v-model="form.initialLat" :precision="7" :step="0.0000001" controls-position="right" style="width: 100%" />
             </el-form-item>
           </el-col>
@@ -877,7 +877,7 @@ function formatDate(input?: string | Date | null): string {
           <el-input v-model="form.rtspUrl" placeholder="rtsp://..." />
         </el-form-item>
         <el-form-item :label="t('fish.rtspStereo')">
-          <el-input v-model="form.rtsp2" placeholder="rtsp://... (第二路, 可选)" />
+          <el-input v-model="form.rtsp2" :placeholder="t('fish.placeholderRtsp2')" />
         </el-form-item>
         <el-form-item :label="t('fish.starlinkMono')">
           <el-input v-model="form.starlinkRtspMono" placeholder="rtsp://..." />

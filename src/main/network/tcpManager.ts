@@ -155,7 +155,19 @@ export function startListenerForFish(fishId: number, ip: string, port: number): 
                 // payload string is like: "786623,-19,265,0.0012,ID=01;C=01;IMG=fm_20260121_101154.jpg;POS=32.0000,135.0000"
                 const payload = event.payload
                 const filenameMatch = payload.match(/IMG=([^;]+)/)
-                const posMatch = payload.match(/POS=([^,]+),([^;\s]+)/)
+                // Improved POS regex
+                const posMatch = payload.match(/POS=\s*([-+]?[\d.]+)\s*,\s*([-+]?[\d.]+)/)
+
+                logger.info(`[TCP Manager] Processing ALARM: payload=${payload}`)
+
+                if (!filenameMatch) {
+                    logger.warn(`[TCP Manager] ALARM ignored: IMG missing in payload`)
+                    return
+                }
+                if (!posMatch) {
+                    logger.warn(`[TCP Manager] ALARM ignored: POS missing or invalid format`)
+                    return
+                }
 
                 alertData.title = `Alarm from device (Protocol)`
                 alertData.type = 'alarm'
@@ -194,6 +206,11 @@ export function startListenerForFish(fishId: number, ip: string, port: number): 
                   // Other events like CMD_ACK, NAV_SUCCESS
                   alertData.title = `Event: ${event.type}`
                   alertData.message = event.raw
+                  // Skip persisting CMD_ACK and UNKNOWN
+                  if (event.type === 'CMD_ACK' || event.type === 'UNKNOWN') {
+                      return
+                  }
+
                   // Persist as info
                   try {
                     await alertService.create({

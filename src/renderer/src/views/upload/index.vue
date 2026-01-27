@@ -75,7 +75,7 @@ async function selectAlarmFolder(): Promise<void> {
 // Import alarm data from selected folder
 async function importAlarmData(): Promise<void> {
   if (!selectedFishId.value) {
-    ElMessage.warning('请先选择机器鱼')
+    ElMessage.warning(t('login.placeholderRobot'))
     return
   }
   if (!selectedAlarmFolder.value) {
@@ -108,7 +108,7 @@ async function importAlarmData(): Promise<void> {
 // Save videos but auto-detect camera type from filename prefix (mcam=mono, bcam=stereo)
 async function saveVideosWithCamera(forceCamera: 'mono' | 'stereo' | 'unknown'): Promise<void> {
   if (!selectedFishId.value) {
-    ElMessage.warning('请先选择机器鱼')
+    ElMessage.warning(t('login.placeholderRobot'))
     return
   }
   const files = videoFiles.value
@@ -210,7 +210,7 @@ async function chooseFiles(): Promise<void> {
 // Import all selected files sequentially and show aggregated results
 async function importSelectedFiles(): Promise<void> {
   if (!selectedFishId.value) {
-    ElMessage.warning('请先选择机器鱼')
+    ElMessage.warning(t('login.placeholderRobot'))
     return
   }
   if (!dataFiles.value.length) {
@@ -325,8 +325,8 @@ async function openWifiOff(): Promise<void> {
     <el-card class="upload-card" shadow="hover">
       <div class="top-bar">
         <div class="fish-select">
-          <span>选择机器鱼：</span>
-          <el-select v-model="selectedFishId" placeholder="请选择机器鱼" style="width: 240px">
+          <span>{{ t('login.selectRobot') }}:</span>
+          <el-select v-model="selectedFishId" :placeholder="t('login.placeholderRobot')" style="width: 240px">
             <el-option
               v-for="fish in fishList"
               :key="fish.id"
@@ -374,7 +374,7 @@ async function openWifiOff(): Promise<void> {
         <el-tab-pane :label="t('upload.dataUpload')" name="data">
           <div class="upload-inline">
             <div class="upload-box">
-              <div class="el-upload__text">{{ t('upload.selectData') }} (支持 .xlsx, .xls, .csv)</div>
+              <div class="el-upload__text">{{ t('upload.selectData') }} {{ t('upload.fileTypeHint') }}</div>
               <div style="margin-top: 12px; display: flex; gap: 8px">
                 <el-button type="primary" @click="chooseFiles">{{ t('upload.selectFile') }}</el-button>
                 <el-button type="primary" @click="importSelectedFiles" :disabled="!dataFiles.length">{{ t('upload.import') }}</el-button>
@@ -411,7 +411,7 @@ async function openWifiOff(): Promise<void> {
                   <span>{{ t('upload.selectedFolder', { path: selectedAlarmFolder }) }}</span>
                 </div>
                 <div v-if="alarmFiles.length > 0" class="list-body">
-                  <div class="sub-title">包含报警文件：</div>
+                  <div class="sub-title">{{ t('upload.content') || '内容' }}：</div>
                   <ul>
                     <li v-for="f in alarmFiles" :key="'a:' + f.name">
                       <span class="name" :title="f.name">{{ f.name }}</span>

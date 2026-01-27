@@ -186,7 +186,7 @@ function exitApp(): void {
         <!-- 下拉列表内容 -->
         <div class="connection-list">
             <div class="list-header">
-                <span>{{ t('store.fishControl.connectionManager') || '连接管理' }}</span>
+                <span>{{ t('topbar.connectionManager') }}</span>
             </div>
             <div
                 v-for="item in allFishStatus"
@@ -221,10 +221,10 @@ function exitApp(): void {
                         class="btn-connect"
                         @click="(e) => toggleConnection(item.id, item.status, e)"
                     >
-                        {{ t('common.connect') || '连接' }}
+                        {{ t('common.connect') }}
                     </el-button>
                     <!-- Connected state: show text -->
-                    <span v-else class="text-connected">{{ t('common.connected') || '已连接' }}</span>
+                    <span v-else class="text-connected">{{ t('common.connected') }}</span>
                 </div>
             </div>
             <div v-if="allFishStatus.length === 0" class="empty-tip">
@@ -235,7 +235,7 @@ function exitApp(): void {
 
       <el-dropdown trigger="click" @command="handleLanguage">
         <el-button circle plain>
-          {{ locale === 'zh-CN' ? '中文' : 'En' }}
+          {{ locale === 'zh-CN' ? t('common.language') : 'En' }}
         </el-button>
         <template #dropdown>
           <el-dropdown-menu>

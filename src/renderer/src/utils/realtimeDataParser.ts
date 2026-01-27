@@ -270,7 +270,7 @@ export class StatDataStrategy implements DataParseStrategy {
             depth,
             altitude: height,
             battery,
-            acoustic: signalStrength > -80 ? 'strong' : signalStrength > -100 ? 'medium' : 'weak',
+            acoustic: signalStrength > 100 ? 'strong' : 'weak',
             lng: lon,
             lat,
             lastUpdated: Date.now()

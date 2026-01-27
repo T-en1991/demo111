@@ -2,6 +2,16 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
 // 最小离线适配层，提供与当前页面使用一致的 BMap API 子集
+
+class Size {
+  width: number
+  height: number
+  constructor(width: number, height: number) {
+    this.width = width
+    this.height = height
+  }
+}
+
 class Point {
   lng: number
   lat: number
@@ -11,13 +21,131 @@ class Point {
   }
 }
 
+class Icon {
+  icon: L.Icon
+  constructor(url: string, size: Size, opts?: { imageSize?: Size; anchor?: Size }) {
+    this.icon = L.icon({
+      iconUrl: url,
+      iconSize: [size.width, size.height],
+      iconAnchor: opts?.anchor ? [opts.anchor.width, opts.anchor.height] : undefined
+    })
+  }
+}
+
+class Label {
+  content: string
+  opts?: { offset?: Size }
+  style?: Record<string, string>
+  private _update?: () => void
+
+  constructor(content: string, opts?: { offset?: Size }) {
+    this.content = content
+    this.opts = opts
+  }
+
+  setStyle(style: Record<string, string>): void {
+    this.style = style
+    this._update?.()
+  }
+
+  setContent(content: string): void {
+    this.content = content
+    this._update?.()
+  }
+
+  _bindUpdate(fn: () => void): void {
+    this._update = fn
+  }
+}
+
 class Marker {
   private marker: L.Marker
-  constructor(point: Point) {
-    this.marker = L.marker([point.lat, point.lng])
+  private label?: Label
+
+  constructor(point: Point, opts?: { icon?: Icon }) {
+    const options: L.MarkerOptions = {}
+    if (opts?.icon) {
+      options.icon = opts.icon.icon
+    }
+    this.marker = L.marker([point.lat, point.lng], options)
   }
+
   addTo(map: L.Map): void {
     this.marker.addTo(map)
+  }
+
+  setPosition(point: Point): void {
+    this.marker.setLatLng([point.lat, point.lng])
+  }
+
+  setIcon(icon: Icon): void {
+    this.marker.setIcon(icon.icon)
+  }
+
+  setZIndex(zIndex: number): void {
+    this.marker.setZIndexOffset(zIndex)
+  }
+
+  setLabel(label: Label): void {
+    this.label = label
+    this.updateLabel()
+    label._bindUpdate(() => this.updateLabel())
+  }
+
+  getLabel(): Label | undefined {
+    return this.label
+  }
+
+  private updateLabel(): void {
+    if (!this.label) return
+    let contentHtml = this.label.content
+    if (this.label.style) {
+      const styleStr = Object.entries(this.label.style)
+        .map(([k, v]) => `${k}:${v}`)
+        .join(';')
+      contentHtml = `<div style="${styleStr}">${this.label.content}</div>`
+    }
+    // Leaflet tooltip allows HTML content
+    this.marker.unbindTooltip()
+    this.marker.bindTooltip(contentHtml, {
+      permanent: true,
+      direction: 'right',
+      offset: this.label.opts?.offset
+        ? [this.label.opts.offset.width, this.label.opts.offset.height]
+        : [0, 0],
+      className: 'offline-label-reset' // Optional: a class to reset leaflet styles if needed
+    })
+  }
+
+  addEventListener(event: string, handler: () => void): void {
+    this.marker.on(event, handler)
+  }
+
+  remove(): void {
+    this.marker.remove()
+  }
+}
+
+class Polyline {
+  private polyline: L.Polyline
+  constructor(
+    points: Point[],
+    opts?: { strokeColor?: string; strokeWeight?: number; strokeOpacity?: number }
+  ) {
+    this.polyline = L.polyline(
+      points.map((p) => [p.lat, p.lng]),
+      {
+        color: opts?.strokeColor,
+        weight: opts?.strokeWeight,
+        opacity: opts?.strokeOpacity
+      }
+    )
+  }
+  addTo(map: L.Map): void {
+    this.polyline.addTo(map)
+  }
+  remove(): void {
+    this.polyline.remove()
   }
 }
 
@@ -37,19 +165,14 @@ class Map {
   private map: L.Map
   constructor(container: string | HTMLElement) {
     const el =
-      typeof container === 'string'
-        ? (document.getElementById(container) as HTMLElement)
-        : container
+      typeof container === 'string' ? (document.getElementById(container) as HTMLElement) : container
     this.map = L.map(el, { zoomControl: false, scrollWheelZoom: false })
-    // 设置深色背景，避免无瓦片时呈现默认灰色
     el.style.background = '#1e2030'
-    // 尝试加载本地瓦片（如不存在则仍可使用空背景进行点位标注）
     const template = getLocalTileUrlTemplate()
     if (template) {
       try {
         L.tileLayer(template, { maxZoom: 18, minZoom: 3, crossOrigin: true }).addTo(this.map)
       } catch (err) {
-        // 忽略瓦片加载错误，继续提供基础交互
         void err
       }
     }
@@ -75,16 +198,33 @@ class Map {
   addOverlay(overlay: { addTo: (map: L.Map) => void }): void {
     overlay?.addTo?.(this.map)
   }
+  removeOverlay(overlay: { remove: () => void }): void {
+    overlay?.remove?.()
+  }
 }
 
 export async function loadOfflineBMap(): Promise<{
   Map: typeof Map
   Point: typeof Point
+  Size: typeof Size
+  Icon: typeof Icon
+  Label: typeof Label
   Marker: typeof Marker
+  Polyline: typeof Polyline
   NavigationControl: typeof NavigationControl
   ScaleControl: typeof ScaleControl
 }> {
-  const BMap = { Map, Point, Marker, NavigationControl, ScaleControl }
+  const BMap = {
+    Map,
+    Point,
+    Size,
+    Icon,
+    Label,
+    Marker,
+    Polyline,
+    NavigationControl,
+    ScaleControl
+  }
   ;(window as unknown as { BMap?: typeof BMap }).BMap = BMap
   return BMap
 }
