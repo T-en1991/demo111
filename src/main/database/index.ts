@@ -20,7 +20,7 @@ const prisma = new PrismaClient({
   log: isDev ? ['query', 'info', 'warn', 'error'] : ['error']
 })
 
-async function initTables() {
+async function initTables(): Promise<void> {
   const sqls = [
     `CREATE TABLE IF NOT EXISTS "users" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +32,8 @@ async function initTables() {
     `CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");`,
     `CREATE TABLE IF NOT EXISTS "fish" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "deviceId" INTEGER NOT NULL DEFAULT 0,
+    "acousticId" TEXT NOT NULL DEFAULT '',
+    "fishCode" TEXT,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL DEFAULT 'default',
     "ip" TEXT,
@@ -44,8 +45,8 @@ async function initTables() {
     "satcomIp" TEXT,
     "satcomPort1" INTEGER,
     "satcomPort2" INTEGER,
-    "microwaveIp" TEXT,
-    "microwavePort" INTEGER,
+    "serialPortPath" TEXT,
+    "serialBaudRate" INTEGER,
     "acousticLon" REAL,
     "acousticLat" REAL,
     "showOnMap" BOOLEAN NOT NULL DEFAULT 1,
@@ -72,7 +73,7 @@ async function initTables() {
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS "fish_deviceId_key" ON "fish"("deviceId");`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS "fish_acousticId_key" ON "fish"("acousticId");`,
     `CREATE TABLE IF NOT EXISTS "alerts" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "title" TEXT NOT NULL,
@@ -152,6 +153,41 @@ async function initTables() {
   logger.info('Database tables initialized successfully')
 }
 
+async function checkAndPatchSchema(): Promise<void> {
+  try {
+    // Check columns in 'fish' table
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const columns: any[] = await prisma.$queryRaw`PRAGMA table_info(fish);`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const columnNames = columns.map((c: any) => c.name)
+
+    if (!columnNames.includes('acousticId')) {
+      logger.info('Patching schema: Adding acousticId to fish table')
+      await prisma.$executeRawUnsafe(`ALTER TABLE "fish" ADD COLUMN "acousticId" TEXT NOT NULL DEFAULT '';`)
+      await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "fish_acousticId_key" ON "fish"("acousticId");`)
+    }
+
+    if (!columnNames.includes('fishCode')) {
+      logger.info('Patching schema: Adding fishCode to fish table')
+      await prisma.$executeRawUnsafe(`ALTER TABLE "fish" ADD COLUMN "fishCode" TEXT;`)
+    }
+
+    if (!columnNames.includes('serialPortPath')) {
+      logger.info('Patching schema: Adding serialPortPath to fish table')
+      await prisma.$executeRawUnsafe(`ALTER TABLE "fish" ADD COLUMN "serialPortPath" TEXT;`)
+    }
+
+    if (!columnNames.includes('serialBaudRate')) {
+      logger.info('Patching schema: Adding serialBaudRate to fish table')
+      await prisma.$executeRawUnsafe(`ALTER TABLE "fish" ADD COLUMN "serialBaudRate" INTEGER;`)
+    }
+
+    logger.info('Schema check and patch completed')
+  } catch (e) {
+    logger.error('Failed to check/patch schema:', e)
+  }
+}
+
 // 确保数据库连接正常
 export async function connectDatabase(): Promise<void> {
   try {
@@ -187,6 +223,7 @@ export async function connectDatabase(): Promise<void> {
     // 二次确认：检查表是否存在
     try {
       await prisma.$queryRaw`SELECT 1 FROM fish LIMIT 1`
+      await checkAndPatchSchema()
     } catch (e) {
       logger.warn('Database connected but tables not found, executing SQL initialization...')
       await initTables()
