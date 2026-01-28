@@ -18,7 +18,7 @@ const allFishStatus = computed(() => {
   // 强制依赖收集：访问 connectionStates 的 size 或其他属性以确保响应式
   // 这行代码虽然看起来没用，但能确保当 Map 内部变化时 computed 重新计算
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _dep = fishControlStore.connectionStates.size
+  void fishControlStore.connectionStates.size
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const list: Array<{ id: number; name: string; status: string; statusText: string; type: string; icon: any }> = []

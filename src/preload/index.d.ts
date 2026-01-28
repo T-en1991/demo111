@@ -46,6 +46,7 @@ declare global {
       }
       video: {
         create(data: {
+          fishId?: number | null
           path: string
           name: string
           size?: number | null
@@ -179,6 +180,12 @@ declare global {
         delete(id: number): Promise<Fish>
         deleteMany(ids: number[]): Promise<Prisma.BatchPayload>
         seed(count: number): Promise<Prisma.BatchPayload>
+        sendCommand(
+          id: number,
+          protocol: string,
+          command: string,
+          params?: any
+        ): Promise<{ success: boolean; error?: string }>
       }
       systemLog: {
         create(data: { content: string; type: string; time?: string }): Promise<any>

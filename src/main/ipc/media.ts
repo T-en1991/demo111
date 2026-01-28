@@ -14,7 +14,7 @@ function getFfmpegPath(): string {
 export function registerMediaIpc(): void {
   ipcMain.handle('media:transcode', async (_, filePath: string) => {
     logger.info(`[media:transcode] Request to transcode: ${filePath}`)
-    
+
     if (!filePath || !existsSync(filePath)) {
       throw new Error(`File not found: ${filePath}`)
     }
@@ -43,7 +43,7 @@ export function registerMediaIpc(): void {
         outputPath
       ])
 
-      ffmpeg.stderr.on('data', (data) => {
+      ffmpeg.stderr.on('data', () => {
         // ffmpeg writes progress to stderr
         // logger.debug(`[ffmpeg] ${data}`)
       })

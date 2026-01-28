@@ -409,9 +409,9 @@ export const useFishControlStore = defineStore(
 
       // Ensure connection if acoustic
       if (protocol === 'acoustic') {
-        if (connectionStatus.value !== 'connected') {
+        if ((connectionStatus.value as string) !== 'connected') {
           await connect(fish.id)
-          if (connectionStatus.value !== 'connected') return
+          if ((connectionStatus.value as string) !== 'connected') return
         }
       }
 
@@ -776,9 +776,9 @@ export const useFishControlStore = defineStore(
       }
       const fishId = currentFish.value.id
 
-      if (connectionStatus.value !== 'connected') {
+      if ((connectionStatus.value as string) !== 'connected') {
         await connect(fishId)
-        if (connectionStatus.value !== 'connected') return
+        if ((connectionStatus.value as string) !== 'connected') return
       }
 
       try {
@@ -837,6 +837,7 @@ export const useFishControlStore = defineStore(
       pick: ['activeFishId', 'fishMap'], // Persist active ID and cache
       storage: localStorage,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // @ts-ignore
       afterRestore: (ctx: any) => {
         // Convert plain object back to Map if needed
         if (ctx.store.fishMap && !(ctx.store.fishMap instanceof Map)) {

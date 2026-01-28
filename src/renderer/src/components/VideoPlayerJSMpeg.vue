@@ -41,14 +41,17 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+// import { useI18n } from 'vue-i18n'
 // @ts-ignore: No types for @cycjimmy/jsmpeg-player, safe to ignore for runtime import
 import JSMpeg from '@cycjimmy/jsmpeg-player'
 
+/*
 const { t } = useI18n()
+*/
 const props = defineProps<{ url: string }>()
 const videoContainer = ref<HTMLElement | null>(null)
 let player: any = null
+/*
 const isPlaying = ref(false)
 const progress = ref(0)
 const duration = ref(0)
@@ -93,6 +96,7 @@ function syncProgress(): void {
   duration.value = player.player.duration || 0
   isPlaying.value = player.player.isPlaying
 }
+*/
 
 
 onMounted(() => {
@@ -121,6 +125,7 @@ function initPlayer(): void {
     control: true
   })
   // Set initial volume
+  /*
   setTimeout(() => {
     if (player && player.player) {
       player.player.volume = volume.value
@@ -130,10 +135,11 @@ function initPlayer(): void {
   // Poll progress
   if (progressTimer) clearInterval(progressTimer)
   progressTimer = setInterval(syncProgress, 500)
+  */
 }
 
 onBeforeUnmount(() => {
-  if (progressTimer) clearInterval(progressTimer)
+  // if (progressTimer) clearInterval(progressTimer)
   if (player && player.destroy) player.destroy()
 })
 </script>
