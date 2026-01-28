@@ -220,9 +220,9 @@ export default {
     checkConnect: 'Failed to switch video stream, please check connection',
     surfSuccessAlert: 'Surf Success\nTime: {time}\nCSQ: {csq}',
     trackSaved: 'Trajectory saved, starting navigation flow',
-    initialTarget: 'Target',
-    setInitialTarget: 'Set Initial Target',
-    initialTargetSent: 'Initial target sent: {lon}, {lat}'
+    initialTarget: 'Initial Point',
+    setInitialTarget: 'Set Initial Point',
+    initialTargetSent: 'Initial point sent: {lon}, {lat}'
   },
   upload: {
     title: 'Upload Data',

@@ -220,9 +220,9 @@ export default {
     checkConnect: '切换视频流失败，请检查连接',
     surfSuccessAlert: '上浮成功\n时间：{time}\nCSQ：{csq}',
     trackSaved: '轨迹已保存，开始执行导航流程',
-    initialTarget: '初始目标点',
-    setInitialTarget: '设置初始目标点',
-    initialTargetSent: '初始目标点指令已发送'
+    initialTarget: '初始点',
+    setInitialTarget: '设置初始点',
+    initialTargetSent: '初始点指令已发送'
   },
   upload: {
     title: '上传数据',

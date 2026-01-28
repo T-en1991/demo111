@@ -233,7 +233,7 @@ function exitApp(): void {
         </div>
       </el-popover>
 
-      <el-dropdown trigger="click" @command="handleLanguage">
+      <el-dropdown trigger="click" @command="handleLanguage" v-if="false">
         <el-button circle plain>
           {{ locale === 'zh-CN' ? t('common.language') : 'En' }}
         </el-button>
