@@ -562,9 +562,9 @@ function updateGamepads(): void {
 
     // 优先级：上浮/下潜 > 前后 > 左右
     if (Math.abs(axisSurfDive) > DEADZONE) {
-      // Axis 3: > 0.5 下潜 (Dive), < -0.5 上浮 (Surf)
-      if (axisSurfDive > DEADZONE) cmd = 'dive'
-      else if (axisSurfDive < -DEADZONE) cmd = 'surf'
+      // Axis 3: > 0.5 下潜 (Down), < -0.5 上浮 (Up)
+      if (axisSurfDive > DEADZONE) cmd = 'down'
+      else if (axisSurfDive < -DEADZONE) cmd = 'up'
     } else if (Math.abs(axisForwardBack) > DEADZONE) {
       // Axis 1: > 0.5 向后/返航 (Return), < -0.5 向前 (Forward)
       if (axisForwardBack > DEADZONE) cmd = '' // 向后映射为返航
@@ -595,11 +595,11 @@ function updateGamepads(): void {
         case 'right':
           moveRight()
           break
-        case 'surf':
-          controlSurf()
+        case 'up':
+          controlUp()
           break
-        case 'dive':
-          controlDive()
+        case 'down':
+          controlDown()
           break
         case 'lightOn':
           setLight(true)
