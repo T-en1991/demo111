@@ -23,7 +23,10 @@ interface TrackPoint {
 
 const appStore = useAppStore()
 const fishControlStore = useFishControlStore()
-const GOOGLE_KEY ='AIzaSyA56Ui2ldmHWWwPMQXfGWX69hBnbFLKpMI'
+const GOOGLE_KEY =
+  typeof import.meta.env.VITE_GOOGLE_MAPS_API_KEY === 'string'
+    ? import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    : ''
 // 使用项目静态资源作为标注图标
 const fishIconUrl = new URL('../../assets/images/fish.svg', import.meta.url).href
 

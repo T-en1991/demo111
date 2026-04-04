@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="google.maps" />
 
 // 为 Vue 单文件组件提供类型声明，避免 `import '*.vue'` 报错
 declare module '*.vue' {
@@ -17,13 +18,18 @@ declare global {
 
     // @ts-ignore: 在全局声明中使用 import() 类型引用以避免运行时依赖，TypeScript 在此处的模块合并可能出现误报；忽略一次以允许 window.api 的类型合并
 
-    // 百度地图 WebGL 全局对象挂载到 window
-    BMapGL?: unknown
-    // 百度地图 2D 版本全局对象备用
+    /** 离线地图适配层仍挂载伪 BMap（Leaflet） */
     BMap?: unknown
-    // 百度地图 2D 回调（通过 script 的 callback 参数触发）
-    __on_bmap_init?: () => void
+    /** Google Maps JS API（脚本加载完成后存在） */
+    google?: typeof google
+    __on_google_maps_init?: () => void
   }
 }
+
+interface ImportMetaEnv {
+  readonly VITE_GOOGLE_MAPS_API_KEY?: string
+}
+
+export type RendererImportMetaEnvKeys = keyof ImportMetaEnv
 
 export {}
