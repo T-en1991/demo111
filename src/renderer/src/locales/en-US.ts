@@ -222,7 +222,11 @@ export default {
     trackSaved: 'Trajectory saved, starting navigation flow',
     initialTarget: 'Initial Point',
     setInitialTarget: 'Set Initial Point',
-    initialTargetSent: 'Initial point sent: {lon}, {lat}'
+    initialTargetSent: 'Initial point sent: {lon}, {lat}',
+    mapCoordPopupTitle: 'Picked location',
+    copyPickedCoords: 'Copy coordinates',
+    copyMapCoordsSuccess: 'Copied (longitude, latitude, 7 decimals)',
+    copyMapCoordsFail: 'Copy failed; check clipboard permission'
   },
   upload: {
     title: 'Upload Data',

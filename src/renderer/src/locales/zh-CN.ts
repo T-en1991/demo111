@@ -222,7 +222,11 @@ export default {
     trackSaved: '轨迹已保存，开始执行导航流程',
     initialTarget: '初始点',
     setInitialTarget: '设置初始点',
-    initialTargetSent: '初始点指令已发送'
+    initialTargetSent: '初始点指令已发送',
+    mapCoordPopupTitle: '拾取坐标',
+    copyPickedCoords: '复制经纬度',
+    copyMapCoordsSuccess: '已复制到剪贴板（经度, 纬度，7 位小数）',
+    copyMapCoordsFail: '复制失败，请检查剪贴板权限'
   },
   upload: {
     title: '上传数据',

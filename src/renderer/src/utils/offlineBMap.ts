@@ -163,6 +163,7 @@ class ScaleControl {
 
 class Map {
   private map: L.Map
+  private pickPopup: L.Popup | null = null
   constructor(container: string | HTMLElement) {
     const el =
       typeof container === 'string' ? (document.getElementById(container) as HTMLElement) : container
@@ -200,6 +201,24 @@ class Map {
   }
   removeOverlay(overlay: { remove: () => void }): void {
     overlay?.remove?.()
+  }
+  closePickPopup(): void {
+    if (this.pickPopup) {
+      this.map.closePopup(this.pickPopup)
+      this.pickPopup = null
+    }
+  }
+  openPickPopup(lat: number, lng: number, el: HTMLElement): void {
+    this.closePickPopup()
+    this.pickPopup = L.popup({
+      className: 'map-coord-leaflet-popup',
+      closeButton: true,
+      autoPan: true,
+      maxWidth: 280
+    })
+      .setLatLng([lat, lng])
+      .setContent(el)
+    this.pickPopup.openOn(this.map)
   }
 }
 

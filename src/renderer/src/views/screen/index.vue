@@ -53,6 +53,8 @@ type BMapLikeMap = {
   addOverlay: (overlay: unknown) => void
   removeOverlay: (overlay: unknown) => void
   setMapType?: (type: unknown) => void
+  openPickPopup?: (lat: number, lng: number, el: HTMLElement) => void
+  closePickPopup?: () => void
 }
 
 interface BMap2DApi {
@@ -152,6 +154,110 @@ let screenMapMode: ScreenMapMode = null
 let googleMap: google.maps.Map | null = null
 const markersGoogle: Map<number, google.maps.Marker> = new Map()
 let currentPolylineGoogle: google.maps.Polyline | null = null
+
+let googleMapClickListener: google.maps.MapsEventListener | null = null
+let pickInfoWindow: google.maps.InfoWindow | null = null
+
+function closeMapPickPopup(): void {
+  if (pickInfoWindow !== null) {
+    pickInfoWindow.close()
+    pickInfoWindow = null
+  }
+  mapInstance?.closePickPopup?.()
+}
+
+async function copyCoordsLiteral(lon: number, lat: number): Promise<void> {
+  const text = `${lon.toFixed(7)}, ${lat.toFixed(7)}`
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(t('screen.copyMapCoordsSuccess'))
+  } catch {
+    ElMessage.error(t('screen.copyMapCoordsFail'))
+  }
+}
+
+function buildMapCoordPopupEl(lon: number, lat: number): HTMLElement {
+  const wrap = document.createElement('div')
+  wrap.className = 'map-coord-popup'
+
+  const titleEl = document.createElement('div')
+  titleEl.className = 'map-coord-popup__title'
+  titleEl.textContent = t('screen.mapCoordPopupTitle')
+
+  const rows = document.createElement('div')
+  rows.className = 'map-coord-popup__rows'
+
+  const makeRow = (label: string, valueText: string): HTMLDivElement => {
+    const row = document.createElement('div')
+    row.className = 'map-coord-popup__row'
+    const lab = document.createElement('span')
+    lab.className = 'map-coord-popup__label'
+    lab.textContent = label
+    const val = document.createElement('span')
+    val.className = 'map-coord-popup__value'
+    val.textContent = valueText
+    row.append(lab, val)
+    return row
+  }
+
+  rows.append(
+    makeRow(t('history.lon'), `${lon.toFixed(6)}°`),
+    makeRow(t('history.lat'), `${lat.toFixed(6)}°`)
+  )
+
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'map-coord-popup__btn'
+  btn.textContent = t('screen.copyPickedCoords')
+  btn.addEventListener('click', (ev) => {
+    ev.stopPropagation()
+    void copyCoordsLiteral(lon, lat)
+  })
+
+  wrap.append(titleEl, rows, btn)
+  return wrap
+}
+
+function showMapPickPopup(lng: number, lat: number): void {
+  closeMapPickPopup()
+  const el = buildMapCoordPopupEl(lng, lat)
+  if (screenMapMode === 'google' && googleMap) {
+    pickInfoWindow = new google.maps.InfoWindow({
+      content: el,
+      pixelOffset: new google.maps.Size(0, -8)
+    })
+    pickInfoWindow.setPosition({ lat, lng })
+    pickInfoWindow.open({ map: googleMap, shouldFocus: false })
+    pickInfoWindow.addListener('closeclick', () => {
+      pickInfoWindow = null
+    })
+  } else if (mapInstance?.openPickPopup) {
+    mapInstance.openPickPopup(lat, lng, el)
+  }
+}
+
+function unbindMapPickClick(): void {
+  if (googleMapClickListener !== null) {
+    google.maps.event.removeListener(googleMapClickListener)
+    googleMapClickListener = null
+  }
+  closeMapPickPopup()
+}
+
+function bindMapPickClick(): void {
+  unbindMapPickClick()
+  if (screenMapMode === 'google' && googleMap) {
+    googleMapClickListener = googleMap.addListener('click', (e: google.maps.MapMouseEvent) => {
+      const ll = e.latLng
+      if (!ll) return
+      showMapPickPopup(ll.lng(), ll.lat())
+    })
+  } else if (mapInstance) {
+    mapInstance.addEventListener('click', (e) => {
+      showMapPickPopup(e.point.lng, e.point.lat)
+    })
+  }
+}
 
 function getBMap(): BMap2DApi | undefined {
   const w = window as { BMap?: BMap2DApi }
@@ -1317,6 +1423,7 @@ async function init(): Promise<void> {
 
     renderMarkers()
     renderTrajectory()
+    bindMapPickClick()
 
     pollTimer = window.setInterval((): void => {
       void refreshAll()
@@ -1336,6 +1443,7 @@ async function init(): Promise<void> {
 }
 
 onUnmounted((): void => {
+  unbindMapPickClick()
   if (pollTimer) {
     clearInterval(pollTimer)
     pollTimer = null
