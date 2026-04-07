@@ -21,6 +21,7 @@ export enum AcousticCommandType {
   POS = 'POS',
   WIFI = 'WIFI',
   WIFI_OFF = 'WIFIOFF',
+  STOP = 'STOP',
   TARGET_POINT = 'P1', // 提供目标点
   TARGET_END = 'PE'    // 目标点结束
 }

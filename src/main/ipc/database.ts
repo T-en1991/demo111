@@ -84,6 +84,7 @@ export function registerDatabaseIpc(): void {
         lightOffCommand?: string | null
         wifiCommand?: string | null
         wifiOffCommand?: string | null
+        stopCommand?: string | null
         manualCommand?: string | null
         exitManualCommand?: string | null
         returnCommand?: string | null
@@ -142,6 +143,7 @@ export function registerDatabaseIpc(): void {
         lightOffCommand?: string | null
         wifiCommand?: string | null
         wifiOffCommand?: string | null
+        stopCommand?: string | null
         manualCommand?: string | null
         exitManualCommand?: string | null
         returnCommand?: string | null

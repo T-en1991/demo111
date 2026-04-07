@@ -68,6 +68,7 @@ model Fish {
   lightOffCommand String?
   wifiCommand     String?
   wifiOffCommand  String?
+  stopCommand     String?
   description     String?
   // 轨迹（JSON 数组：{ lon, lat, alt|null, depth|null }[]）
   track Json?

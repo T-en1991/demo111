@@ -755,6 +755,10 @@ function moveRight(): void {
   console.log('[tap] right')
   void fishControlStore.sendCommand('right')
 }
+function controlStop(): void {
+  console.log('[tap] stop')
+  void fishControlStore.sendCommand('stop')
+}
 
 
 
@@ -783,6 +787,7 @@ const controlUpDebounced = debounce(controlUp, 300)
 const controlDownDebounced = debounce(controlDown, 300)
 const controlDiveDebounced = debounce(controlDive, 300)
 const controlSurfDebounced = debounce(controlSurf, 300)
+const controlStopDebounced = debounce(controlStop, 300)
 const enableManualDebounced = debounce(enableManual, 300)
 const enableNavigateDebounced = debounce(enableNavigate, 300)
 const setLightOnDebounced = debounce((): void => setLight(true), 300)
@@ -1441,6 +1446,10 @@ onUnmounted((): void => {
             </button>
             <button class="action-btn accent" @click="controlSurfDebounced">
               <span class="text">{{ t('screen.surf') }}</span>
+            </button>
+            <!-- 停止 -->
+            <button class="action-btn warn" @click="controlStopDebounced">
+              <span class="text">{{ t('screen.stop') }}</span>
             </button>
             <!-- 功耗与灯光 -->
             <button class="action-btn warn" @click="enableNavigateDebounced">

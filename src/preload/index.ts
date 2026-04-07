@@ -138,6 +138,7 @@ const api = {
       lightOffCommand?: string | null
       wifiCommand?: string | null
       wifiOffCommand?: string | null
+      stopCommand?: string | null
       description?: string | null
       track?: import('@prisma/client').Prisma.JsonValue | null
     }) => ipcRenderer.invoke('fish:create', data),
@@ -182,6 +183,7 @@ const api = {
         lightOffCommand?: string | null
         wifiCommand?: string | null
         wifiOffCommand?: string | null
+        stopCommand?: string | null
         description?: string | null
         track?: import('@prisma/client').Prisma.JsonValue | null
       }

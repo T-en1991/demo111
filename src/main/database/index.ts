@@ -68,6 +68,7 @@ async function initTables(): Promise<void> {
     "lightOffCommand" TEXT,
     "wifiCommand" TEXT,
     "wifiOffCommand" TEXT,
+    "stopCommand" TEXT,
     "description" TEXT,
     "track" JSONB,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -180,6 +181,11 @@ async function checkAndPatchSchema(): Promise<void> {
     if (!columnNames.includes('serialBaudRate')) {
       logger.info('Patching schema: Adding serialBaudRate to fish table')
       await prisma.$executeRawUnsafe(`ALTER TABLE "fish" ADD COLUMN "serialBaudRate" INTEGER;`)
+    }
+
+    if (!columnNames.includes('stopCommand')) {
+      logger.info('Patching schema: Adding stopCommand to fish table')
+      await prisma.$executeRawUnsafe(`ALTER TABLE "fish" ADD COLUMN "stopCommand" TEXT;`)
     }
 
     logger.info('Schema check and patch completed')
@@ -864,6 +870,7 @@ export const fishService = {
     lightOffCommand?: string | null
     wifiCommand?: string | null
     wifiOffCommand?: string | null
+    stopCommand?: string | null
     description?: string | null
     track?: Prisma.JsonValue | null
   }): Promise<Fish> {
@@ -904,6 +911,7 @@ export const fishService = {
       lightOffCommand: data.lightOffCommand ?? null,
       wifiCommand: data.wifiCommand ?? null,
       wifiOffCommand: data.wifiOffCommand ?? null,
+      stopCommand: data.stopCommand ?? null,
       description: data.description ?? null,
       track:
         data.track === undefined
@@ -1034,6 +1042,7 @@ export const fishService = {
       lightOffCommand?: string | null
       wifiCommand?: string | null
       wifiOffCommand?: string | null
+      stopCommand?: string | null
       description?: string | null
       track?: Prisma.JsonValue | null
     }

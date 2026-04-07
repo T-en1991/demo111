@@ -129,6 +129,7 @@ declare global {
           lightOffCommand?: string | null
           wifiCommand?: string | null
           wifiOffCommand?: string | null
+          stopCommand?: string | null
           description?: string | null
           track?: Prisma.InputJsonValue | null
         }): Promise<Fish>
@@ -173,6 +174,7 @@ declare global {
             lightOffCommand?: string | null
             wifiCommand?: string | null
             wifiOffCommand?: string | null
+            stopCommand?: string | null
             description?: string | null
             track?: Prisma.InputJsonValue | null
           }

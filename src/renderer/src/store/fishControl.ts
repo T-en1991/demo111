@@ -37,6 +37,7 @@ export interface Fish {
   lightOffCommand?: string | null
   wifiCommand?: string | null
   wifiOffCommand?: string | null
+  stopCommand?: string | null
   acousticLon?: number | null
   acousticLat?: number | null
 }
@@ -335,6 +336,7 @@ export const useFishControlStore = defineStore(
         | 'descend'
         | 'wifi'
         | 'wifiOff'
+        | 'stop'
         | 'dive'
     ): Promise<void> {
       const fish = currentFish.value
@@ -400,6 +402,9 @@ export const useFishControlStore = defineStore(
             break
           case 'wifiOff':
             command = 'WIFIOFF'
+            break
+          case 'stop':
+            command = 'STOP'
             break
           default:
             ElMessage.warning(`Unknown command type: ${cmdType}`)

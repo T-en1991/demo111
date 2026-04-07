@@ -38,6 +38,7 @@ interface Fish {
   lightOffCommand?: string
   wifiCommand?: string
   wifiOffCommand?: string
+  stopCommand?: string
   description?: string
   track?: TrackPoint[]
   // 额外通信参数（解析自 description 的结构化内容）
@@ -86,6 +87,7 @@ type FishFromBackend = {
   lightOffCommand?: string | null
   wifiCommand?: string | null
   wifiOffCommand?: string | null
+  stopCommand?: string | null
   description?: string | null
   // 新增：声通与微波通信参数（后端直接返回）
   satcomIp?: string | null
@@ -145,6 +147,7 @@ interface FishForm {
   cmdLightOff: string
   cmdWifi: string
   cmdWifiOff: string
+  cmdStop: string
   description: string
   track: TrackPoint[]
 }
@@ -253,6 +256,7 @@ async function loadFish(): Promise<void> {
         lightOffCommand: f.lightOffCommand ?? undefined,
         wifiCommand: f.wifiCommand ?? undefined,
         wifiOffCommand: f.wifiOffCommand ?? undefined,
+        stopCommand: f.stopCommand ?? undefined,
         description: typeof extra.text === 'string' ? extra.text : (f.description ?? undefined),
         track: toTrackPoints(f.track as unknown),
         // 额外通信参数：优先使用后端字段，其次兼容旧的 description JSON
@@ -335,6 +339,7 @@ const form = reactive<FishForm>({
   cmdLightOff: '',
   cmdWifi: '',
   cmdWifiOff: '',
+  cmdStop: '',
   description: '',
   track: []
 })
@@ -365,6 +370,7 @@ watch(
     form.cmdLightOff = generateCmd('LIGHTOFF', id)
     form.cmdWifi = generateCmd('WIFI', id)
     form.cmdWifiOff = generateCmd('WIFIOFF', id)
+    form.cmdStop = generateCmd('STOP', id)
   }
 )
 
@@ -403,6 +409,7 @@ function openCreate(): void {
     cmdLightOff: '',
     cmdWifi: '',
     cmdWifiOff: '',
+    cmdStop: '',
     description: '',
     track: []
   })
@@ -448,6 +455,7 @@ function openEdit(row: Fish): void {
     cmdLightOff: row.lightOffCommand ?? '',
     cmdWifi: row.wifiCommand ?? '',
     cmdWifiOff: row.wifiOffCommand ?? '',
+    cmdStop: row.stopCommand ?? '',
     description: row.description ?? '',
     track: (row.track ?? []).map((p) => ({ ...p }))
   })
@@ -561,6 +569,7 @@ async function save(): Promise<void> {
         lightOffCommand: form.cmdLightOff || null,
         wifiCommand: form.cmdWifi || null,
         wifiOffCommand: form.cmdWifiOff || null,
+        stopCommand: form.cmdStop || null,
         // 描述仅保存纯文本
         description: form.description || null,
         track: form.track.length
@@ -609,6 +618,7 @@ async function save(): Promise<void> {
         lightOffCommand: form.cmdLightOff || null,
         wifiCommand: form.cmdWifi || null,
         wifiOffCommand: form.cmdWifiOff || null,
+        stopCommand: form.cmdStop || null,
         // 描述仅保存纯文本
         description: form.description || null,
         track: form.track.length
