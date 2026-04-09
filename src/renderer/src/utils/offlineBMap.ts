@@ -86,7 +86,12 @@ class Marker {
     this.marker.setZIndexOffset(zIndex)
   }
 
-  setLabel(label: Label): void {
+  setLabel(label: Label | null): void {
+    if (!label) {
+      this.label = undefined
+      this.marker.unbindTooltip()
+      return
+    }
     this.label = label
     this.updateLabel()
     label._bindUpdate(() => this.updateLabel())

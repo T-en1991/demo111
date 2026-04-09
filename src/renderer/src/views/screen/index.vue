@@ -38,7 +38,7 @@ type BMapMarker = {
   setIcon: (icon: unknown) => void
   setZIndex: (index: number) => void
   getLabel: () => BMapLabel | null
-  setLabel: (label: BMapLabel) => void
+  setLabel: (label: BMapLabel | null) => void
   addEventListener: (event: string, handler: () => void) => void
 }
 
@@ -268,22 +268,12 @@ function getBMap(): BMap2DApi | undefined {
 }
 
 function fishIconGoogle(isSelected: boolean): google.maps.Icon {
-  const s = isSelected ? 48 : 32
-  const a = isSelected ? 24 : 16
+  const s = isSelected ? 112 : 84
+  const a = s / 2
   return {
     url: fishIconUrl,
     scaledSize: new google.maps.Size(s, s),
     anchor: new google.maps.Point(a, a)
-  }
-}
-
-function fishLabelGoogle(name: string, isSelected: boolean): google.maps.MarkerLabel {
-  return {
-    text: name,
-    className: isSelected ? 'fish-map-lbl fish-map-lbl--sel' : 'fish-map-lbl fish-map-lbl--def',
-    color: isSelected ? '#ffffff' : '#eeeeee',
-    fontSize: isSelected ? '14px' : '12px',
-    fontWeight: isSelected ? 'bold' : 'normal'
   }
 }
 
@@ -333,14 +323,13 @@ function renderMarkersGoogle(): void {
       marker.setPosition({ lat: r.lat, lng: r.lng })
       marker.setIcon(icon)
       marker.setZIndex(zIndex)
-      marker.setLabel(fishLabelGoogle(r.name, isSelected))
+      marker.setLabel(null)
     } else {
       marker = new google.maps.Marker({
         map,
         position: { lat: r.lat, lng: r.lng },
         icon,
         zIndex: zIndex,
-        label: fishLabelGoogle(r.name, isSelected),
         optimized: false
       })
       marker.addListener('click', () => {
@@ -558,92 +547,26 @@ function renderMarkers(): void {
     // 图标样式
     let icon
     if (isSelected) {
-      // 绿色/选中：使用 fishIcon (大)
-      icon = new BMap.Icon(fishIconUrl, new BMap.Size(48, 48), {
-        imageSize: new BMap.Size(48, 48),
-        anchor: new BMap.Size(24, 24)
+      icon = new BMap.Icon(fishIconUrl, new BMap.Size(112, 112), {
+        imageSize: new BMap.Size(112, 112),
+        anchor: new BMap.Size(56, 56)
       })
     } else {
-      // 未选中：也使用 fishIcon (小)
-      icon = new BMap.Icon(fishIconUrl, new BMap.Size(32, 32), {
-        imageSize: new BMap.Size(32, 32),
-        anchor: new BMap.Size(16, 16)
+      icon = new BMap.Icon(fishIconUrl, new BMap.Size(84, 84), {
+        imageSize: new BMap.Size(84, 84),
+        anchor: new BMap.Size(42, 42)
       })
     }
 
     let marker = markers.get(r.id)
     if (marker) {
-      // 更新位置和图标
       marker.setPosition(point)
       marker.setIcon(icon)
       marker.setZIndex(zIndex)
-      // 更新 Label
-      const label = marker.getLabel()
-      if (label) {
-        label.setContent(r.name)
-        label.setStyle(
-          isSelected
-            ? {
-                color: '#ffffff',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                border: '2px solid transparent',
-                borderRadius: '6px',
-                background:
-                  'linear-gradient(#1f2230, #1f2230) padding-box, linear-gradient(135deg, #00C6FB 0%, #005BEA 100%) border-box',
-                padding: '4px 8px',
-                boxShadow: '0 2px 10px rgba(0, 91, 234, 0.5)',
-                zIndex: '1000'
-              }
-            : {
-                color: '#eeeeee',
-                fontWeight: 'normal',
-                fontSize: '12px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: '4px',
-                background: 'rgba(0,0,0,0.6)',
-                padding: '2px 4px',
-                boxShadow: 'none',
-                zIndex: 'auto'
-              }
-        )
-      }
+      marker.setLabel(null)
     } else {
-      // 创建新标注
       marker = new BMap.Marker(point, { icon })
       marker.setZIndex(zIndex)
-
-      // 添加 Label
-      const label = new BMap.Label(r.name, {
-        offset: new BMap.Size(-20, -25)
-      })
-      label.setStyle(
-        isSelected
-          ? {
-              color: '#ffffff',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              border: '2px solid transparent',
-              borderRadius: '6px',
-              background:
-                'linear-gradient(#1f2230, #1f2230) padding-box, linear-gradient(135deg, #00C6FB 0%, #005BEA 100%) border-box',
-              padding: '4px 8px',
-              boxShadow: '0 2px 10px rgba(0, 91, 234, 0.5)',
-              zIndex: '1000'
-            }
-          : {
-              color: '#eeeeee',
-              fontWeight: 'normal',
-              fontSize: '12px',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '4px',
-              background: 'rgba(0,0,0,0.6)',
-              padding: '2px 4px',
-              boxShadow: 'none',
-              zIndex: 'auto'
-            }
-      )
-      marker.setLabel(label)
 
       // 点击事件：选中
       marker.addEventListener('click', () => {
