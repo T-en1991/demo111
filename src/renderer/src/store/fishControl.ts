@@ -678,10 +678,22 @@ export const useFishControlStore = defineStore(
             port,
             updateStatus: (status: FishTelemetry) => {
               const prev = fishStates.value.get(fish.id) || {}
-              fishStates.value.set(fish.id, {
+              const mergedStatus = {
                 ...prev,
                 ...status
-              } as FishTelemetry)
+              } as FishTelemetry
+
+              console.log('[fishControl][realtime] status update', {
+                fishId: fish.id,
+                fishName: fish.name,
+                prevLng: (prev as FishTelemetry).lng,
+                prevLat: (prev as FishTelemetry).lat,
+                nextLng: mergedStatus.lng,
+                nextLat: mergedStatus.lat,
+                payloadKeys: Object.keys(status)
+              })
+
+              fishStates.value.set(fish.id, mergedStatus)
             }
           })
 

@@ -95,6 +95,7 @@ const toTrackPoints = (json: unknown): TrackPoint[] => {
     const depthRaw = o.depth
     const altNum = altRaw === null || altRaw === undefined ? null : Number(altRaw)
     const depthNum = depthRaw === null || depthRaw === undefined ? null : Number(depthRaw)
+    console.log(`[screen][toTrackPoints] lon: ${lon}, lat: ${lat}, alt: ${altNum}, depth: ${depthNum}`)
     return {
       lon: Number.isFinite(lon) ? lon : 0,
       lat: Number.isFinite(lat) ? lat : 0,
@@ -1358,7 +1359,10 @@ async function init(): Promise<void> {
     bindMapPickClick()
 
     pollTimer = window.setInterval((): void => {
-      void refreshAll()
+      console.log(`[screen][poll] refreshAll tick @ ${new Date().toISOString()}`)
+      void refreshAll().catch((err) => {
+        console.error('[screen][poll] refreshAll failed:', err)
+      })
     }, 3000)
 
     await fetchAlertsAndUpdate()
